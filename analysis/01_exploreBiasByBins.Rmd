@@ -1,0 +1,175 @@
+---
+title: "01_exploreBiasByBins"
+author: "Caitlin Page"
+date: "2024-09-05"
+output: workflowr::wflow_html
+editor_options: 
+  chunk_output_type: inline
+---
+chunk_output_type: console
+## Introduction
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(ChIPseqSpikeInFree)
+library(biovizBase)
+library(BSgenome.Hsapiens.UCSC.hg19)
+```
+
+```{r}
+wgbs_counts <- readRDS("output/wgbs_counts.rds")
+bsseq_res <- readRDS("output/bsseq_res.rds")
+bsseq_dmrs <- readRDS("output/bsseq_dmrs.rds")
+```
+
+# What bin size to choose?
+
+```{r}
+bsseq_dmrs %>%
+  ggplot(aes(x = width, colour = seqnames)) +
+  geom_density()
+```
+
+* dmrs are mostly < 2000 bp
+
+```{r shared-code}
+source("code/function_binBiasPlot.R")
+plotBiasGenomeBins(wgbs_counts, bsseq_dmrs, bin_size = 2000)
+```
+
+* explore other bin sizes
+
+```{r}
+plotBiasGenomeBins(wgbs_counts, bsseq_dmrs, bin_size = 500)
+```
+
+```{r}
+plotBiasGenomeBins(wgbs_counts, bsseq_dmrs, bin_size = 1000)
+```
+
+```{r}
+plotBiasGenomeBins(wgbs_counts, bsseq_dmrs, bin_size = 5000)
+```
+
+* prefer 2000 bp bin length
+
+```{r}
+genome_bins <- plotBiasGenomeBins(wgbs_counts, bsseq_dmrs, bin_size = 2000)
+```
+
+Questions:
+* why are some bins with high cgs have no dmrs?
+
+# Strange proportions in big bins
+Possible explanations
+* telomeres - strange things at the starts and the ends of chromosomes
+Test: plot the first and last 20 bins per chromosome - are these the bins with high cg numbers?
+
+* tail
+```{r}
+genome_bins[[1]] %>% group_by(seqnames) %>% do(tail(., n = 20)) %>% mutate(n = 1:n()) %>%
+  ggplot(aes(x = n, y = num_cg, colour = seqnames)) +
+  geom_point()
+```
+* head
+```{r}
+genome_bins[[1]] %>% group_by(seqnames) %>% do(head(., n = 20)) %>% mutate(n = 1:n()) %>%
+  ggplot(aes(x = n, y = num_cg, colour = seqnames)) +
+  geom_point()
+```
+
+Result: ends of chromosomes are not the source of high cg bins
+
+## GC content?
+
+```{r}
+genome_bins <- cbind(genome_bins[[1]], biovizBase::GCcontent(BSgenome.Hsapiens.UCSC.hg19, as_granges(genome_bins[[1]]))) %>% data.frame()
+```
+
+```{r}
+genome_bins %>%
+  ggplot(aes(x = num_cg, y = C.G, colour = has_dmr)) +
+  geom_point(alpha = 0.3)
+```
+
+```{r}
+genome_bins %>%
+  ggplot(aes(x = C.G)) +
+  geom_density()
+
+genome_bins %>%
+  ggplot(aes(x = C.G, colour = has_dmr)) +
+  geom_density()
+```
+
+```{r}
+cor.test(genome_bins$num_cg, genome_bins$C.G)
+```
+
+GC content is related to coverage
+
+## Coverage in bins
+```{r}
+counts_per_bin <- find_overlaps(as_granges(genome_bins), as_granges(wgbs_counts)) %>% data.frame()
+```
+
+```{r}
+counts_per_bin_sum <- counts_per_bin %>% group_by(num) %>% mutate(sum_nk_TM = sum(nk_C_TM), sum_nk_U1 = sum(nk_C_U1), sum_nk_UF = sum(nk_C_UF),
+                                            sum_b_TX = sum(b_C_TX), sum_b_UB = sum(b_C_UB), sum_b_UR = sum(b_C_UR)) %>% distinct(bin_pos, num, sum_nk_TM, sum_nk_U1, sum_nk_UF, sum_b_TX, sum_b_UB, sum_b_UR)
+counts_per_bin_sum$av_nk <- rowMeans(counts_per_bin_sum[,3:5])
+counts_per_bin_sum$av_b <- rowMeans(counts_per_bin_sum[,6:8])
+counts_per_bin_sum <- counts_per_bin_sum %>% ungroup() %>% data.frame()
+```
+
+```{r}
+genome_bins <- genome_bins %>% mutate(av_nk = counts_per_bin_sum[match(.$bin_pos, counts_per_bin_sum$bin_pos), "av_nk"],
+                                      av_b = counts_per_bin_sum[match(.$bin_pos, counts_per_bin_sum$bin_pos), "av_b"])
+genome_bins[is.na(genome_bins)] <- 0
+genome_bins
+```
+
+```{r}
+genome_bins %>%
+  ggplot(aes(y = av_nk, x = C.G)) +
+  geom_point(colour = "red", alpha = 0.3) +
+  geom_point(aes(y = av_b, x = C.G), colour = "black", alpha = 0.3)
+```
+```{r}
+genome_bins %>%
+  ggplot(aes(y = log2(av_nk), x = C.G)) +
+  geom_point(colour = "red", alpha = 0.3) +
+  geom_point(aes(y = log2(av_b), x = C.G), colour = "black", alpha = 0.3)
+```
+
+```{r}
+genome_bins %>% mutate(num_cg_gr_200 = ifelse(num_cg > 200, TRUE, FALSE)) %>%
+  ggplot(aes(y = av_nk, colour = num_cg_gr_200)) +
+  geom_boxplot()
+
+genome_bins %>% mutate(num_cg_gr_200 = ifelse(num_cg > 200, TRUE, FALSE)) %>%
+  ggplot(aes(x = av_nk, colour = num_cg_gr_200)) +
+  geom_density()
+```
+
+```{r}
+genome_bins[1:5000,] %>%
+  ggplot(aes(x = av_nk, y = av_b)) +
+  geom_point()
+```
+```{r}
+cor.test(genome_bins$av_nk, genome_bins$av_b)
+```
+
+## how common are these bins anyway?
+```{r}
+genome_bins %>%
+  ggplot(aes(x = num_cg)) +
+  geom_density()
+genome_bins %>%
+  ggplot(aes(x = num_cg, colour = has_dmr)) +
+  geom_density()
+```
+
