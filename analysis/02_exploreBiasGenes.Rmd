@@ -17,11 +17,47 @@ library(ggplot2)
 library(ExperimentHub)
 library(BSgenome.Hsapiens.UCSC.hg19)
 ```
+```{r}
+library(AnnotationHub)
+ah <- AnnotationHub()
+```
+```{r}
+ah$genome
+query(query(query(ah, "hg19"), "Homo sapiens"), "Ensembl genes")
+```
+```{r}
+ah_a <- ah[["AH5046"]]
+ah_a[1:5,] %>% data.frame()
+```
+```{r}
+query(query(query(ah, "hg19"), "Homo sapiens"), "UCSC genes")
+ah[["AH5036"]][1:5,] %>% data.frame()
+```
+- where is the TSS hiding??
+- dont want to have to need biomart
+
+```{r}
+#query(query(query(query(ah, "hg19"), "Homo sapiens"), "GRanges"), "GENCODE")
+```
+- ensembl, ucsc, and gencode don't give tss coords
+```{r}
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+TxDb.Hsapiens.UCSC.hg19.knownGene
+```
+```{r}
+genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
+```
+- maybe like a combination of trancripts and genes?
+- but that seems terrible
+
 
 ```{r}
 eh <- ExperimentHub()
 eh_genes <- eh[["EH3132"]]
 eh_genes
+```
+```{r}
+eh["EH3132"]
 ```
 
 ```{r}
@@ -31,7 +67,6 @@ head(unique(eh$species))
 ```{r}
 query(eh, "Homo sapiens")
 ```
-
 
 ```{r}
 wgbs_counts <- readRDS("output/wgbs_counts.rds")
@@ -300,3 +335,425 @@ anno_islands %>% mutate(has_dmr = ifelse(id %in% bseq_dmrs_cpg_isl$annot.id, TRU
 bsseq_dmrs %>% mutate(has_island = ifelse(rank %in% bseq_dmrs_cpg_isl$rank, TRUE, FALSE)) %>% group_by(has_island) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
 ```
 
+#################
+# repeat for biomart (has a tss)
+
+```{r}
+biomart_genes
+bsseq_dmrs
+```
+- overlap genes and dmrs
+
+```{r}
+find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame()
+find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% distinct(position, rank)
+find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% distinct(ensembl_gene_id, gene_name)
+```
+```{r}
+find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes), maxgap = 10000) %>% data.frame()
+find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes), maxgap = 10000) %>% data.frame() %>% distinct(position, rank)
+find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes), maxgap = 10000) %>% data.frame() %>% distinct(ensembl_gene_id, gene_name)
+```
+```{r}
+pair_nearest(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% distinct(position, rank)
+
+pair_nearest(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% group_by(position, rank) %>% summarise(n=n()) %>% .[order(.$n, decreasing = TRUE),]
+```
+- ok this gives 1-to-1 gene pairing and dmr
+- now can get distance of dmr to tss
+```{r}
+pair_nearest(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame()
+```
+- but are we gene or dmr centric?
+- probs gene because that's what we care about after
+- ok so position of dmr relative to gene
+- overlap we can get from find_overlaps
+- need to take strand into account
+- how did i do it in damsel?
+- it was a minus thing and then a case_when
+- but that dealing with 2 lots of ends, this is just tss
+
+```{r}
+pair_nearest(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% 
+  mutate(tss_start = TSS - granges.x.start, tss_end = TSS - granges.x.end) %>% .[,c(1:3,10,24:26,28,34:35)] %>%
+  mutate(tss_rel_peak = case_when(tss_start > 0 & tss_end > 0 & tss_end < tss_start ~ "Peak upstream", 
+                                  tss_start < 0 & tss_end < 0 & tss_end < tss_start ~ "Peak downstream"),
+         tss_rel_peak = case_when(tss_rel_peak == "Peak upstream" & granges.y.strand == "-" ~ "Peak downstream", 
+                                  tss_rel_peak == "Peak downstream" & granges.y.strand == "-" ~ "Peak upstream",
+                                  TRUE ~ tss_rel_peak))
+pair_nearest(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% 
+  mutate(tss_start = TSS - granges.x.start, tss_end = TSS - granges.x.end) %>% .[,c(1:3,10,24:26,28,34:35)] %>%
+  mutate(tss_rel_peak = case_when(tss_start > 0 & tss_end > 0 & tss_end < tss_start ~ "Peak upstream", 
+                                  tss_start < 0 & tss_end < 0 & tss_end < tss_start ~ "Peak downstream"),
+         tss_rel_peak = case_when(tss_rel_peak == "Peak upstream" & granges.y.strand == "-" ~ "Peak downstream", 
+                                  tss_rel_peak == "Peak downstream" & granges.y.strand == "-" ~ "Peak upstream",
+                                  TRUE ~ tss_rel_peak)) %>% filter(is.na(tss_rel_peak))
+```
+```{r}
+find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% filter(gene_name == "DOK3")
+```
+- ok the nas as suspected seem to match  the overlaps
+```{r}
+overlap_biomart_dmr <- find_overlaps(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% 
+  mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
+```
+
+- i think i may have more na's than i think
+- so more overlaps
+- but pair_nearest does 1-to-1
+- find overlaps does not
+- so want to match the exact
+
+```{r}
+anno_biomart_dmr <- pair_nearest(as_granges(bsseq_dmrs), as_granges(biomart_genes)) %>% data.frame() %>% 
+  mutate(tss_start = TSS - granges.x.start, tss_end = TSS - granges.x.end, combo = paste0(ensembl_gene_id, "-DMR", rank)) %>% mutate(tss_rel_peak = ifelse(combo %in% overlap_biomart_dmr$combo, "Overlap", NA),                                              tss_rel_peak = case_when(is.na(tss_rel_peak) & tss_start > 0 & tss_end > 0 &                                                                      tss_end < tss_start ~ "Peak_upstream",
+                                  is.na(tss_rel_peak) & tss_start < 0 & tss_end < 0 & 
+                                    tss_end < tss_start ~ "Peak_downstream", TRUE ~ tss_rel_peak),
+         tss_rel_peak = case_when(tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ "Peak_downstream", 
+                                  tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ "Peak_upstream",
+                                  TRUE ~ tss_rel_peak),
+         min_dist = case_when(tss_rel_peak == "Overlap" ~ 0, 
+                              tss_rel_peak == "Peak_downstream" & granges.y.strand == "+" ~ tss_start,
+                              tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ tss_end,
+                              tss_rel_peak == "Peak_upstream" & granges.y.strand == "+" ~ tss_end,
+                              tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ tss_start))
+```
+- ok so the overlap is to the gene body not the tss in particular but still
+
+- ok now bin plot
+
+```{r}
+anno_biomart_dmr %>%
+  ggplot(aes(x = min_dist)) +
+  geom_density()
+```
+```{r}
+filter(anno_biomart_dmr, abs(min_dist) < 5000)
+```
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) < 5000)$ensembl_gene_id, TRUE, FALSE)) %>% group_by(width) %>%
+    mutate(num_bins_same_width = n()) %>%
+    group_by(width, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_width) %>%
+    distinct(width, num_bins_same_width, num_per_dmr, prop, has_dmr) %>%
+    group_by(width) %>%
+    .[order(.$width),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = width, y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) < 5000)$ensembl_gene_id, TRUE, FALSE)) %>% group_by(width) %>%
+    mutate(num_bins_same_width = n()) %>%
+    group_by(width, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_width) %>%
+    distinct(width, num_bins_same_width, num_per_dmr, prop, has_dmr) %>%
+    group_by(width) %>%
+    .[order(.$width),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = log2(width), y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+```
+- now in the way I've tried to fix it
+- this is by width remember
+- not num_cg
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) < 5000)$ensembl_gene_id, TRUE, FALSE)) %>% group_by(width) %>%
+    mutate(num_bins_same_width = n()) %>% 
+  .[order(.$width),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(width_bin_group = sum(width)) %>%
+  group_by(width_bin_group) %>%
+    mutate(num_bins_group_same_width = n()) %>%
+    group_by(width_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_width) %>%
+    distinct(width_bin_group, num_bins_group_same_width, num_per_dmr, prop, has_dmr) %>%
+    group_by(width_bin_group) %>%
+    .[order(.$width_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = width_bin_group, y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+```
+- well hello that's pretty
+
+- now with num_cg
+
+```{r}
+biomart_cg <- find_overlaps(as_granges(biomart_genes), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(ensembl_gene_id) %>% summarise(num_cg = n())
+biomart_cg <- data.frame(biomart_cg)
+```
+
+```{r}
+biomart_genes <- biomart_genes %>% mutate(num_cg = biomart_cg[match(.$ensembl_gene_id, biomart_cg$ensembl_gene_id), "num_cg"],
+                                          num_cg = ifelse(is.na(num_cg), 0, num_cg))
+anno_biomart_dmr <- anno_biomart_dmr %>% mutate(num_cg = biomart_cg[match(.$ensembl_gene_id, biomart_cg$ensembl_gene_id), "num_cg"], num_cg = ifelse(is.na(num_cg), 0, num_cg))
+```
+```{r}
+anno_biomart_dmr$rank %in% bsseq_dmrs$rank %>% summary()
+bsseq_dmrs$rank %in% filter(anno_biomart_dmr, tss_rel_peak == "Overlap")$rank %>% summary()
+```
+```{r}
+49744/69858
+```
+```{r}
+biomart_genes
+```
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) < 5000)$ensembl_gene_id, TRUE, FALSE)) %>% group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>%
+    group_by(num_cg, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_cg) %>%
+    distinct(num_cg, num_bins_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg) %>%
+    .[order(.$num_cg),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg, y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) < 5000)$ensembl_gene_id, TRUE, FALSE)) %>% group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>%
+    group_by(num_cg, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_cg) %>%
+    distinct(num_cg, num_bins_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg) %>%
+    .[order(.$num_cg),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = log2(num_cg), y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+```
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) < 5000)$ensembl_gene_id, TRUE, FALSE)) %>% group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>%
+    group_by(num_cg, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_cg) %>%
+    distinct(num_cg, num_bins_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg) %>%
+    .[order(.$num_cg),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE)
+```
+- new version
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = sum(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) < 5000)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = sum(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+```
+- ok need to be able to explain what the code does
+- in order to send off and find out if it's correct (or how wrong it is)
+- we've said if a gene has a dmr or not - and defined that by overlap (or by min dist to dmr)
+- we have num of cgs per gene
+- order the genes by that
+- group genes into bins of 100 genes
+- got sum of cgs in that group (100 genes with 0 cgs - 0 cgs)
+(side note - maybe sum is incorrect - maybe it should be something else??)
+- then treated it as before
+- so do any other bins have the sum number of cgs
+- use this to get the proportion
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = sum(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = log2(num_cg_bin_group), y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+```
+
+- no we want average - not sum
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+      geom_point(alpha = 0.4) 
+  #    geom_smooth() 
+
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = log2(num_cg_bin_group), y = prop)) +
+      geom_point(alpha = 0.4) 
+ #     geom_smooth()
+```
+- alicia likes these plots - yay!
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>% group_by(has_dmr) %>% summarise(n=n()) %>% ungroup() %>% mutate(ratio = n/sum(n))
+```
+```{r}
+biomart_genes
+```
+```{r}
+ann
+```
+
+
+```{r}
+biomart_genes %>% mutate(n_genes = n()) %>% filter(num_cg == 0) %>% mutate(n_0 = n(), ratio = n()/n_genes)
+```
+- need to be able to explain the math well
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  .[order(.$num_cg),] %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)])
+
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  .[order(.$num_cg),] %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n())
+
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  .[order(.$num_cg),] %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr)
+
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  .[order(.$num_cg),] %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE)
+```
+
+```{r}
+biomart_genes %>% group_by(gene_name) %>% summarise(n=n()) %>% .[order(.$n, decreasing = TRUE),]
+```
+```{r}
+biomart_cg
+```
+
+```{r}
+biomart_cg_full <- find_overlaps(as_granges(biomart_genes), as_granges(wgbs_counts)) %>% data.frame()
+```
+
+```{r}
+wgbs_counts[,1:4]
+```
+density = num_cg per gene/length of gene
+-islands - too definition dependent
+-ditch tss and biomart - just use start and be up 5k, down 2k
+-check against belinda's code
+-then start running goseq
