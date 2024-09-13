@@ -1,0 +1,185 @@
+---
+title: "00_obtainGenes"
+author: "Caitlin Page"
+date: "2024-09-10"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+library(AnnotationHub)
+ah <- AnnotationHub()
+```
+```{r}
+ah$genome
+query(query(query(ah, "hg19"), "Homo sapiens"), "Ensembl genes")
+```
+```{r}
+ah_a <- ah[["AH5046"]]
+ah_a[1:5,] %>% data.frame()
+```
+```{r}
+query(query(query(ah, "hg19"), "Homo sapiens"), "UCSC genes")
+ah[["AH5036"]][1:5,] %>% data.frame()
+```
+- where is the TSS hiding??
+- dont want to have to need biomart
+
+```{r}
+#query(query(query(query(ah, "hg19"), "Homo sapiens"), "GRanges"), "GENCODE")
+```
+- ensembl, ucsc, and gencode don't give tss coords
+```{r}
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+TxDb.Hsapiens.UCSC.hg19.knownGene
+```
+```{r}
+genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
+```
+- maybe like a combination of trancripts and genes?
+- but that seems terrible
+
+
+```{r}
+eh <- ExperimentHub()
+eh_genes <- eh[["EH3132"]]
+eh_genes
+```
+```{r}
+eh["EH3132"]
+```
+
+```{r}
+eh$
+head(unique(eh$species))
+```
+```{r}
+query(eh, "Homo sapiens")
+```
+- use biomart for now
+```{r}
+library(biomaRt)
+listEnsemblArchives()
+```
+```{r}
+ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", version = "GRCh37")
+```
+- need hg19 which is grch37
+```{r}
+listAttributes(ensembl)
+```
+- the old ensembl website has canonical transcript stuff
+- so why can't i find it here
+- this is annoying
+
+- but ensembl transcript is longest, most high exp, and matches other databases
+- maybe run stuff just picking a random for now lol
+```{r}
+biomart_genes <- getBM(
+        attributes = c("ensembl_gene_id", "external_gene_name", "ensembl_transcript_id",
+            "chromosome_name", "start_position", "end_position", "strand",
+            "transcription_start_site" , "transcript_start", "transcript_end", "transcript_length"),
+        filters = "chromosome_name",
+        values = gsub("chr", "", unique(wgbs_counts$seqnames)[1:22]),
+        mart = ensembl
+    )
+biomart_genes <- biomart_genes %>% .[order(.$chromosome_name, .$start_position), ]
+colnames(biomart_genes) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
+biomart_genes
+```
+```{r}
+biomart_genes %>% mutate(check_t_length = t_end - t_start, same = ifelse(t_length == check_t_length, TRUE, FALSE))  %>% group_by(same) %>% summarise(n())
+biomart_genes %>% mutate(check_t_length = t_end - t_start, same = ifelse(t_length == check_t_length, TRUE, FALSE)) %>% filter(same == TRUE)
+```
+- so the ensembl transcript length isn't taken from the start and stop
+- must be because it includes UTR's?
+- but does it change the largest transcript per gene??
+```{r}
+biomart_genes %>% mutate(check_t_length = t_end - t_start, same = ifelse(t_length == check_t_length, TRUE, FALSE), diff = check_t_length - t_length) %>% group_by(ensembl_gene_id) %>% mutate(max_trans = max(t_length), max_check = max(check_t_length), same_max = ifelse(max_trans == t_length & max_check == check_t_length, TRUE, FALSE))
+```
+- ok so that doesn't really match
+- maybe just go with the transcript length one?
+
+```{r}
+biomart_genes <- biomart_genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup() %>% mutate(seqnames = as.character(seqnames), seqnames = paste0("chr", seqnames))
+biomart_genes
+```
+```{r}
+biomart_genes %>% distinct(ensembl_gene_id) %>% nrow()
+```
+
+```{r}
+biomart_genes <- biomart_genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:n()) %>% filter(num_t == 1) %>% ungroup() 
+biomart_genes
+```
+- hold up these tss's are just matching the start site
+- that's not how it's supposed to work
+- hold up they used to be different - but seems like by picking the longest transcript - (or trying to), the tss is now same as the start
+```{r}
+biomart_genes %>% group_by(gene_name) %>% summarise(n=n()) %>% filter(n>1)
+```
+?????
+- let's ignore that
+```{r}
+biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .[order(.$gene_name),]
+```
+- ok so now bit nervous a screw up has happened because we have different ensembl-id but same gene-name
+- and lots of these are different chrom
+- i think i want to check on these before i do tss stuff
+
+```{r}
+nrow(eh_genes)
+nrow(distinct(eh_genes, gene))
+nrow(distinct(eh_genes, symbol))
+```
+```{r}
+eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% .[order(.$symbol),]
+```
+```{r}
+(eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.)) %in% (biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) %>% summary()
+(eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.)) %in% (biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) 
+```
+```{r}
+(biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) %in% (eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.)) %>% summary()
+(biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) %in% (eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.))
+```
+- so all biomart in eh_genes
+- but eh_genes has some extras
+```{r}
+biomart_genes %>% group_by(gene_name) %>% summarise(n=n()) %>% .[order(.$n, decreasing = TRUE),]
+```
+```{r}
+biomart_genes <- biomart_genes %>% group_by(gene_name) %>% mutate(num_gene_name = n()) %>% ungroup() %>% filter(num_gene_name == 1) %>% data.frame()
+biomart_genes
+```
+
+
+
+
+# found a paper that used genomicfeatures and txdb to get start sites
+- genomfeatures vignette - promoters fn is area around tss for transcript
+```{r}
+library(GenomicFeatures)
+promoters(TxDb.Hsapiens.UCSC.hg19.knownGene, upstream = 0, downstream = 0)
+```
+- except that's way more than the genes - and no way to match unless overlapping i guess
+```{r}
+genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
+transcripts(TxDb.Hsapiens.UCSC.hg19.knownGene)
+```
+- stick with biomart genes for now i think
+
+# biomart
+```{r}
+biomart_genes
+```
+
