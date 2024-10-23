@@ -1,0 +1,152 @@
+---
+title: "00_microarrayOntologyAnalysis"
+author: "Caitlin Page"
+date: "2024-09-24"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+https://www.bioconductor.org/packages/release/bioc/vignettes/missMethyl/inst/doc/missMethyl.html
+```{r}
+library(missMethyl)
+library(limma)
+library(minfi)
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r}
+#top <- topRUV(rfit4, number = Inf, p.BH = 1)
+#table(top$p.BH_X1.1 < 0.01)
+```
+```{r}
+DMPs <- readRDS("output/array_dmps.rds")
+DMPs
+```
+```{r}
+top <- DMPs %>% filter(adj.P.Val < 0.05)
+top
+```
+```{r}
+head(bVals)
+```
+
+```{r}
+#beta <- getBeta(mSet)
+beta <- bVals
+# make sure that order of beta values matches orer after analysis
+beta <- beta[match(rownames(top),rownames(beta)),]
+beta_norm <- rowMeans(beta[,7:12])
+beta_can <- rowMeans(beta[,1:6])
+Delta_beta <- beta_can - beta_norm
+sigDM <- top$adj.P.Val < 0.01 & abs(Delta_beta) > 0.25
+table(sigDM)
+```
+
+```{r}
+#topCpGs<-topRUV(rfit4,number=10000)
+topCpGs <- DMPs[1:10000,]
+sigCpGs <- rownames(topCpGs)
+sigCpGs[1:10]
+
+```
+
+```{r}
+# Check number of genes that significant CpGs are annotated to
+check <- getMappedEntrezIDs(sig.cpg = sigCpGs)
+```
+
+```{r}
+length(check$sig.eg)
+```
+
+```{r}
+gst <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
+              plot.bias=TRUE)
+```
+
+```{r}
+topGSA(gst, n=10)
+```
+
+```{r}
+gst.kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="KEGG")
+## All input CpGs are used for testing.
+topGSA(gst.kegg, n=10)
+
+```
+
+#####
+# ok we've seen the results
+now i want to know what's happening under the hood
+gometh 
+- this function gets the collection data - GO, KEGG etc
+
+everything else happens under gsameth
+-entrez ids 
+- takes names of signif cpgs
+```{r}
+mapped_genes <- getMappedEntrezIDs(rownames(top), array.type = "EPIC")
+mapped_genes
+```
+
+```{r}
+mapped_genes$fract.counts # if cpg multiple genes
+length(mapped_genes$sig.eg) # this is just entrez gene ids for signif cpgs
+length(mapped_genes$universe) # entrez gene ids for all - either from array or provided set
+data.frame(mapped_genes$freq) # entrez gene id - all of them - and number of cpgs (Freq)
+data.frame(mapped_genes$equiv) # multigene bias into account
+length(mapped_genes$de) # is each gene from universe de or not - 1 or 0
+```
+
+- for consistency with missmethyl
+- i probably want a function like this then - just for sequencing
+- or even just add sequencing to it?
+- again though all belinda's code is in base
+- i reckon maybe a function and then maybe the thing could just have a wrapper? - and add sequencing as what data type?
+- but i'll still need to do all the code because it's not like array where it's set which probes match to which genes and it's easy
+
+-they check that the genes are all in the go/kegg category
+- remove genes from go that aren't in list
+
+- then it's the nullp - bias plots and stuff
+```{r}
+pwf <- .estimatePWF(D=test.de,bias=as.vector(equiv))
+```
+
+pwf <- .estimatePWF(D=test.de,bias=as.vector(equiv))
+- so it takes vector of if gene de or not - 1 or 0, and bias with multigene mapping into account
+```{r}
+.estimatePWF <- function(D,bias)
+  # An alternative to goseq function nullp, which is transformation invariant
+  # Belinda Phipson and Gordon Smyth
+  # 6 March 2015
+{
+  prior.prob <- bias
+  o <- order(bias)
+  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
+  prior.prob
+}
+```
+
+```{r}
+?tricubeMovingAverage # moving average smoother
+```
+- similar to least squares loess curve of degree 0
+- this step is sim to goseq nullp
+- that uses monotonic spline with 6 knots
+- they did it with mgcv::pcls()
+- I assume those 2 functions are similar?
+```{r}
+?goseq::nullp
+```
+
+- then there's some compiling stuff (??)
+
+- and then hypergeometric test
+- and yes they do use BiasedUrn
