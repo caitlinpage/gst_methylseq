@@ -69,9 +69,10 @@ query(eh, "Homo sapiens")
 ```
 
 ```{r}
-wgbs_counts <- readRDS("output/wgbs_counts.rds")
-bsseq_res <- readRDS("output/bsseq_res.rds")
-bsseq_dmrs <- readRDS("output/bsseq_dmrs.rds")
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+bsseq_res <- readRDS("../output/bsseq_res.rds")
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
+bsseq_dmrs$rank <- 1:nrow(bsseq_dmrs)
 ```
 
 
@@ -748,12 +749,137 @@ biomart_cg
 ```{r}
 biomart_cg_full <- find_overlaps(as_granges(biomart_genes), as_granges(wgbs_counts)) %>% data.frame()
 ```
+```{r}
+biomart_genes
+```
 
 ```{r}
 wgbs_counts[,1:4]
 ```
+# cpg density per gene
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, density = num_cg/width)
+biomart_genes %>% mutate(width = end - start + 1, density = num_cg/width) %>% group_by(density) %>% summarise(n_match = n())
+biomart_genes %>% mutate(width = end - start + 1, density = num_cg/width) %>% 
+  group_by(density) %>% summarise(n_match = n()) %>%
+  ggplot(aes(x = density, y = n_match)) +
+  geom_point(alpha = 0.3)
+```
+- what was i supposed to do with density??
+- is it about if more dense genes have dmr?
+```{r}
+biomart_genes <- biomart_genes %>% mutate(width = end - start + 1, density = num_cg/width)
+biomart_genes <- biomart_genes %>% mutate(overlap_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE))
+```
+
+```{r}
+biomart_genes %>%
+  ggplot(aes(x = overlap_dmr, y = density, colour = overlap_dmr)) +
+  geom_boxplot()
+biomart_genes %>%
+  ggplot(aes(x = overlap_dmr, y = log2(density + 0.1), colour = overlap_dmr)) +
+  geom_boxplot()
+```
+```{r}
+t.test(filter(biomart_genes, overlap_dmr == TRUE)$density, filter(biomart_genes, overlap_dmr == FALSE)$density)
+t.test(filter(biomart_genes, overlap_dmr == TRUE)$density, filter(biomart_genes, overlap_dmr == FALSE)$density, alternative = "less")
+t.test(filter(biomart_genes, overlap_dmr == TRUE)$density, filter(biomart_genes, overlap_dmr == FALSE)$density, alternative = "greater")
+```
+- nope p vals are not signif
+- what else could do with density??
+- oh was this connected to the promoter stuff where we want to know if they cluster more at start of gene than end?
+- i think density comes into that
+- i think it was to do with promoter and 1st exon?
+```{r}
+eh_genes
+anno_islands
+```
+
+## things to do
 density = num_cg per gene/length of gene
 -islands - too definition dependent
 -ditch tss and biomart - just use start and be up 5k, down 2k
+ - we want to 
 -check against belinda's code
 -then start running goseq
+
+
+
+## test my functions
+```{r shared-code}
+source("code/function_binBiasPlot.R")
+test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs)
+```
+
+- damn it reached max memory limit
+- ok moderate fix - just give it the biomart genes
+
+
+```{r}
+test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs, gene_source = "self", biomart_genes[,1:11])
+head(biomart_genes)
+```
+-try breaking it more - first get the genes
+```{r}
+test_genes <- sourceGenes(wgbs_counts)
+test_genes
+```
+- num cg is very wrong
+```{r}
+biomart_genes
+```
+
+```{r}
+test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs, genes = test_genes)
+```
+- finally! i had to delete some stuff for it to run
+```{r}
+plotBiasGrouped(test_genes, test_anno)
+plotBiasGrouped(test_genes, test_anno, log2_scale = TRUE)
+plotBiasGrouped(test_genes, test_anno, regression_line = TRUE)
+plotBiasGrouped(test_genes, test_anno, log2_scale = TRUE, regression_line = TRUE)
+```
+yay working now!
+```{r}
+plotBiasGroupedMedian(test_genes, test_anno)
+plotBiasGroupedMedian(test_genes, test_anno, log2_scale = TRUE)
+plotBiasGroupedMedian(test_genes, test_anno, regression_line = TRUE)
+plotBiasGroupedMedian(test_genes, test_anno, log2_scale = TRUE, regression_line = TRUE)
+```
+-looks the same with median compared to mean
+
+
+##
+```{r}
+biomart_genes %>%
+  ggplot(aes(x = log2(num_cg + 1))) +
+  geom_density()
+```
+
+####
+# pre-conf
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+      geom_point(alpha = 0.4) +
+  scale_x_continuous(limits = c(0,5000)) +
+  labs(x = "Number of CpGs per gene", y = "Proportion differentially methylated")
+```
+
