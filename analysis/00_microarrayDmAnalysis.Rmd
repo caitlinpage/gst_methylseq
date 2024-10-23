@@ -1,0 +1,644 @@
+---
+title: "00_microarrayAnalysis"
+author: "Caitlin Page"
+date: "2024-09-24"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+https://f1000research.com/articles/5-1281
+## array again
+```{r}
+#array
+library(limma)
+library(minfi)
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylationEPICmanifest)
+library(RColorBrewer)
+library(missMethyl)
+library(matrixStats)
+library(Gviz)
+library(DMRcate)
+library(stringr)
+#seq
+library(edgeR)
+#general
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+#comparing
+library(ggVennDiagram)
+#library(ComplexUpset)
+```
+
+# Sample Set-up
+```{r}
+anno_array <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+anno_array
+anno_array <- anno_array %>% data.frame() %>% mutate(seqnames = chr, start = pos, width = 1) %>% relocate(c(seqnames, start, width))
+anno_array
+```
+
+```{r}
+file_source <- c("natural_killer", "b_cell")
+files_new <- character()
+for(i in 1:2) {
+  files <- list.files(paste0("../data/microarray/", file_source[i])) %>% gsub(".idat.gz", "", .)
+  files <- files[!grepl("Red", files)]
+  files <- files %>% gsub("_Grn", "", .)
+  files <- paste0("../data/microarray/", file_source[i], "/", files)
+  files_new <- c(files_new, files)
+}
+files_new
+```
+
+```{r}
+blood_samples <- cbind(sample_num = 1:12) %>% data.frame()
+blood_samples <- blood_samples %>% mutate(sample_group = rep(file_source, times = 6) %>% .[order(., decreasing = TRUE)])
+blood_samples <- blood_samples %>% mutate(sample_id = substring(files_new, first = stringr::str_locate(files_new, "G")[,1])
+)
+blood_samples <- blood_samples %>% mutate(short_group = ifelse(sample_group == "natural_killer", "NK", "B"))
+blood_samples <- blood_samples %>% mutate(id_group = paste0(short_group, "_", substring(sample_id, first = 1, last = stringr::str_locate(sample_id, "_")[,1] - 1)))
+blood_samples
+```
+
+# Pre-processing
+```{r}
+rgSet <- read.metharray(files_new)
+rgSet
+```
+
+```{r}
+sampleNames(rgSet) <- blood_samples$id_group
+rgSet
+```
+
+```{r}
+# calculate the detection p-values
+detP <- detectionP(rgSet)
+head(detP)
+```
+
+```{r}
+# examine mean detection p-values across all samples to identify any failed samples
+pal <- brewer.pal(8,"Dark2")
+par(mfrow=c(1,2))
+barplot(colMeans(detP), col=pal[factor(blood_samples$short_group)], las=2,
+         cex.names=0.8,ylab="Mean detection p-values")
+abline(h=0.01,col="red")
+legend("topleft", legend=levels(factor(blood_samples$short_group)), fill=pal,
+        bg="white")
+
+barplot(colMeans(detP), col=pal[factor(blood_samples$short_group)], las=2,
+         cex.names=0.8, ylim = c(0,0.002), ylab="Mean detection p-values")
+legend("topleft", legend=levels(factor(blood_samples$short_group)), fill=pal,
+        bg="white")
+```
+
+```{r}
+# remove poor quality samples
+keep <- colMeans(detP) < 0.05
+keep
+rgSet <- rgSet[,keep]
+rgSet
+```
+
+```{r}
+# normalize the data; this results in a GenomicRatioSet object
+mSetSq <- preprocessQuantile(rgSet)
+mSetSq
+```
+
+```{r}
+# create a MethylSet object from the raw data for plotting
+mSetRaw <- preprocessRaw(rgSet)
+mSetRaw
+```
+
+```{r}
+# visualise what the data looks like before and after normalisation
+par(mfrow=c(1,2))
+densityPlot(rgSet, sampGroups=blood_samples$short_group,main="Raw", legend=FALSE)
+legend("top", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+densityPlot(getBeta(mSetSq), sampGroups=blood_samples$short_group,
+              main="Normalized", legend=FALSE)
+legend("top", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+```
+
+```{r}
+# MDS plots to look at largest sources of variation
+par(mfrow=c(1,2))
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)])
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$sample_num)])
+legend("top", legend=levels(factor(blood_samples$sample_num)), text.col=pal,
+        bg="white", cex=0.7)
+```
+
+```{r}
+par(mfrow=c(1,3))
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(1,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(2,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(3,4))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+```
+
+```{r}
+# ensure probes are in the same order in the mSetSq and detP objects
+detP <- detP[match(featureNames(mSetSq),rownames(detP)),]
+
+# remove any probes that have failed in one or more samples
+keep <- rowSums(detP < 0.01) == ncol(mSetSq)
+table(keep)
+```
+
+```{r}
+mSetSqFlt <- mSetSq[keep,]
+mSetSqFlt
+```
+
+# Sample filtering
+```{r}
+anno_array %>% distinct(seqnames)
+```
+
+
+```{r}
+keep <- featureNames(mSetSqFlt) %in% anno_array$Name
+table(keep)
+mSetSqFlt <- mSetSqFlt[keep,]
+```
+
+
+```{r}
+# if your data includes males and females, remove probes on the sex chromosomes
+keep <- !(featureNames(mSetSqFlt) %in% anno_array$Name[anno_array$seqnames %in%
+                                                               c("chrX","chrY")])
+table(keep)
+mSetSqFlt <- mSetSqFlt[keep,]
+```
+
+```{r}
+# remove probes with SNPs at CpG site
+mSetSqFlt <- dropLociWithSnps(mSetSqFlt)
+mSetSqFlt
+```
+
+```{r}
+cross_reactive_probes <- read.table("../data/microarray/cross_reactive_probes_supp2.txt")
+cross_reactive_probes
+
+keep <- !(featureNames(mSetSqFlt) %in% cross_reactive_probes$V1)
+table(keep)
+```
+
+```{r}
+mSetSqFlt <- mSetSqFlt[keep,]
+mSetSqFlt
+```
+
+```{r}
+par(mfrow=c(1,2))
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], cex=0.8)
+legend("right", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        cex=0.65, bg="white")
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$sample_num)])
+legend("right", legend=levels(factor(blood_samples$sample_num)), text.col=pal,
+        cex=0.7, bg="white")
+```
+- the 1st component is even stronger now - not sure if that's supposed to happen
+
+```{r}
+par(mfrow=c(1,3))
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(1,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(2,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(3,4))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+```
+
+```{r}
+mVals <- getM(mSetSqFlt)
+head(mVals[,1:5])
+```
+
+```{r}
+bVals <- getBeta(mSetSqFlt)
+head(bVals[,1:5])
+```
+
+```{r}
+par(mfrow=c(1,2))
+densityPlot(bVals, sampGroups=blood_samples$short_group, main="Beta values",
+             legend=FALSE, xlab="Beta values")
+legend("top", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+densityPlot(mVals, sampGroups=blood_samples$short_group, main="M-values",
+             legend=FALSE, xlab="M values")
+legend("topleft", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+```
+
+# Differential methylation
+```{r}
+# this is the factor of interest
+cellType <- factor(blood_samples$short_group)
+# this is the individual effect that we need to account for
+individual <- factor(blood_samples$id_group)
+
+# use the above to create a design matrix
+#design <- model.matrix(~0+cellType+individual, data=blood_samples)
+#colnames(design) <- c(levels(cellType),levels(individual)[-1])
+design <- model.matrix(~0+cellType, data=blood_samples)
+colnames(design) <- c(levels(cellType))
+design
+
+# fit the linear model
+fit <- lmFit(mVals, design)
+fit
+# create a contrast matrix for specific comparisons
+contMatrix <- makeContrasts(NK-B,
+			      levels=design)
+contMatrix
+```
+
+```{r}
+# fit the contrasts
+fit2 <- contrasts.fit(fit, contMatrix)
+fit2 <- eBayes(fit2)
+
+# look at the numbers of DM CpGs at FDR < 0.05
+summary(decideTests(fit2))
+```
+
+```{r}
+# get the table of results for the first contrast
+# do for 2nd contrast - nk - b
+annoSub <- anno_array[match(rownames(mVals),anno_array$Name),
+                         c(1:3,9)]
+DMPs <- topTable(fit2,  num=Inf, coef=1, genelist=annoSub)
+DMPs
+```
+
+
+
+```{r}
+# plot the top 4 most significantly differentially methylated CpGs
+par(mfrow=c(2,2))
+sapply(rownames(DMPs)[1:4], function(cpg){
+  plotCpg(bVals, cpg=cpg, pheno=blood_samples$short_group, ylab = "Beta values")
+})
+```
+```{r}
+tail(DMPs)
+```
+
+
+# gene set testing
+```{r}
+DMPs$rank <- 1:nrow(DMPs)
+array_signif <- filter(DMPs, adj.P.Val < 0.05)
+array_signif
+```
+
+######
+# gene set testing
+## unbiased with missMethyl
+```{r}
+gst_array <- gometh(sig.cpg=rownames(array_signif), all.cpg=rownames(DMPs), collection="GO", array.type = "EPIC",
+              plot.bias=TRUE)
+```
+```{r}
+gst_array
+gst_array %>% .[order(.$FDR),] %>% filter(FDR < 0.05)
+```
+
+```{r}
+topGSA(gst_array, n=10)
+```
+- damn I was hoping for some more specific significant sites
+
+do a non bias corrected
+```{r}
+library(goseq)
+```
+```{r}
+biomart_genes
+```
+
+```{r}
+array_genes_sig <- pair_overlaps(as_granges(biomart_genes), as_granges(array_signif)) %>% data.frame()
+array_genes <- biomart_genes %>% mutate(signif = ifelse(ensembl_gene_id %in% array_genes_sig$ensembl_gene_id, 1, 0))
+gene.vec <- array_genes$signif
+names(gene.vec) <- array_genes$ensembl_gene_id
+pwf <- nullp(gene.vec,"hg19","ensGene", bias.data = array_genes$num_cg)
+head(pwf)
+```
+```{r}
+GO.wall <- goseq(pwf,"hg19","ensGene")
+head(GO.wall)
+```
+
+
+```{r}
+GO.nobias <- goseq(pwf,"hg19","ensGene",method="Hypergeometric")
+GO.nobias <- GO.nobias %>% mutate(FDR = p.adjust(over_represented_pvalue, method = "BH"))
+GO.nobias
+```
+
+```{r}
+plot(log10(GO.wall[,2]), log10(GO.nobias[match(GO.wall[,1],GO.nobias[,1]),2]),
+     xlab="log10(Wallenius p-values)", ylab="log10(Hypergeometric p-values)",
+     xlim=c(-3,0), ylim=c(-3,0))
+abline(0,1,col=3,lty=2)
+```
+
+# compare gene set terms
+
+```{r}
+gst_array_signif <- gst_array %>% .[order(.$FDR),] %>% filter(FDR < 0.05)
+GO.nobias_signif <- GO.nobias %>% filter(FDR < 0.05)
+
+gst_array_signif$rank <- 1:nrow(gst_array_signif)
+GO.nobias_signif$rank <- 1:nrow(GO.nobias_signif)
+```
+```{r}
+compare_gst <- data.frame(term=c(gst_array_signif$TERM, GO.nobias_signif$term)) %>% distinct(term)
+compare_gst <- compare_gst %>% mutate(gst_rank = gst_array_signif[match(.$term, gst_array_signif$TERM), "rank"],
+                                      gst_pval = gst_array_signif[match(.$term, gst_array_signif$TERM), "FDR"],
+                                    no_correct_rank = GO.nobias_signif[match(.$term, GO.nobias_signif$term), "rank"],
+                                  no_correct_pval = GO.nobias_signif[match(.$term, GO.nobias_signif$term), "FDR"],
+                                  in_gst = ifelse(is.na(gst_rank), FALSE, TRUE), 
+                                  in_no_correct = ifelse(is.na(no_correct_rank), FALSE, TRUE),
+                                  gst_pval = ifelse(is.na(gst_pval), 1, gst_pval), 
+                                  no_correct_pval = ifelse(is.na(no_correct_pval), 1, no_correct_pval))
+```
+```{r}
+compare_gst %>%
+  ggplot(aes(x = no_correct_pval, y = gst_pval)) +
+  geom_point(alpha = 0.3)
+
+compare_gst %>%
+  ggplot(aes(x = log2(no_correct_pval), y = log2(gst_pval))) +
+  geom_point(alpha = 0.3)
+```
+```{r}
+cor.test(compare_gst$no_correct_pval, compare_gst$gst_pval)
+```
+- no correlation between p values
+- can i at least say the terms are more significant??
+
+```{r}
+compare_gst <- compare_gst %>% mutate(from = case_when(in_gst == TRUE & in_no_correct == TRUE ~ "Both", in_gst == TRUE & in_no_correct == FALSE ~ "GST", TRUE ~ "No_correction")) %>% relocate(term, from)
+```
+```{r}
+compare_gst %>% group_by(from) %>% summarise(n=n())
+```
+- good I can say no correction has more terms 
+
+
+
+# compare similarity of go terms
+- there's GOSim
+- and GOSemSim 
+- both in bioc 
+- second is much newer - actually its been in bioc for longer
+
+```{r}
+library(GOSim)
+library(GOSemSim)
+```
+- ah GOSim is being deprecated
+- but it does have 1 function to try
+#gosim
+```{r}
+term_sim_mm <- getTermSim(rownames(gst_array_signif)[1:100], verbose = TRUE)
+```
+
+```{r}
+term_sim_no_correct <- getTermSim(GO.nobias_signif[1:100,]$category, verbose = TRUE)
+term_sim_no_correct %>% data.frame()
+#term_sim_mm <- getTermSim(rownames(gst_array_signif), verbose = TRUE)
+```
+- hmm
+- i feel like this is the sort of thing that goes in a heat map
+
+- so let's use GOSemSim then
+- actually i think i do want gosemsim i think the vignette was just not very impressive
+# gosemsim
+https://www.bioconductor.org/packages/release/bioc/manuals/GOSemSim/man/GOSemSim.pdf
+https://yulab-smu.top/biomedical-knowledge-mining-book/semantic-similarity-overview.html - i don't think this is very helpful
+- there's stuff about gene clusters but i don't think i want that
+- there is a function comparing 2 go terms lists yaya
+
+- need to provide a thing in it
+- can only have 1 ontology - so split it and do 1 category at a time
+- i think this is hg38 but i want hg19 - or is it not a position thing 
+```{r}
+d <- godata('org.Hs.eg.db', ont="MF", computeIC=FALSE)
+
+mgoSim(GO.nobias_signif$category, rownames(gst_array_signif), semData = d)
+```
+```{r}
+d <- godata('org.Hs.eg.db', ont="BP", computeIC=FALSE)
+
+mgoSim(GO.nobias_signif$category, rownames(gst_array_signif), semData = d)
+```
+
+```{r}
+d <- godata('org.Hs.eg.db', ont="CC", computeIC=FALSE)
+
+mgoSim(GO.nobias_signif$category, rownames(gst_array_signif), semData = d)
+```
+
+
+# gogadget
+- and now i have found another package - inconvenient not on bioconductor or github but i think it will be better
+- gogadget - in the paper they use goseq first - we love that for them
+https://onlinelibrary.wiley.com/doi/full/10.1002/minf.201600132?saml_referrer
+https://sourceforge.net/projects/gogadget/
+```{r}
+library(gogadget)
+```
+```{r}
+vignette(package = "gogadget")
+```
+```{r}
+?gogadget.p.adjust
+gogad_nocorrect <- gogadget.p.adjust(GO.nobias[,1:7])
+```
+```{r}
+gogadget.explore(gogad_nocorrect)
+```
+- how many go terms left with different filter thresholds for minimum and maximum number of genes per go term
+- they say list 60-80 go terms is ideal for quick bio insight
+- so all the filtering options give me more than that lol
+
+```{r}
+gogadget.filter(gogad_nocorrect)
+```
+- just use the default for now
+```{r}
+library(gplots)
+```
+
+```{r}
+gogadget.heatmap(gogadget.filter(gogad_nocorrect), genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+?gogadget.heatmap
+```
+- how many overlapping genes each go term pair has
+- as terms that share many genes have similar descriptions (redundancy)
+- pearson correlation calc based on number of overlapping genes
+- plotted as heatmap - similar go terms are red blocks (highly correlated)
+- so this plot has a lot of red - lots similar go terms
+- let's cut it down more - top 100
+```{r}
+gogadget.heatmap(gogadget.filter(gogad_nocorrect)[1:100,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+gogadget.heatmap(gogadget.filter(gogad_nocorrect)[1:50,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+```
+- i can't read this plot still
+- ok this was pearson's coeff
+- can also do overlap indexes
+```{r}
+gogadget.overlap(gogadget.filter(gogad_nocorrect), genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+
+gogadget.overlap(gogadget.filter(gogad_nocorrect)[1:100,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+gogadget.overlap(gogadget.filter(gogad_nocorrect)[1:50,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+```
+- and this plot is 
+- instead of correlation between 2 go terms, it's the overlap index
+- what's the overlap index?
+- overlap index: number of overlapping genes between 2 go terms / smallest number of the 2
+- index = 0 - no genes overlap, index = 1 - all genes overlap
+- the more blue the more overlapping
+- ok i guess that shows something
+- maybe I should be trying these with the other data and see if they look different?
+
+```{r}
+gogad_mm <- mutate(gst_array_signif, adjusted_pvalue = FDR, numInCat = N, numDEInCat = DE, category = rownames(gst_array_signif), term = TERM, ontology = ONTOLOGY)
+gogadget.heatmap(gogadget.filter(gogad_mm), genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+```
+
+- guess hope is it looks neater? - and maybe the terms are less sim because there's less redundancy??
+```{r}
+gogadget.heatmap(gogadget.filter(gogad_mm)[1:100,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+gogadget.heatmap(gogadget.filter(gogad_mm)[1:50,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+```
+- these 2 subsetted ones seem to have clearer things - do we like that?
+```{r}
+gogadget.overlap(gogadget.filter(gogad_mm), genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+
+gogadget.overlap(gogadget.filter(gogad_mm)[1:100,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+gogadget.overlap(gogadget.filter(gogad_mm)[1:50,], genes = biomart_genes$ensembl_gene_id, genome = "hg19", id = "ensGene")
+```
+- ok i think they do look nicer
+# ok try the calandra thing
+- the N from the results is the number of genes to the go term
+- so can filter by that
+- so let's just compare the N for the 2 sets
+```{r}
+compare_gst
+gst_array_signif
+GO.nobias_signif
+```
+- so the N's don't match up so that's cool and fine
+- does that mean it's different versions of GO or something?
+
+```{r}
+gst_array$TERM %in% GO.nobias$term %>% summary()
+GO.nobias$term %in% gst_array$TERM %>% summary()
+GO.nobias_signif$term %in% gst_array$TERM %>% summary()
+```
+- maybe let's trust missmethyl because it's newer?
+
+```{r}
+compare_gst <- compare_gst %>% mutate(N = gst_array[match(.$term, gst_array$TERM), "N"])
+```
+```{r}
+compare_gst %>%
+  ggplot(aes(x = from, y = N, colour = from)) +
+  geom_boxplot()
+compare_gst %>%
+  ggplot(aes(x = from, y = log2(N), colour = from)) +
+  geom_boxplot()
+
+compare_gst %>%
+  ggplot(aes(x = in_gst, y = N, colour = in_gst)) +
+  geom_boxplot()
+compare_gst %>%
+  ggplot(aes(x = in_gst, y = log2(N), colour = in_gst)) +
+  geom_boxplot()
+
+compare_gst %>%
+  ggplot(aes(x = in_no_correct, y = N, colour = in_no_correct)) +
+  geom_boxplot()
+compare_gst %>%
+  ggplot(aes(x = in_no_correct, y = log2(N), colour = in_no_correct)) +
+  geom_boxplot()
+```
+```{r}
+t.test(filter(compare_gst, from != "GST")$N, filter(compare_gst, from != "No_correction")$N)
+t.test(filter(compare_gst, from != "GST")$N, filter(compare_gst, from != "No_correction")$N, alternative = "less")
+wilcox.test(filter(compare_gst, from != "GST")$N, filter(compare_gst, from != "No_correction")$N)
+wilcox.test(filter(compare_gst, from != "GST")$N, filter(compare_gst, from != "No_correction")$N, alternative = "less")
+```
+
+
+```{r}
+compare_gst
+```
+```{r}
+rbind(cbind(term = filter(compare_gst, in_gst == TRUE)$term, N = filter(compare_gst, in_gst == TRUE)$N, from = rep("gst", times = 1625)), cbind(term = filter(compare_gst, in_no_correct == TRUE)$term, N = filter(compare_gst, in_no_correct == TRUE)$N, from = rep("no_correction", times = 2381))) %>% data.frame() %>% mutate(N = as.double(N)) %>%
+  ggplot(aes(x = from, y = N, colour = from)) +
+  geom_boxplot()
+
+rbind(cbind(term = filter(compare_gst, in_gst == TRUE)$term, N = filter(compare_gst, in_gst == TRUE)$N, from = rep("gst", times = 1625)), cbind(term = filter(compare_gst, in_no_correct == TRUE)$term, N = filter(compare_gst, in_no_correct == TRUE)$N, from = rep("no_correction", times = 2381))) %>% data.frame() %>% mutate(N = as.double(N)) %>%
+  ggplot(aes(x = from, y = log2(N), colour = from)) +
+  geom_boxplot()
+
+rbind(cbind(term = filter(compare_gst, in_gst == TRUE)$term, N = filter(compare_gst, in_gst == TRUE)$N, from = rep("gst", times = 1625)), cbind(term = filter(compare_gst, in_no_correct == TRUE)$term, N = filter(compare_gst, in_no_correct == TRUE)$N, from = rep("no_correction", times = 2381))) %>% data.frame() %>% mutate(N = as.double(N)) %>%
+  ggplot(aes(x = N, colour = from)) +
+  geom_density()
+
+rbind(cbind(term = filter(compare_gst, in_gst == TRUE)$term, N = filter(compare_gst, in_gst == TRUE)$N, from = rep("gst", times = 1625)), cbind(term = filter(compare_gst, in_no_correct == TRUE)$term, N = filter(compare_gst, in_no_correct == TRUE)$N, from = rep("no_correction", times = 2381))) %>% data.frame() %>% mutate(N = as.double(N)) %>%
+  ggplot(aes(x = log2(N), colour = from)) +
+  geom_density()
+```
+```{r}
+summary(filter(compare_gst, in_gst == TRUE)$N)
+summary(filter(compare_gst, in_no_correct == TRUE)$N)
+```
+- dammit
+- actually we got less specific go terms - we also just got less terms overall
+
+- not the expected result for sure
