@@ -84,6 +84,10 @@ listAttributes(ensembl)
 - but ensembl transcript is longest, most high exp, and matches other databases
 - maybe run stuff just picking a random for now lol
 ```{r}
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+```
+
+```{r}
 biomart_genes <- getBM(
         attributes = c("ensembl_gene_id", "external_gene_name", "ensembl_transcript_id",
             "chromosome_name", "start_position", "end_position", "strand",
@@ -135,6 +139,16 @@ biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .[or
 - ok so now bit nervous a screw up has happened because we have different ensembl-id but same gene-name
 - and lots of these are different chrom
 - i think i want to check on these before i do tss stuff
+```{r}
+biomart_cg <- find_overlaps(as_granges(biomart_genes), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(ensembl_gene_id) %>% summarise(num_cg = n())
+biomart_cg <- data.frame(biomart_cg)
+```
+
+```{r}
+biomart_genes <- biomart_genes %>% mutate(num_cg = biomart_cg[match(.$ensembl_gene_id, biomart_cg$ensembl_gene_id), "num_cg"],
+                                          num_cg = ifelse(is.na(num_cg), 0, num_cg))
+```
+
 
 ```{r}
 nrow(eh_genes)
@@ -181,5 +195,24 @@ transcripts(TxDb.Hsapiens.UCSC.hg19.knownGene)
 # biomart
 ```{r}
 biomart_genes
+```
+# allow for multiple sources with diff col names
+- which col has the ensembl_gene_id?? (ENSG)
+```{r}
+biomart_genes
+```
+
+```{r}
+colnames(biomart_genes)[grepl("ENSG", biomart_genes[1,])]
+```
+- i want the index of the true
+```{r}
+biomart_genes2 <- biomart_genes[1:5,]
+biomart_genes2
+colnames(biomart_genes2)[grepl("ENSG", biomart_genes2[1,])] <- "ensembl_id"
+biomart_genes2
+```
+```{r}
+rm(biomart_genes2)
 ```
 
