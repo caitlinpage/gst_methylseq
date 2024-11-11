@@ -73,12 +73,55 @@ gst <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
 ```{r}
 topGSA(gst, n=10)
 ```
+```{r}
+sig_terms_array <- topGSA(gst, n = 1000) %>% filter(FDR < 0.01)
+sig_terms_array
+```
 
+## no bias
+
+```{r}
+gst.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
+              prior.prob=FALSE)
+
+sig_terms_array_biased <- topGSA(gst.biased, n=10000) %>% filter(FDR < 0.01)
+sig_terms_array_biased
+```
+## compare bias and corrected
+```{r}
+list_venn <- list(correct = sig_terms_array$TERM, bias = sig_terms_array_biased$TERM)
+ggVennDiagram(list_venn)
+```
+
+
+## 
+# with kegg
 ```{r}
 gst.kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="KEGG")
 ## All input CpGs are used for testing.
 topGSA(gst.kegg, n=10)
 
+```
+
+#promoters
+
+```{r}
+gst_promoter <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
+              plot.bias=TRUE, genomic.features = "TSS1500")
+```
+```{r}
+gst_promoter
+sig_terms_array_promoter <- gst_promoter %>% .[order(.$FDR),] %>% filter(FDR < 0.05)
+sig_terms_array_promoter
+```
+
+```{r}
+gst_promoter.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
+              prior.prob = FALSE, genomic.features = "TSS1500")
+```
+```{r}
+sig_terms_array_promoter_biased <- gst_promoter.biased %>% .[order(.$FDR),] %>% filter(FDR < 0.05)
+sig_terms_array_promoter_biased
 ```
 
 #####
