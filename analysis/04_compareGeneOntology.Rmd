@@ -4,12 +4,608 @@ author: "Caitlin Page"
 date: "2024-09-26"
 output: workflowr::wflow_html
 editor_options:
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ## Introduction
 
 ```{r}
-
+list_venn <- list(bias = GO.wall.null$term, correct = GO.wall$term)
+ggVennDiagram(list_venn)
 ```
+```{r}
+list_venn <- list(correct = sig_terms_array$TERM, bias = sig_terms_array_biased$TERM)
+ggVennDiagram(list_venn)
+```
+```{r}
+list_venn <- list(seq_correct = GO.wall$term, array_correct = sig_terms_array$TERM)
+ggVennDiagram(list_venn)
+```
+```{r}
+list_venn <- list(seq_correct = GO.wall$term, array_bias = sig_terms_array_biased$TERM)
+ggVennDiagram(list_venn)
+```
+```{r}
+list_venn <- list(seq_bias = GO.wall.null$term, array_correct = sig_terms_array$TERM)
+ggVennDiagram(list_venn)
+```
+```{r}
+list_venn <- list(seq_bias = GO.wall.null$term, array_bias = sig_terms_array_biased$TERM)
+ggVennDiagram(list_venn)
+```
+
+
+```{r}
+list_venn <- list(array_correct = sig_terms_array$TERM, array_bias = sig_terms_array_biased$TERM, seq_correct = GO.wall$term, seq_bias = GO.wall.null$term)
+ggVennDiagram(list_venn)
+```
+
+
+####
+# terms no longer signif - if they match up
+```{r}
+go_entrez %>% distinct(go, array_cat_signif, array_cat_signif_bias, seq_cat_signif, seq_cat_signif_bias) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_sig_a = ifelse(array_cat_signif == FALSE, TRUE, FALSE))
+```
+```{r}
+go_entrez %>% distinct(go, array_cat_signif, array_cat_signif_bias, seq_cat_signif, seq_cat_signif_bias) %>% filter(seq_cat_signif_bias == TRUE) %>% mutate(stop_sig_s = ifelse(seq_cat_signif == FALSE, TRUE, FALSE)) 
+```
+```{r}
+ggVennDiagram(list(array_not = go_entrez %>% distinct(go, array_cat_signif, array_cat_signif_bias, seq_cat_signif, seq_cat_signif_bias) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_sig_a = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>% filter(stop_sig_a == TRUE) %>% .$go, 
+              seq_not = go_entrez %>% distinct(go, array_cat_signif, array_cat_signif_bias, seq_cat_signif, seq_cat_signif_bias) %>% filter(seq_cat_signif_bias == TRUE) %>% mutate(stop_sig_s = ifelse(seq_cat_signif == FALSE, TRUE, FALSE)) %>% filter(stop_sig_s == TRUE) %>% .$go))
+```
+- ok so that doesn't agree
+
+-maybe categories that become significant?
+-so filter to the false and then it's whatever the unbiased picks up as true
+```{r}
+ggVennDiagram(list(array_not = go_entrez %>% distinct(go, array_cat_signif, array_cat_signif_bias, seq_cat_signif, seq_cat_signif_bias) %>% filter(array_cat_signif_bias == FALSE) %>% mutate(stop_sig_a = ifelse(array_cat_signif == TRUE, TRUE, FALSE)) %>% filter(stop_sig_a == TRUE) %>% .$go, 
+              seq_not = go_entrez %>% distinct(go, array_cat_signif, array_cat_signif_bias, seq_cat_signif, seq_cat_signif_bias) %>% filter(seq_cat_signif_bias == FALSE) %>% mutate(stop_sig_s = ifelse(seq_cat_signif == TRUE, TRUE, FALSE)) %>% filter(stop_sig_s == TRUE) %>% .$go))
+```
+-yeah that's a no as expected - array all the unbiased is within the biased approach
+##############################
+
+
+## more complicated stuff
+compare number of genes with many probes in sets without bias correction compared to with bias correction.
+So the categories that are significant before correction might have higher than average CpG content...
+
+but the result we have is terms and genes
+and i can't get the genes back
+```{r}
+sig_terms_array
+```
+- so i want some way to add the genes back in?
+- if i can match entrez ids to go terms i'm good - can go from there
+
+```{r}
+library(org.Hs.eg.db)
+```
+```{r}
+?org.Hs.egGO
+```
+```{r}
+x <- org.Hs.egGO
+# Get the entrez gene identifiers that are mapped to a GO ID
+entrez_map <- mappedkeys(x)
+# Convert to a list
+xx <- as.list(x[entrez_map])
+```
+```{r}
+xx[[1]][[1]][["GOID"]]
+str(xx)
+```
+```{r}
+entrez_map[1:10]
+length(entrez_map)
+```
+- that was the exact match version
+- so like one gene per go
+- we don't want that
+
+```{r}
+# For org.Hs.egGO2ALLEGS
+xx <- as.list(org.Hs.egGO2ALLEGS)
+if(length(xx) > 0){
+    # Gets the Entrez Gene identifiers for the top 2nd and 3nd GO identifiers
+    goids <- xx[2:3]
+    # Gets all the Entrez Gene identifiers for the first element of goids
+    goids[[1]]
+    # Evidence code for the mappings
+    names(goids[[1]])
+}
+```
+i don't have the brainspace for this
+ok so xx is a list 
+each section is a go term, and in it, is the entrez ids of genes in it
+```{r}
+names(xx)[1:3]
+```
+
+
+
+and here I have the entrez gene ids and the number of cpg sites
+i want a way to pass over the go term to this?
+maybe it would be easier to pass it over to the results which has the go terms
+```{r}
+sig_terms_array %>% mutate(test_pass = ifelse(rownames(.) %in% names(xx), TRUE, FALSE))
+```
+- ok this is the "set"
+- now just need the biases to go with
+- i could just do a massive unlist - i think
+-actually that worked - except for the names bit
+```{r}
+names(unlist(xx))[1:5]
+```
+
+```{r}
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+```
+```{r}
+go_entrez <- go_entrez %>% mutate(num_cg = data.frame(mapped_genes$freq)[match(.$entrez, data.frame(mapped_genes$freq)$eg.all), "Freq"])
+go_entrez
+```
+```{r}
+mapped_genes$freq %>% data.frame() %>% filter(eg.all == "28472")
+sig_terms_array["GO:0002376",]
+```
+```{r}
+unique(go_entrez$entrez) %in% mapped_genes$universe %>% summary()
+mapped_genes$universe %in% unique(go_entrez$entrez) %>% summary()
+```
+- ok this also explains problems - they don't match
+- is it that the missing ones have 0 cpgs??? - because those were removed in the mapped_genes thing it didn't want them
+
+# let's limit to the matching ones for now
+```{r}
+go_entrez 
+```
+
+```{r}
+go_entrez %>% filter(is.na(num_cg))
+```
+
+```{r}
+go_entrez %>% distinct(go)
+go_entrez %>% distinct(entrez)
+go_entrez %>% distinct(num_cg)
+```
+
+```{r}
+go_entrez <- go_entrez %>% mutate(array_cat_signif = ifelse(go %in% rownames(sig_terms_array), TRUE, FALSE),
+                     array_cat_signif_bias = ifelse(go %in% rownames(sig_terms_array_biased), TRUE, FALSE),
+                     seq_cat_signif = ifelse(go %in% GO.wall$category, TRUE, FALSE),
+                     seq_cat_signif_bias = ifelse(go %in% GO.wall.null$category, TRUE, FALSE))
+```
+- ok I'm actually getting close now
+
+```{r}
+go_entrez %>% group_by(go) %>% mutate(num_entrez = dplyr::n(), median_cg = median(num_cg)) %>% distinct(.)
+```
+```{r}
+go_entrez %>% group_by(go) %>% mutate(num_entrez = dplyr::n(), median_cg = median(num_cg)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, num_entrez, median_cg) %>% filter(array_cat_signif == TRUE) %>%
+  ggplot(aes(x = median_cg, colour = array_cat_signif)) +
+  geom_density()
+
+go_entrez %>% group_by(go) %>% filter(array_cat_signif == TRUE) %>%
+  ggplot(aes(x = num_cg, colour = array_cat_signif)) +
+  geom_density()
+```
+-second plot i think is close?
+except plot looks the same between signif and not signif
+```{r}
+go_entrez %>% group_by(go) %>% mutate(num_entrez = dplyr::n(), median_cg = median(num_cg)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, num_entrez, median_cg) %>% filter(array_cat_signif_bias == TRUE) %>%
+  ggplot(aes(x = median_cg, colour = array_cat_signif_bias)) +
+  geom_density()
+
+go_entrez %>% group_by(go) %>% filter(array_cat_signif_bias == TRUE) %>%
+  ggplot(aes(x = num_cg, colour = array_cat_signif_bias)) +
+  geom_density()
+```
+hold up no we want to be comparing number of genes with many probes (many cpgs)
+i'm so done
+```{r}
+go_entrez[,1:5] %>% melt(id = c("go", "entrez", "num_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = num_cg)) +
+  geom_boxplot()
+```
+- again they look the same
+```{r}
+go_entrez[,1:5] %>% melt(id = c("go", "entrez", "num_cg")) %>% filter(value == TRUE) %>% group_by(variable) %>% distinct(go) %>% summarise(dplyr::n())
+```
+```{r}
+go_entrez[,1:5] %>% melt(id = c("go", "entrez", "num_cg")) %>% filter(value == TRUE) %>% distinct(.)
+```
+
+```{r}
+go_entrez[,1:5] %>% melt(id = c("go", "entrez", "num_cg")) %>% filter(value == TRUE) %>% distinct(.) %>% .[1:500,] %>%
+  ggplot(aes(x = go, colour = variable, y = num_cg)) +
+  geom_boxplot()
+```
+```{r}
+go_entrez[,1:5] %>% melt(id = c("go", "entrez", "num_cg")) %>% filter(value == TRUE) %>% distinct(.) %>% group_by(go, variable) %>% summarise(mean = mean(num_cg), median = median(num_cg)) 
+```
+
+```{r}
+go_entrez[,1:5] %>% melt(id = c("go", "entrez", "num_cg")) %>% filter(value == TRUE) %>% distinct(.)
+```
+```{r}
+go_entrez[,1:5] %>% filter(array_cat_signif == TRUE) %>% group_by(go) %>% summarise(mean = mean(num_cg), median = median(num_cg))
+go_entrez[,1:5] %>% filter(array_cat_signif_bias == TRUE) %>% group_by(go) %>% summarise(mean = mean(num_cg), median = median(num_cg))
+```
+- ok so these numbers are diff now but also they are very similar
+```{r}
+go_entrez %>% filter(array_cat_signif == TRUE) %>%
+  ggplot(aes(x = num_cg)) +
+  geom_density()
+
+go_entrez %>% filter(array_cat_signif_bias == TRUE) %>%
+  ggplot(aes(x = num_cg)) +
+  geom_density()
+
+go_entrez %>% filter(array_cat_signif == TRUE) %>%
+  ggplot(aes(x = log2(num_cg))) +
+  geom_density()
+
+go_entrez %>% filter(array_cat_signif_bias == TRUE) %>%
+  ggplot(aes(x = log2(num_cg))) +
+  geom_density()
+```
+```{r}
+go_entrez %>% group_by(num_cg) %>% filter(is.na(num_cg))
+```
+
+```{r}
+?mean
+go_entrez[,1:5] %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE), median=median(num_cg, na.rm=TRUE), sd = sd(num_cg, na.rm=TRUE))
+summary(go_entrez$num_cg)
+go_entrez %>% 
+  ggplot(aes(x = num_cg)) +
+  geom_density()
+```
+mean of it all: 27
+median: 36.47
+- feels weird that max is 51 - feel like it should be higher
+
+- let's get mean and median for each - and compare it to the overall
+so like a z test basically
+
+- let's try z test
+- i think non-param version is chi-square
+
+z need mu and sd of pop
+27 & 38.39442
+want for each of "sets" - signif go terms
+```{r}
+library(BSDA)
+```
+
+```{r}
+list_go <- go_entrez[,1:5] %>% filter(array_cat_signif == TRUE) %>% distinct(go) %>% .$go
+list_go[1:5]
+length(list_go)
+
+res_stat <- c()
+res_p <- c()
+for(i in 1:73) {
+  test <- z.test(filter(go_entrez, array_cat_signif == TRUE, go == list_go[i])$num_cg, mu = 27, sigma.x=38.39442)
+  res_stat <- c(res_stat, test$statistic)
+  res_p <- c(res_p, test$p.value)
+}
+array_signif_z <- cbind(go=list_go, z_stat = res_stat, p_val = res_p) %>% data.frame()
+array_signif_z 
+```
+```{r}
+array_signif_z %>% mutate(z_stat = as.double(z_stat), p_val = as.double(p_val)) %>% filter(p_val < 0.05)
+array_signif_bias_z %>% mutate(z_stat = as.double(z_stat), p_val = as.double(p_val)) %>% filter(p_val < 0.05)
+```
+- nothing signif
+```{r}
+list_go <- go_entrez[,1:5] %>% filter(array_cat_signif_bias == TRUE) %>% distinct(go) %>% .$go
+list_go[1:5]
+
+res_stat <- c()
+res_p <- c()
+for(i in 1:length(list_go)) {
+  test <- z.test(filter(go_entrez, array_cat_signif_bias == TRUE, go == list_go[i])$num_cg, mu=27, sigma.x=38.39442)
+  res_stat <- c(res_stat, test$statistic)
+  res_p <- c(res_p, test$p.value)
+}
+array_signif_bias_z <- cbind(go=list_go, z_stat = res_stat, p_val = res_p) %>% data.frame()
+array_signif_bias_z
+```
+```{r}
+go_entrez %>% filter(array_cat_signif_bias == TRUE) %>% summarise(mean = mean(num_cg), sd(num_cg))
+```
+- doesn't change the stats
+
+
+# what about a t test?
+
+```{r}
+t.test(filter(go_entrez, array_cat_signif == TRUE, array_cat_signif_bias == TRUE)$num_cg, 
+       filter(go_entrez, array_cat_signif == FALSE, array_cat_signif_bias == TRUE)$num_cg)
+```
+- nope
+
+# what about just the number of genes with more than average num_cg??
+av = 27
+```{r}
+array_sig_num <- go_entrez[,1:5] %>% filter(array_cat_signif == TRUE) %>% group_by(go) %>% mutate(num_genes = dplyr::n()) %>% filter(num_cg > 27) %>% mutate(num_genes_above = dplyr::n(), ratio = dplyr::n()/num_genes) %>% distinct(go, num_genes, num_genes_above, ratio) %>% ungroup() %>% data.frame()
+```
+```{r}
+array_bias_num <- go_entrez[,1:5] %>% filter(array_cat_signif_bias == TRUE) %>% group_by(go) %>% mutate(num_genes = dplyr::n()) %>% filter(num_cg > 27) %>% mutate(num_genes_above = dplyr::n(), ratio = dplyr::n()/num_genes) %>% distinct(go, num_genes, num_genes_above, ratio) %>% ungroup() %>% data.frame()
+```
+
+```{r}
+array_bias_num %>% mutate(sig_ratio = array_sig_num[match(.$go, array_sig_num$go), "ratio"]) %>% filter(!is.na(sig_ratio)) %>%
+  ggplot(aes(x = ratio, y = sig_ratio)) +
+  geom_point()
+```
+
+# alicia says average should be average per category
+
+```{r}
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg)
+
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% 
+  ggplot(aes(y = mean_cg)) +
+  geom_boxplot()
+
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif == TRUE) %>% 
+  ggplot(aes(y = mean_cg)) +
+  geom_boxplot()
+```
+
+```{r}
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif == TRUE | array_cat_signif_bias == TRUE) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg)) +
+  geom_boxplot()
+```
+```{r}
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(array_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+- ok now I think I'm rightish
+- ok now we're talking
+
+alicia wants to know how many categories in each box
+```{r}
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_signif = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>% ungroup() %>% group_by(stop_signif) %>% summarise(dplyr::n())
+```
+```{r}
+go_entrez[,1:5] %>% filter(array_cat_signif == TRUE | array_cat_signif_bias == TRUE) %>% mutate(median = median(num_cg, na.rm=TRUE))
+```
+```{r}
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_signif = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>% filter(stop_signif == TRUE) %>% .$mean_cg %>% summary()
+
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_signif = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>% filter(stop_signif == FALSE) %>% .$mean_cg %>% summary()
+```
+```{r}
+t.test(go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_signif = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>% filter(stop_signif == TRUE) %>% .$mean_cg, go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_signif = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>% filter(stop_signif == FALSE) %>% .$mean_cg)
+```
+
+
+
+- try it as a density
+```{r}
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_signif = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>%
+  ggplot(aes(colour = stop_signif, x = mean_cg)) +
+  geom_density()
+```
+- yeah they are the same
+-try median
+
+```{r}
+go_entrez[,1:5] %>% group_by(go) %>% mutate(median_cg = median(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, median_cg) %>% filter(array_cat_signif_bias == TRUE) %>% mutate(stop_signif = ifelse(array_cat_signif == FALSE, TRUE, FALSE)) %>%
+  ggplot(aes(x = stop_signif, y = median_cg)) +
+  geom_boxplot()
+```
+
+########
+## ok this boxplot thing but for sequencing
+
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)"))
+```
+
+
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+
+go_entrez %>% distinct() %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+- alicia was hoping it would be clearer
+
+-maybe median?
+
+```{r}
+go_entrez %>% group_by(go) %>% mutate(median_cg = median(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, median_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = median_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+- no not really
+
+-maybe this is the NA problem?
+
+```{r}
+go_entrez %>% distinct() %>% mutate(num_cg_na = ifelse(is.na(num_cg), TRUE, FALSE)) %>% group_by(go) %>% mutate(num_gene = dplyr::n()) %>% ungroup() %>%
+  group_by(go, num_gene, num_cg_na) %>% summarise(n=dplyr::n(), ratio = dplyr::n()/num_gene) %>% distinct() 
+go_entrez %>% distinct() %>% filter(seq_cat_signif == TRUE | seq_cat_signif_bias == TRUE) %>% mutate(num_cg_na = ifelse(is.na(num_cg), TRUE, FALSE)) %>% group_by(go) %>% mutate(num_gene = dplyr::n()) %>% ungroup() %>%
+  group_by(go, num_gene, num_cg_na) %>% summarise(n=dplyr::n(), ratio = dplyr::n()/num_gene) %>% distinct() %>% filter(num_cg_na == TRUE) %>% .[order(.$ratio, decreasing = TRUE),]
+```
+```{r}
+GO.wall %>% filter(category == "GO:0019814")
+```
+# should be using the goseq matching probably - maybe that will make it look more elegant
+```{r}
+gene2cat <- goseq::getgo(test_bias$ensembl_gene_id, "hg19", "ensGene")
+names(gene2cat) <- test_bias$ensembl_gene_id
+#Do the two rebuilds to remove any nulls
+reversemapping=function(map){
+	tmp=unlist(map,use.names=FALSE)
+	names(tmp)=rep(names(map),times=as.numeric(summary(map)[,1]))
+	return(split(names(tmp),as.vector(tmp)))
+}
+cat2gene <- reversemapping(gene2cat)
+gene2cat <- reversemapping(cat2gene)
+```
+```{r}
+if(sum(unique(unlist(gene2cat,use.names=FALSE))%in%test_bias$ensembl_gene_id)>sum(unique(names(gene2cat))%in%test_bias$ensembl_gene_id)){
+			gene2cat <- reversemapping(gene2cat)
+		}
+		#Alright, we're garunteed a list going in the direction we want now.  Throw out genes which we will not use
+		gene2cat <- gene2cat[names(gene2cat)%in%test_bias$ensembl_gene_id]
+
+		#Rebuild because it's a fun thing to do
+		cat2gene <- reversemapping(gene2cat)
+		gene2cat <- reversemapping(cat2gene)
+
+		## make sure we remove duplicate entries .. e.g. see 
+		## http://permalink.gmane.org/gmane.science.biology.informatics.conductor/46876
+		cat2gene <- lapply(cat2gene,function(x){unique(x)})
+		gene2cat <- lapply(gene2cat,function(x){unique(x)})
+```
+
+
+```{r}
+head(cat2gene)[1]
+```
+```{r}
+GO.wall
+```
+
+```{r}
+cat2gene2 <- cat2gene
+names(cat2gene2) <- paste0(names(cat2gene2), ".")
+go_ensembl <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(cat2gene2))), ensembl = unlist(cat2gene)))
+go_ensembl %>% distinct(ensembl)
+go_ensembl %>% distinct(go)
+```
+```{r}
+go_ensembl %>% distinct()
+```
+
+
+
+```{r}
+unique(go_entrez$go) %in% unique(go_ensembl$go) %>% summary()
+```
+
+```{r}
+unique(go_ensembl$ensembl) %in% test_bias$ensembl_gene_id %>% summary()
+GO.wall$category %in% unique(go_ensembl$go) %>% summary()
+test_bias <- data.frame(test_bias)
+test_bias
+GO.wall
+GO.wall.null
+go_ensembl
+```
+
+
+
+```{r}
+try_res <- data.frame(category = names(cat2gene), numDEInCat = NA, numInCat=NA)
+degenesnum=which(test_bias$has_dmr==1)
+try_res[,2:3]=t(sapply(cat2genenum,function(u){
+      c(sum(degenesnum%in%u),length(u))
+   }))
+```
+```{r}
+go_ensembl %>% filter(go == "GO:0000002")
+"GO:0000002" %in% names(cat2gene)
+```
+
+```{r}
+go_ensembl <- go_ensembl %>% mutate(num_cg = test_bias[match(.$ensembl, test_bias$ensembl_gene_id), "num_cg"],
+                      gene_signif = test_bias[match(.$ensembl, test_bias$ensembl_gene_id), "has_dmr"],
+                      gene_signif = ifelse(gene_signif == 0, FALSE, TRUE),
+                      seq_cat_signif = ifelse(go %in% GO.wall$category, TRUE, FALSE),
+                      seq_cat_signif_bias = ifelse(go %in% GO.wall.null$category, TRUE, FALSE))
+```
+
+```{r}
+go_ensembl %>% distinct() %>% group_by(go) %>% mutate(median_cg = median(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, median_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = median_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Median number of CpGs per ontology category")
+
+go_ensembl %>% distinct() %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+- still doesn't look as good as we hoped it would
+```{r}
+go_ensembl %>% distinct() %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category") +
+  theme(legend.position = "none")
+```
+
+```{r}
+png(filename="../output/boxplot.png", res=5000) # perhaps width/height as well
+plot <- go_ensembl %>% distinct() %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category") +
+  theme(legend.position = "none")
+plot
+dev.off()
+```
+
+- oops i think I've done it wrong
+wait no
+this plot is more about what we lose rather than gaining stuff
+```{r}
+go_ensembl %>% distinct() %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+
+```{r}
+go_entrez %>% distinct() %>% mutate(num_cg_na = ifelse(is.na(num_cg), TRUE, FALSE)) %>% group_by(go) %>% mutate(num_gene = dplyr::n()) %>% ungroup() %>%
+  group_by(go, num_gene, num_cg_na) %>% summarise(n=dplyr::n(), ratio = dplyr::n()/num_gene) %>% distinct() %>% filter(num_cg_na == TRUE) %>%
+  ggplot(aes(x = num_gene, y = n)) +
+  geom_point()
+```
+
+```{r}
+GO.wall %>% filter(category %in% filter(go_entrez, is.na(num_cg), seq_cat_signif == TRUE)$go)
+GO.wall %>% filter(category %in% filter(go_entrez, is.na(num_cg), seq_cat_signif_bias == TRUE)$go)
+```
+- let's not use the entrez freq maybe
+- let's do the 
+
+
 
