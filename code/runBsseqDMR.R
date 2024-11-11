@@ -6,7 +6,10 @@ library(Biostrings)
 library(bsseq)
 library(BiocParallel)
 
-# get the positions
+# bsseq vignette
+# https://www.bioconductor.org/packages/release/bioc/vignettes/bsseq/inst/doc/bsseq_analysis.html
+
+# get the positions of cg sites
 seq_names <- seqnames(BSgenome.Hsapiens.UCSC.hg19)[1:25]
 anno_seq <- lapply(seq_names, function(x) {
   cbind(data.frame(matchPattern("CG", BSgenome.Hsapiens.UCSC.hg19[[x]])),
@@ -55,6 +58,8 @@ colnames(beta_nk)[5:13] <- paste0("nk_", colnames(beta_nk)[5:13])
 beta_all <- cbind(beta_nk, beta_b[,5:13])
 
 saveRDS(beta_all, "output/wgbs_counts.rds")
+
+#####
 
 # bsseq dmr analysis
 ## set up
@@ -110,6 +115,7 @@ saveRDS(bseq_all_res, "output/bsseq_res.rds")
 
 ## dmrs
 bsseq_dmrs <- dmrFinder(bseq.tstat)
+# filter the dmrs
 bsseq_dmrs <- subset(bsseq_dmrs, n >= 3 & abs(meanDiff) >= 0.1)
 colnames(bsseq_dmrs)[1] <- "seqnames"
 bsseq_dmrs <- bsseq_dmrs %>%
