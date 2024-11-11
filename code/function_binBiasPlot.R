@@ -49,7 +49,7 @@ plotBiasGenomeBins <- function(counts, dmr, bin_size=2000) {
 }
 
 
-sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub")) {
+sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter")) {
   gene_source <- gene_source[1]
   if(gene_source == "biomaRt") {
     ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", version = "GRCh37")
@@ -64,7 +64,7 @@ sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub")) {
     genes <- genes %>% .[order(.$chromosome_name, .$start_position), ]
     colnames(genes) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
     genes <- genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup() %>% mutate(seqnames = as.character(seqnames), seqnames = paste0("chr", seqnames))
-    genes <- genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:n()) %>% filter(num_t == 1) %>% ungroup()
+    genes <- genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:dplyr::n()) %>% filter(num_t == 1) %>% ungroup()
   } else if (gene_source == "ExperimentHub") {
     eh <- ExperimentHub()
     genes <- eh[["EH3132"]]
@@ -77,9 +77,15 @@ sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub")) {
   genes <- genes %>% group_by(ensembl_gene_id) %>% filter(width == max(width)) %>% ungroup()
   # add random identifier
   genes$gene_num <- 1:nrow(genes)
+  #is it promoter???
+  if(length(gene_feature) == 1 & gene_feature == "promoter") {
+    genes <- genes %>% mutate(start = ifelse(.$strand == 1, .$start - 2000, .$end - 500),
+                              end = ifelse(.$strand == 1, .$start + 2500, .$end + 2000)) %>%
+      .[,!colnames(.) == "width"]
+  }
   # add number of cpgs overlapping gene
   gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
-  gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = n()) %>% ungroup() %>% data.frame()
+  gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = dplyr::n()) %>% ungroup() %>% data.frame()
 
   genes <- genes %>% mutate(num_cg = gene_cpg[match(.$gene_num, gene_cpg$gene_num), "n_cpg"])
   genes[is.na(genes)] <- 0
@@ -105,6 +111,8 @@ annoGeneDmr <- function(counts, dmrs, gene_source = c("biomaRt", "ExperimentHub"
   if(!"TSS" %in% colnames(genes)) {
     genes <- genes %>% mutate(TSS = ifelse(strand == "+", start, end))
   }
+  # assume dmrs are already in order of most to least signif
+  dmrs$rank <- 1:nrow(dmrs)
   # add if gene overlaps dmr
   overlap_dmr <- find_overlaps(as_granges(dmrs), as_granges(genes)) %>% data.frame() %>%
     mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
@@ -128,21 +136,21 @@ annoGeneDmr <- function(counts, dmrs, gene_source = c("biomaRt", "ExperimentHub"
 plotBiasGrouped <- function(genes, anno_genes, regression_line=FALSE, log2_scale=FALSE) {
   genes <- genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_genes, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
     group_by(num_cg) %>%
-    mutate(num_bins_same_cg = n()) %>%
+    mutate(num_bins_same_cg = dplyr::n()) %>%
     .[order(.$num_cg),] %>%
     ungroup() %>%
     mutate(bin_group = rep(1:ceiling(nrow(genes)/100), each = 100)[1:nrow(genes)]) %>%
     group_by(bin_group) %>%
     mutate(num_cg_bin_group = mean(num_cg)) %>%
     group_by(num_cg_bin_group) %>%
-    mutate(num_bins_group_same_cg = n()) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
     group_by(num_cg_bin_group, has_dmr) %>%
-    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    mutate(num_per_dmr = n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
     distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
     group_by(num_cg_bin_group) %>%
     .[order(.$num_cg_bin_group),] %>%
     mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
-    mutate(num = n()) %>%
+    mutate(num = dplyr::n()) %>%
     mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE)
   plot <- genes %>%
     ggplot(aes(x = num_cg_bin_group, y = prop)) +
@@ -161,21 +169,21 @@ plotBiasGrouped <- function(genes, anno_genes, regression_line=FALSE, log2_scale
 plotBiasGroupedMedian <- function(genes, anno_genes, regression_line=FALSE, log2_scale=FALSE) {
   genes <- genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_genes, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
     group_by(num_cg) %>%
-    mutate(num_bins_same_cg = n()) %>%
+    mutate(num_bins_same_cg = dplyr::n()) %>%
     .[order(.$num_cg),] %>%
     ungroup() %>%
     mutate(bin_group = rep(1:ceiling(nrow(genes)/100), each = 100)[1:nrow(genes)]) %>%
     group_by(bin_group) %>%
     mutate(num_cg_bin_group = median(num_cg)) %>%
     group_by(num_cg_bin_group) %>%
-    mutate(num_bins_group_same_cg = n()) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
     group_by(num_cg_bin_group, has_dmr) %>%
-    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    mutate(num_per_dmr = dplyr::n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
     distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
     group_by(num_cg_bin_group) %>%
     .[order(.$num_cg_bin_group),] %>%
     mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
-    mutate(num = n()) %>%
+    mutate(num = dplyr::n()) %>%
     mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE)
   plot <- genes %>%
     ggplot(aes(x = num_cg_bin_group, y = prop)) +
