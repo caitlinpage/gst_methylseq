@@ -7,6 +7,19 @@ editor_options:
   chunk_output_type: inline
 ---
 
+```{r}
+library(plyranges)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(BSgenome.Hsapiens.UCSC.hg19)
+
+library(missMethyl)
+library(goseq)
+library(GO.db)
+```
+
+
 ## Introduction
 
 
@@ -246,6 +259,7 @@ entrez_genes <- AnnotationDbi::select(org.Hs.eg.db,
                                 keys=AnnotationDbi::keys(org.Hs.eg.db), 
                                 columns=c("ENTREZID","SYMBOL"), 
                                 keytype="ENTREZID")
+entrez_genes
 ```
 ```{r}
 biomart_genes$gene_name %in% entrez_genes$SYMBOL %>% summary()
@@ -280,9 +294,7 @@ distinct(test_anno_filt, gene_name)
 distinct(test_anno_filt, ensembl_gene_id)
 biomart_genes
 ```
-```{r}
 
-```
 
 ```{r}
 biomart_genes <- biomart_genes %>% mutate(entrez_id = entrez_genes[match(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"])
@@ -293,12 +305,7 @@ test_anno <- test_anno %>% mutate(entrez_id = entrez_genes[match(test_anno$gene_
 test_anno_filt <- test_anno %>% filter(!is.na(entrez_id), tss_rel_peak == "Overlap")
 test_anno_filt
 ```
-```{r}
-class(mapped_genes$freq)
-mapped_genes$freq[1:10]
-data.frame(mapped_genes$freq) %>% table()
-?table
-```
+
 
 ```{r}
 biomart_genes_filt %>% group_by(gene_name) %>% filter(num_cg == max(num_cg)) %>% ungroup() %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, num_cg) %>% mutate(n=dplyr::n()) %>% ungroup() %>% filter(n>1)
@@ -309,6 +316,7 @@ table(table(biomart_genes_filt %>% group_by(gene_name) %>% filter(num_cg == max(
 ```{r}
 test_uni_freq <- biomart_genes_filt %>% group_by(gene_name) %>% filter(num_cg == max(num_cg)) %>% ungroup() %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, num_cg) %>% ungroup() %>% data.frame()
 test_uni_freq <- test_uni_freq %>% filter(num_cg > 0)
+test_uni_freq
 ```
 hold up I think it straight up counts it
 ```{r}
@@ -339,7 +347,6 @@ data.frame(mapped_genes$equiv)
 ```
 
 ```{r}
-?array
 equiv_table <- freq_make_table
 data.frame(as.array(equiv_table, dimnames = list("", "mapped_genes.equiv")))
 data.frame(as.array(data.frame(freq_make_table)))
@@ -395,25 +402,46 @@ hack_map_output
 ```{r}
 out <- hack_map_output
 ```
+```{r}
+eg.universe[1:10]
+```
+```{r}
+go$idList
+```
+```{r}
+collection$collection[1]
+```
 
 ```{r}
-sorted.eg.sig <- out$sig.eg
-eg.universe <- out$universe
+sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+length(sorted.eg.sig) #9551
+eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+length(eg.universe) #27195
 freq_genes <- out$freq
-test.de <- out$de
+data.frame(freq_genes) #freq for each gene in universe
+test.de <- out$de #res for each gene
+length(test.de) #27195
 frac <- out$fract.counts
 equiv <- out$equiv
   
   # Check collection is a list with character vectors
-    collection <- list(collection=go$idList)
+  collection <- go$idList  
+  class(collection)
+  collection[1:5]
+  #collection <- list(collection=go$idList)
+    collection$collection[1:10] # entrez ids for each go term
   collection <- lapply(collection, as.character)
+length(collection$collection) #22561
   # Make sure gene set collections don't have any NAs
   collection <- lapply(collection, function(x) x[!is.na(x)])
+  length(collection$collection) #22561
   # Remove genes that are NOT in the universe from collections
   collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  length(collection) #22561
   # Remove collections with no genes left after universe filter
   inUniv <- sapply(collection, function(x) length(x) > 0)
   collection <- collection[inUniv]
+  length(collection) #22124
 ```
 
 # now for pwf
@@ -451,15 +479,28 @@ test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
 .plotBias(D=test.de,bias=as.vector(freq_genes))
 ```
 ```{r}
+length(sorted.eg.sig)
+length(collection)
+class(collection)
+length(collection)
+```
+```{r}
+names(collection[1:10])
+collection[1:10]
+```
+
+```{r}
 results <- matrix(NA,ncol=4,nrow=length(collection))
   colnames(results) <- c("N","DE","P.DE","FDR")
   rownames(results) <- names(collection)
   results[,"N"] <- unlist(lapply(collection,length))
 SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+results
 ```
 ```{r}
 results[,"DE"] <- unlist(lapply(collection, function(x) 
           sum((sorted.eg.sig %in% x))))
+results
 ```
 
 ```{r}
@@ -521,6 +562,8 @@ results[,"FDR"] <- stats::p.adjust(results[,"P.DE"],method="BH")
 results <- data.frame(results, SigGenesInSet)
 results
 ```
+- this is still wrong
+and p and fdr should not be the same
 ```{r}
 result <- merge(go$idTable,results,by.x="GOID",by.y="row.names")
     rownames(result) <- result$GOID
@@ -530,6 +573,27 @@ result
 it went wrong somewhere (clearly)
 
 don't know how why or where
+oh the loop thing is for length of collection
+so my guess - collection is just 1 thing
+```{r}
+collection$collection
+```
+it's not
+but it is a list
+and that list would return 1 thing
+```{r}
+length(collection)
+length(collection$collection)
+```
+correct
+-ooh so if i just change this and re-run that section - it could be right
+-ok yes but also all the same thing so it's still wrong
+- i think it's now a rownames issue? - and it's not matching the info between the things
+it was a rownames thing
+but that came basically from double listing the thing - don't make it a list if it's already a list
+
+
+
 
 
 mm uses univariate - 2 colours
