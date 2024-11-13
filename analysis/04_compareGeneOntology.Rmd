@@ -8,9 +8,28 @@ editor_options:
 ---
 
 ## Introduction
+```{r}
+library(ggVennDiagram)
+```
 
 ```{r}
+GO.wall <- readRDS("../output/goseq_res.rds")
+GO.wall.null <- readRDS("../output/goseq_null_res.rds")
+
+mm_hack <- readRDS("../output/mm_hack_res.rds")
+
+sig_terms_array <- readRDS("../output/mm_array_res.rds")
+sig_terms_array_biased <- readRDS("../output/mm_array_null.rds")
+```
+
+# Compare the significant terms between approaches
+
+## Venn diagrams
+```{r}
 list_venn <- list(bias = GO.wall.null$term, correct = GO.wall$term)
+ggVennDiagram(list_venn)
+
+list_venn <- list(bias = GO.wall.null$term, correct = mm_hack$TERM)
 ggVennDiagram(list_venn)
 ```
 ```{r}
@@ -39,6 +58,8 @@ ggVennDiagram(list_venn)
 list_venn <- list(array_correct = sig_terms_array$TERM, array_bias = sig_terms_array_biased$TERM, seq_correct = GO.wall$term, seq_bias = GO.wall.null$term)
 ggVennDiagram(list_venn)
 ```
+## Upset plot
+
 
 
 ####
@@ -64,6 +85,9 @@ ggVennDiagram(list(array_not = go_entrez %>% distinct(go, array_cat_signif, arra
 -yeah that's a no as expected - array all the unbiased is within the biased approach
 ##############################
 
+```{r}
+mm_hack
+```
 
 ## more complicated stuff
 compare number of genes with many probes in sets without bias correction compared to with bias correction.
@@ -80,9 +104,7 @@ sig_terms_array
 ```{r}
 library(org.Hs.eg.db)
 ```
-```{r}
-?org.Hs.egGO
-```
+
 ```{r}
 x <- org.Hs.egGO
 # Get the entrez gene identifiers that are mapped to a GO ID
@@ -609,3 +631,4 @@ GO.wall %>% filter(category %in% filter(go_entrez, is.na(num_cg), seq_cat_signif
 
 
 
+- an upset plot would also be nice
