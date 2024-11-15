@@ -17,6 +17,9 @@ library(BSgenome.Hsapiens.UCSC.hg19)
 library(missMethyl)
 library(goseq)
 library(GO.db)
+library(BiasedUrn)
+
+library(ggVennDiagram)
 ```
 
 
@@ -87,6 +90,10 @@ GO.wall <- GO.wall %>%
     .[order(.$FDR, decreasing = FALSE), ]
 GO.wall
 ```
+```{r}
+saveRDS(GO.wall, "../output/goseq_res.rds")
+```
+
 - ok these are not the terms I was hoping for
 - microarray terms are way better and relate to B cells
 - I'm getting T cell terms
@@ -106,6 +113,7 @@ GO.wall.num_cg <- GO.wall.num_cg %>%
     dplyr::filter(.data$FDR < 0.05) %>%
     .[order(.$FDR, decreasing = FALSE), ]
 GO.wall.num_cg
+saveRDS(GO.wall.num_cg, "../output/goseq_num_cg_res.rds")
 ```
 - oh maybe it does the binning in the testing so in the first example I double binned??
 ```{r}
@@ -118,6 +126,7 @@ GO.wall.null <- GO.wall.null %>%
     dplyr::filter(.data$FDR < 0.05) %>%
     .[order(.$FDR, decreasing = FALSE), ]
 GO.wall.null
+saveRDS(GO.wall.null, "../output/goseq_null_res.rds")
 ```
 ## compare bias and corrected terms
 ```{r}
@@ -352,17 +361,7 @@ data.frame(as.array(equiv_table, dimnames = list("", "mapped_genes.equiv")))
 data.frame(as.array(data.frame(freq_make_table)))
 ```
 
-```{r}
-rep(test_uni_freq$entrez_id[18], each = test_uni_freq$num_cg[18:20])
-```
 
-```{r}
-?rep
-```
-
-```{r}
-as.table(mutate(test_uni_freq, num_cg == as.integer(num_cg)))
-```
 
 ```{r}
 data.frame(mapped_genes$freq) %>% filter(Freq == 1)
@@ -402,15 +401,7 @@ hack_map_output
 ```{r}
 out <- hack_map_output
 ```
-```{r}
-eg.universe[1:10]
-```
-```{r}
-go$idList
-```
-```{r}
-collection$collection[1]
-```
+
 
 ```{r}
 sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
@@ -428,6 +419,7 @@ equiv <- out$equiv
   collection <- go$idList  
   class(collection)
   collection[1:5]
+  #only if it's not a list
   #collection <- list(collection=go$idList)
     collection$collection[1:10] # entrez ids for each go term
   collection <- lapply(collection, as.character)
@@ -478,16 +470,7 @@ test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
 }
 .plotBias(D=test.de,bias=as.vector(freq_genes))
 ```
-```{r}
-length(sorted.eg.sig)
-length(collection)
-class(collection)
-length(collection)
-```
-```{r}
-names(collection[1:10])
-collection[1:10]
-```
+
 
 ```{r}
 results <- matrix(NA,ncol=4,nrow=length(collection))
@@ -511,15 +494,7 @@ Nuniverse <- length(eg.universe)
 ```{r}
 library(BiasedUrn)
 ```
-```{r}
-length(collection$collection)
-collection[[2]]
-```
-```{r}
-InSet[1:5]
-pwf$pwf[InSet]
-pwf$
-```
+
 
 ```{r}
 #collection <- collection$collection
@@ -562,69 +537,96 @@ results[,"FDR"] <- stats::p.adjust(results[,"P.DE"],method="BH")
 results <- data.frame(results, SigGenesInSet)
 results
 ```
-- this is still wrong
-and p and fdr should not be the same
+yay results
 ```{r}
 result <- merge(go$idTable,results,by.x="GOID",by.y="row.names")
     rownames(result) <- result$GOID
 result
 ```
 
-it went wrong somewhere (clearly)
-
-don't know how why or where
-oh the loop thing is for length of collection
-so my guess - collection is just 1 thing
 ```{r}
-collection$collection
-```
-it's not
-but it is a list
-and that list would return 1 thing
-```{r}
-length(collection)
-length(collection$collection)
-```
-correct
--ooh so if i just change this and re-run that section - it could be right
--ok yes but also all the same thing so it's still wrong
-- i think it's now a rownames issue? - and it's not matching the info between the things
-it was a rownames thing
-but that came basically from double listing the thing - don't make it a list if it's already a list
-
-
-
-
-
-mm uses univariate - 2 colours
-multivariate is for more than 2
-hold up i thought the diff colours were about the "weight"/bias
-unless the 2 colours is the signif/not signif?
-ok going by how the arguments are described - the 2 ball colours are signif and not signif
-so that explains the univariate
-except the odds is prob of red/white (signif and not signif)
-which doesn't fit when that is dependent on length
-but they get odds by doing other stuff
-and they are smarter than me so it must make sense
-hold up by the time we do the testing are we testing genes or categories?
-because if categories i need to back up
-and it probably is categories
-it could still be genes
-but they would be annotated to categories at least
-
-from the goseq paper
-"This distribution extends the hypergeometric distribution to the case where the probability of success and failure differ. The GOseq implementation of the approximation assumes that all genes within a category have the same probability of being chosen, but this probability is different from the probability of choosing genes outside this category. The mean of the probability weightings for each gene within/outside the category is defined as the common probability of choosing a gene within/outside that category. While the Wallenius approximation is obviously a simplification, it is significantly closer to the true distribution than the standard hypergeometric distribution."
-- this explains that odds thing - because it's about the categories
-- so this must be in the InSet stuff (I think??)
-results[i,"P.DE"] <- BiasedUrn::pWNCHypergeo(results[i,"DE"], #cum distrib fn
-                                                   results[i,"N"],
-                                                   Nuniverse-results[i,"N"],
-                                                   m,odds,lower.tail=FALSE) + 
-          BiasedUrn::dWNCHypergeo(results[i,"DE"], #prob mass fn pmf
-                                  results[i,"N"],
-                                  Nuniverse-results[i,"N"],
-                                  m,odds)
-```{r}
-?pWNCHypergeo
+result <- result %>% filter(FDR < 0.05) %>% .[order(.$FDR),]
+result
+mm_hack <- result
 ```
 
+```{r}
+saveRDS(mm_hack, "../output/mm_hack_res.rds")
+```
+
+- run a null version
+
+```{r}
+mm_hack_null <- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(mm_hack_null) <- c("N","DE","P.DE","FDR")
+  rownames(mm_hack_null) <- names(collection)
+  mm_hack_null[,"N"] <- unlist(lapply(collection,length))
+SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+
+mm_hack_null[,"DE"] <- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+
+
+for(i in 1:length(collection)){
+
+        mm_hack_null[i,"P.DE"] <- stats::phyper(q=mm_hack_null[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=mm_hack_null[i,"N"],
+                                           lower.tail=FALSE)
+        # Get gene symbols of significant genes
+        SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+        SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+        SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+}
+mm_hack_null[,"FDR"] <- stats::p.adjust(mm_hack_null[,"P.DE"],method="BH")
+  mm_hack_null[,"DE"] <- floor(mm_hack_null[,"DE"])
+mm_hack_null <- data.frame(mm_hack_null, SigGenesInSet)
+
+mm_hack_null <- merge(go$idTable,mm_hack_null,by.x="GOID",by.y="row.names")
+    rownames(mm_hack_null) <- mm_hack_null$GOID
+mm_hack_null <- mm_hack_null %>% filter(FDR < 0.05) %>% .[order(.$FDR),]
+mm_hack_null
+```
+```{r}
+saveRDS(mm_hack_null, "../output/mm_hack_null_res.rds")
+```
+
+```{r}
+list_venn <- list(mm_hack = mm_hack$GOID, mm_null = mm_hack_null$GOID)
+ggVennDiagram(list_venn)
+```
+```{r}
+mm_hack
+```
+
+
+
+```{r}
+list_venn <- list(mm_hack = mm_hack$GOID, goseq = GO.wall$category)
+ggVennDiagram(list_venn)
+
+list_venn <- list(mm_null = mm_hack_null$GOID, go_null = GO.wall.null$category)
+ggVennDiagram(list_venn)
+```
+- good, mm hack gets more terms but they all overlap
+- are the ones that don't lower ranked?
+
+```{r}
+c(mm_hack$GOID, GO.wall$category) %>% data.frame() %>% setNames("GOID") %>% distinct() %>% 
+  mutate(mm_fdr = result[match(.$GOID, mm_hack$GOID), "FDR"],
+         goseq_fdr = GO.wall[match(.$GOID, GO.wall$category), "FDR"]) %>% replace(is.na(.), 0.1) %>%
+  ggplot(aes(x = goseq_fdr, y = mm_fdr)) +
+  geom_point(alpha = 0.3)
+```
+- not what I was hoping this would look like
+
+```{r}
+list_venn <- list(mm_hack = mm_hack$GOID, goseq_null = GO.wall.null$category)
+ggVennDiagram(list_venn)
+
+list_venn <- list(mm_hack = mm_hack$GOID, goseq = GO.wall$category, goseq_null = GO.wall.null$category)
+ggVennDiagram(list_venn)
+```
+- ok so just with goseq - most of the corrected are in the biased
+- here similarish thing - lots of overlap
