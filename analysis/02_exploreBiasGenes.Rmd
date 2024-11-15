@@ -829,8 +829,9 @@ test_genes
 biomart_genes
 ```
 
-```{r}
-test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs, genes = test_genes)
+```{r shared-anno}
+source("../code/function_binBiasPlot.R")
+test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs, genes = biomart_genes)
 ```
 - finally! i had to delete some stuff for it to run
 ```{r}
@@ -847,7 +848,7 @@ plotBiasGroupedMedian(test_genes, test_anno, regression_line = TRUE)
 plotBiasGroupedMedian(test_genes, test_anno, log2_scale = TRUE, regression_line = TRUE)
 ```
 -looks the same with median compared to mean
-
+- alicia prefers it without the regression line
 
 ##
 ```{r}
@@ -880,6 +881,33 @@ biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_
     ggplot(aes(x = num_cg_bin_group, y = prop)) +
       geom_point(alpha = 0.4) +
   scale_x_continuous(limits = c(0,5000)) +
+  theme_bw() +
+  labs(x = "Number of CpGs per gene", y = "Proportion differentially methylated")
+```
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(test_anno, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = dplyr::n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = dplyr::n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+      geom_point(alpha = 0.4) +
+  scale_x_continuous(limits = c(0,5000)) +
+  theme_bw() +
   labs(x = "Number of CpGs per gene", y = "Proportion differentially methylated")
 ```
 

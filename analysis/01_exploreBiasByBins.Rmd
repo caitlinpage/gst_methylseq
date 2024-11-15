@@ -20,9 +20,9 @@ library(BSgenome.Hsapiens.UCSC.hg19)
 ```
 
 ```{r}
-wgbs_counts <- readRDS("output/wgbs_counts.rds")
-bsseq_res <- readRDS("output/bsseq_res.rds")
-bsseq_dmrs <- readRDS("output/bsseq_dmrs.rds")
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+bsseq_res <- readRDS("../output/bsseq_res.rds")
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
 ```
 
 # What bin size to choose?
