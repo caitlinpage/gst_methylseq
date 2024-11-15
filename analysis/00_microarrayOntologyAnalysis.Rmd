@@ -17,6 +17,8 @@ library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 
 library(dplyr)
 library(ggplot2)
+
+library(ggVennDiagram)
 ```
 
 
@@ -25,7 +27,7 @@ library(ggplot2)
 #table(top$p.BH_X1.1 < 0.01)
 ```
 ```{r}
-DMPs <- readRDS("output/array_dmps.rds")
+DMPs <- readRDS("../output/array_dmps.rds")
 DMPs
 ```
 ```{r}
@@ -35,7 +37,7 @@ top
 ```{r}
 head(bVals)
 ```
-
+- this code is just an option to filter the CpGs by just picking the ones with a big beta value.
 ```{r}
 #beta <- getBeta(mSet)
 beta <- bVals
@@ -69,23 +71,31 @@ length(check$sig.eg)
 gst <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
               plot.bias=TRUE)
 ```
+- this all.cpg thing - the vignette uses top - damn I did a filtering thing on that, the vignette uses just all the tested - which would be all of the DMPs table
+```{r}
+gst2 <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
+              plot.bias=TRUE)
+```
 
 ```{r}
-topGSA(gst, n=10)
+topGSA(gst, n=20)
+topGSA(gst2, n=20)
 ```
 ```{r}
-sig_terms_array <- topGSA(gst, n = 1000) %>% filter(FDR < 0.01)
+sig_terms_array <- topGSA(gst2, n = 1000) %>% filter(FDR < 0.05)
 sig_terms_array
+saveRDS(sig_terms_array, "../output/mm_array_res.rds")
 ```
 
 ## no bias
 
 ```{r}
-gst.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
+gst.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
               prior.prob=FALSE)
 
-sig_terms_array_biased <- topGSA(gst.biased, n=10000) %>% filter(FDR < 0.01)
+sig_terms_array_biased <- topGSA(gst.biased, n=10000) %>% filter(FDR < 0.05)
 sig_terms_array_biased
+saveRDS(sig_terms_array_biased, "../output/mm_array_null.rds")
 ```
 ## compare bias and corrected
 ```{r}
@@ -97,7 +107,7 @@ ggVennDiagram(list_venn)
 ## 
 # with kegg
 ```{r}
-gst.kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="KEGG")
+gst.kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="KEGG")
 ## All input CpGs are used for testing.
 topGSA(gst.kegg, n=10)
 
@@ -106,7 +116,7 @@ topGSA(gst.kegg, n=10)
 #promoters
 
 ```{r}
-gst_promoter <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
+gst_promoter <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
               plot.bias=TRUE, genomic.features = "TSS1500")
 ```
 ```{r}
@@ -116,7 +126,7 @@ sig_terms_array_promoter
 ```
 
 ```{r}
-gst_promoter.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
+gst_promoter.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
               prior.prob = FALSE, genomic.features = "TSS1500")
 ```
 ```{r}
@@ -135,6 +145,19 @@ everything else happens under gsameth
 - takes names of signif cpgs
 ```{r}
 mapped_genes <- getMappedEntrezIDs(rownames(top), array.type = "EPIC")
+mapped_genes
+```
+```{r}
+mapped_genes <- getMappedEntrezIDs(rownames(DMPs), array.type = "EPIC")
+mapped_genes
+```
+- probs want this version
+```{r}
+mapped_genes <- getMappedEntrezIDs(sigCpGs, array.type = "EPIC")
+mapped_genes
+```
+```{r}
+mapped_genes <- getMappedEntrezIDs(rownames(DMPs), array.type = "EPIC")
 mapped_genes
 ```
 
