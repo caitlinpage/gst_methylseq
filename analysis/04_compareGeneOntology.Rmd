@@ -149,7 +149,7 @@ and here I have the entrez gene ids and the number of cpg sites
 i want a way to pass over the go term to this?
 maybe it would be easier to pass it over to the results which has the go terms
 ```{r}
-sig_terms_array %>% mutate(test_pass = ifelse(rownames(.) %in% names(xx), TRUE, FALSE))
+sig_terms_array %>% mutate(test_pass = ifelse(rownames(.) %in% names(xx), TRUE, FALSE)) %>% group_by(test_pass) %>% summarise(n())
 ```
 - ok this is the "set"
 - now just need the biases to go with
@@ -161,21 +161,33 @@ names(unlist(xx))[1:5]
 
 ```{r}
 go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
-```
-```{r}
-go_entrez <- go_entrez %>% mutate(num_cg = data.frame(mapped_genes$freq)[match(.$entrez, data.frame(mapped_genes$freq)$eg.all), "Freq"])
 go_entrez
 ```
 ```{r}
-mapped_genes$freq %>% data.frame() %>% filter(eg.all == "28472")
-sig_terms_array["GO:0002376",]
+mapped_genes$freq %>% data.frame()
 ```
 ```{r}
-unique(go_entrez$entrez) %in% mapped_genes$universe %>% summary()
-mapped_genes$universe %in% unique(go_entrez$entrez) %>% summary()
+as.character(unique(test_anno$entrez_id)) %in% as.character(data.frame(mapped_genes$freq)$eg.all) %>% summary()
+as.character(unique(test_anno$entrez_id)) %in% as.character(data.frame(out$freq)$eg.all) %>% summary()
 ```
-- ok this also explains problems - they don't match
-- is it that the missing ones have 0 cpgs??? - because those were removed in the mapped_genes thing it didn't want them
+```{r}
+out$freq %>% data.frame()
+```
+- numbers are very diff between the array version and my hacked sequencing one
+- so let's do my seq one - more stuff
+```{r}
+biomart_genes %>% filter(gene_name == "A1BG")
+```
+
+```{r}
+entrez_genes
+```
+
+```{r}
+go_entrez <- go_entrez %>% mutate(num_cg = data.frame(out$freq)[match(.$entrez, data.frame(out$freq)$eg.all), "Freq"])
+go_entrez
+```
+
 
 # let's limit to the matching ones for now
 ```{r}
@@ -196,9 +208,15 @@ go_entrez %>% distinct(num_cg)
 go_entrez <- go_entrez %>% mutate(array_cat_signif = ifelse(go %in% rownames(sig_terms_array), TRUE, FALSE),
                      array_cat_signif_bias = ifelse(go %in% rownames(sig_terms_array_biased), TRUE, FALSE),
                      seq_cat_signif = ifelse(go %in% GO.wall$category, TRUE, FALSE),
-                     seq_cat_signif_bias = ifelse(go %in% GO.wall.null$category, TRUE, FALSE))
+                     seq_cat_signif_bias = ifelse(go %in% GO.wall.null$category, TRUE, FALSE),
+                     mm_seq = ifelse(go %in% mm_hack$GOID, TRUE, FALSE))
+go_entrez
 ```
 - ok I'm actually getting close now
+```{r}
+go_entrez <- go_entrez %>% mutate(mm_seq_bias = ifelse(go %in% mm_hack_null$GOID, TRUE, FALSE))
+```
+
 
 ```{r}
 go_entrez %>% group_by(go) %>% mutate(num_entrez = dplyr::n(), median_cg = median(num_cg)) %>% distinct(.)
@@ -632,3 +650,59 @@ GO.wall %>% filter(category %in% filter(go_entrez, is.na(num_cg), seq_cat_signif
 
 
 - an upset plot would also be nice
+###############
+
+# new results boxplot
+```{r}
+go_entrez
+go_ensembl
+```
+```{r}
+
+```
+
+```{r}
+# mm hack
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_seq, mm_seq_bias, mean_cg) %>% filter(mm_seq_bias == TRUE) %>% 
+  mutate(Method = ifelse(mm_seq == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+# goseq hack
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+# array mm
+go_entrez[,1:5] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(array_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+```{r}
+
+```
+
+
+
+well damn guessing I'm not doing it right
+or hold it it's how i'm getting that info
+```{r}
+mm_hack_freq <- out$freq %>% data.frame()
+```
+```{r}
+go_entrez %>% distinct(entrez)
+unique(go_entrez$entrez) %in% mm_hack_freq$eg.all %>% summary()
+```
+
+```{r}
+go_entrez %>% mutate(seq_freq = mm_hack_freq[match(.$entrez, mm_hack_freq$eg.all), "Freq"]) %>% mutate(match = ifelse(num_cg == seq_freq, TRUE, FALSE)) %>% distinct(entrez, num_cg, seq_freq, match) %>% group_by(match) %>% summarise(n())
+```
+- ok so some in seq aren't actually in my other one but the num_cg match so it's not that
+something else must be happening
+
