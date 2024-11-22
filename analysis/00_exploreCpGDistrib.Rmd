@@ -4,12 +4,80 @@ author: "Caitlin Page"
 date: "2024-09-05"
 output: workflowr::wflow_html
 editor_options:
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+```
 
 ## Introduction
 
 ```{r}
+DMPs <- readRDS("../output/DMPs.rds")
 
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+bsseq_res <- readRDS("../output/bsseq_res.rds")
+
+biomart_genes <- readRDS("../output/biomart_genes.rds")
 ```
+
+# compare array and seq genes and num cpg
+```{r}
+DMPs # this is all the tested cpgs from array
+```
+```{r}
+wgbs_counts # this is all the sites for sequencing 
+bsseq_res # sites tested
+```
+```{r}
+find_overlaps(as_granges(biomart_genes_filt), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(ensembl_gene_id) %>% mutate(num_wgbs = n()) %>% ungroup() %>% mutate(match = ifelse(num_cg == num_wgbs, TRUE, FALSE)) %>% group_by(match) %>% summarise(n())
+```
+- nice
+```{r}
+biomart_genes_filt <- data.frame(biomart_genes_filt)
+biomart_genes_filt
+```
+```{r}
+mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>% filter(Freq == 0 | num_cg_wgbs == 0)
+```
+
+
+```{r}
+mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>%
+  ggplot(aes(x = Freq, y = num_cg_wgbs)) +
+  geom_point(alpha = 0.3) +
+  labs(x = "num_probes")
+
+mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>%
+  ggplot(aes(x = log2(Freq + 1), y = log2(num_cg_wgbs + 1))) +
+  geom_point(alpha = 0.3) +
+  labs(x = "log2(num_probes + 1)")
+```
+```{r}
+mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>% filter(!is.na(num_cg_wgbs)) %>% cor.test(.$Freq, .$num_cg_wgbs) # yeah ok i knew i couldn't shove it in like that
+```
+```{r}
+cor.test()
+```
+
+```{r}
+array_freq <- mapped_genes$freq %>% data.frame()
+```
+
+```{r}
+biomart_genes_filt %>% mutate(num_cg_array = array_freq[match(.$entrez_id, array_freq$eg.all), "Freq"]) %>%
+  ggplot(aes(x = num_cg_array, y = num_cg)) +
+  geom_point(alpha = 0.3)
+```
+- ok so both ways not all overlap but plot is similar
+- what am I saying - plot is the same b/c missing values are removed
+```{r}
+ggVennDiagram(list(wgbs=biomart_genes_filt$entrez_id, array=as.character(array_freq$eg.all)))
+```
+
+
+
+
 
