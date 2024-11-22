@@ -153,7 +153,7 @@ mapped_genes
 ```
 - probs want this version
 ```{r}
-mapped_genes <- getMappedEntrezIDs(sigCpGs, array.type = "EPIC")
+mapped_genes <- getMappedEntrezIDs(sigCpGs, array.type = "EPIC") 
 mapped_genes
 ```
 ```{r}
