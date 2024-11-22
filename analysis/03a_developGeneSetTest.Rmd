@@ -1,0 +1,303 @@
+---
+title: "03a_developGeneSetTest"
+author: "Caitlin Page"
+date: "2024-11-15"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+
+```
+
+# i want to compare the gene sets
+- figure out if that's what's going wrong
+(and maybe paste all my code in here lol)
+or just rename the other file to this
+
+
+## get the gene set from goseq
+goseq::goseq(pwf, "hg19", "ensGene")
+getgo(rownames(pwf),genome,id,fetch.cats=test.cats)
+```{r}
+rownames(pwf) %>% length()
+test_bias$ensembl_gene_id %>% length()
+```
+
+```{r}
+go_goseq <- getgo(test_bias$ensembl_gene_id, "hg19", "ensGene")
+names(go_goseq) <- test_bias$ensembl_gene_id
+go_goseq <- reversemapping(go_goseq)
+go_goseq <- reversemapping(go_goseq)
+goseq_go <- reversemapping(go_goseq)
+go_goseq
+```
+```{r}
+names(goseq_go)[1:5]
+names(go_goseq)[1:5]
+```
+
+```{r}
+length(unique(names(goseq_go))) # goseq 22258 
+length(unique(names(collection))) # mm 22124
+```
+
+```{r}
+ggVennDiagram(list(mm = unique(names(collection)), goseq = unique(names(goseq_go))))
+```
+
+
+```{r}
+names(goseq_go[test_bias$ensembl_gene_id]) %>% unique() %>% length()
+length(test_bias$ensembl_gene_id) - length(go_goseq)
+```
+```{r}
+test_bias$ensembl_gene_id %in% names(go_goseq) %>% summary()
+go_goseq[filter(test_bias, ensembl_gene_id %in% names(go_goseq))$ensembl_gene_id] %>% length()
+```
+```{r}
+go_goseq_filt <- go_goseq[filter(test_bias, ensembl_gene_id %in% names(go_goseq))$ensembl_gene_id]
+goseq_go_filt <- reversemapping(go_goseq_filt)
+```
+```{r}
+length(goseq_go_filt)
+names(goseq_go_filt)[1:5]
+```
+
+- so I filtered out the genes but it didn't change the categories
+```{r}
+lapply(go_goseq[1:5], length)
+lapply(goseq_go[1:5], length)
+```
+```{r}
+lapply(goseq_go, length) %>% unlist() %>% data.frame() %>% setNames("num_genes") #22258, same with filt
+lapply(goseq_go_filt, length) %>% unlist() %>% data.frame() %>% setNames("num_genes") %>% filter(num_genes > 0)
+```
+there's no diff between these
+```{r}
+ggVennDiagram(list(mm = unique(names(collection)), goseq = unique(names(goseq_go_filt))))
+```
+
+- ok so this can't be the cause of getting more res in mm - also they are fairly sim
+
+- so what is happening?
+-running with the other inputs did not fix it
+##############
+# functions
+```{r}
+# copied from mm
+.getGO <- function(){
+  if(!requireNamespace("org.Hs.eg.db", quietly = TRUE))
+    stop("org.Hs.eg.db package required but not installed.")
+  egGO2ALLEGS <- utils::getFromNamespace("org.Hs.egGO2ALLEGS", "org.Hs.eg.db")
+  GeneID.PathID <- AnnotationDbi::toTable(egGO2ALLEGS)[,c("gene_id", "go_id", "Ontology")]
+  d <- !duplicated(GeneID.PathID[, c("gene_id", "go_id")])
+  GeneID.PathID <- GeneID.PathID[d, ]
+  GOID.TERM <- suppressMessages(AnnotationDbi::select(GO.db::GO.db, 
+                                                      keys=unique(GeneID.PathID$go_id), 
+                                                      columns=c("GOID","ONTOLOGY","TERM"), 
+                                                      keytype="GOID"))
+  go <- tapply(GeneID.PathID$gene_id, GeneID.PathID$go_id, list)
+    
+  list(idList=go, idTable=GOID.TERM)
+}
+go <- .getGO()
+
+.estimatePWF <- function(D,bias)
+  # An alternative to goseq function nullp, which is transformation invariant
+  # Belinda Phipson and Gordon Smyth
+  # 6 March 2015
+{
+  prior.prob <- bias
+  o <- order(bias)
+  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
+  prior.prob
+}
+test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+
+.plotBias <- function(D,bias)
+  # Plotting function to show gene level CpG density bias
+  # Belinda Phipson
+  # 5 March 2015
+{
+  o <- order(bias)
+  splitf <- rep(1:100,each=200)[1:length(bias)]
+  avgbias <- tapply(bias[o],factor(splitf),mean)
+  sumDM <- tapply(D[o],factor(splitf),sum)
+  propDM <- sumDM/table(splitf)
+  graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Number of CpGs per gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+}
+.plotBias(D=test.de,bias=as.vector(freq_genes))
+```
+```{r}
+library(BiasedUrn)
+```
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(test_anno, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE)
+```
+
+```{r}
+run_miss_methyl <- function(biomart_genes, test_anno, bias_type = c("binned", "num_cg")) {
+  entrez_genes <- AnnotationDbi::select(org.Hs.eg.db, 
+                                keys=AnnotationDbi::keys(org.Hs.eg.db), 
+                                columns=c("ENTREZID","SYMBOL"), 
+                                keytype="ENTREZID")
+  biomart_genes <- biomart_genes %>% mutate(entrez_id = entrez_genes[match(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"])
+  biomart_genes_filt <- biomart_genes %>% filter(!is.na(entrez_id))
+  biomart_genes_filt %>% group_by(gene_name) %>% filter(num_cg == max(num_cg)) %>% ungroup()
+  
+  test_anno <- test_anno %>% mutate(entrez_id = entrez_genes[match(test_anno$gene_name, entrez_genes$SYMBOL), "ENTREZID"])
+  test_anno_filt <- test_anno %>% filter(!is.na(entrez_id), tss_rel_peak == "Overlap")
+  
+  #bias type
+  if(length(bias_type) > 1) {
+    bias_type <- "binned"
+  }
+  if(bias_type == "binned") {
+    biomart_genes_filt <- biomart_genes_filt %>% 
+      group_by(num_cg) %>%
+      mutate(num_bins_same_cg = dplyr::n()) %>% 
+      .[order(.$num_cg),] %>%
+      ungroup() %>%
+      mutate(bin_group = rep(1:ceiling(nrow(biomart_genes_filt)/100), each = 100)[1:nrow(biomart_genes_filt)]) %>% 
+      group_by(bin_group) %>%
+      mutate(bias = mean(num_cg))
+  } else {
+    biomart_genes_filt$bias <- biomart_genes_filt$num_cg
+  }
+  
+  
+    
+  test_uni_freq <- biomart_genes_filt %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, bias) %>% ungroup() %>% data.frame()
+  test_uni_freq <- test_uni_freq %>% filter(bias > 0)
+  freq_make_table <- character()
+  for(i in 1:nrow(test_uni_freq)) {
+    res <- rep(test_uni_freq$entrez_id[i], each = test_uni_freq$bias[i])
+    freq_make_table <- c(freq_make_table, res)
+  }
+  freq_make_table <- table(freq_make_table)
+  biomart_genes_filt <- biomart_genes_filt %>% filter(bias > 0)
+  out <- list(
+  fract.counts = biomart_genes_filt %>%
+    mutate(sigid = entrez_id) %>% distinct(sigid) %>% .[order(.$sigid),] %>% data.frame() %>% 
+    mutate(frac = as.double(1)),
+  sig.eg = test_anno_filt %>% distinct(entrez_id) %>% .[order(.$entrez_id),],
+  universe = biomart_genes_filt %>% distinct(entrez_id) %>% 
+    .[order(.$entrez_id),] %>% .$entrez_id,
+  freq = freq_make_table,
+  equiv = as.array(freq_make_table), # column names wrong but maybe not too bad?
+  de = biomart_genes_filt %>% 
+    mutate(is_de = ifelse(entrez_id %in% test_anno_filt$entrez_id, 1, 0), is_de = as.integer(is_de)) %>%
+    .[order(.$entrez_id),] %>% distinct(entrez_id, is_de) %>% .$is_de
+)
+  
+  sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+  freq_genes <- out$freq
+  test.de <- out$de #res for each gene
+  frac <- out$fract.counts
+  equiv <- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  collection <- .getGO()$idList  
+  #only if it's not a list
+  #collection <- list(collection=go$idList)
+  collection <- lapply(collection, as.character)
+  # Make sure gene set collections don't have any NAs
+  collection <- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv <- sapply(collection, function(x) length(x) > 0)
+  collection <- collection[inUniv]
+  
+  results <- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(results) <- c("N","DE","P.DE","FDR")
+  rownames(results) <- names(collection)
+  results[,"N"] <- unlist(lapply(collection,length))
+  SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+  
+  results[,"DE"] <- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+  Nuniverse <- length(eg.universe)
+  m <- length(sorted.eg.sig)
+  test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+  # the testing
+  for(i in 1:length(collection)){
+      InSet <- eg.universe %in% collection[[i]]
+      pw.red <- sum(test_pwf[InSet])/results[i,"N"]
+      pw.white <- sum(test_pwf[!InSet])/(Nuniverse-results[i,"N"])
+      odds <- pw.red/pw.white
+      results[i,"P.DE"] <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+      #the optional thing
+        # Get gene symbols of significant genes
+        SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+        SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+        SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+      #end optional gene thing
+      if(results[i,"P.DE"]==0){
+        message("Pvalue of exactly zero detected. Performing hypergeometric 
+                test for gene set ", rownames(results)[i])
+        results[i,"P.DE"] <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,"N"],
+                                           lower.tail=FALSE)
+      }
+  }
+  results %>% data.frame()
+}
+
+run_miss_methyl(biomart_genes, test_anno)
+```
+
+- weird i don't think the pwf is even used at all
+- yes it is test_pwf is part of the testing
+therefore the thing that is taking forever is not going to run
+
+```{r}
+?pWNCHypergeo()
+```
+
+
+```{r}
+run_miss_methyl(biomart_genes, test_anno)
+```
+
+```{r}
+
+```
+
+
