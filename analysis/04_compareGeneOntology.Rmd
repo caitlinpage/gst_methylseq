@@ -176,6 +176,11 @@ out$freq %>% data.frame()
 - numbers are very diff between the array version and my hacked sequencing one
 - so let's do my seq one - more stuff
 ```{r}
+test_out$freq %>% data.frame()
+test_out_num$freq %>% data.frame()
+```
+
+```{r}
 biomart_genes %>% filter(gene_name == "A1BG")
 ```
 
@@ -184,7 +189,8 @@ entrez_genes
 ```
 
 ```{r}
-go_entrez <- go_entrez %>% mutate(num_cg = data.frame(out$freq)[match(.$entrez, data.frame(out$freq)$eg.all), "Freq"])
+go_entrez <- go_entrez %>% mutate(num_cg = data.frame(test_out_num$freq)[match(.$entrez, data.frame(test_out_num$freq)$freq_make_table), "Freq"],
+                                  num_cg_bin = data.frame(test_out$freq)[match(.$entrez, data.frame(test_out$freq)$freq_make_table), "Freq"])
 go_entrez
 ```
 
@@ -203,18 +209,33 @@ go_entrez %>% distinct(go)
 go_entrez %>% distinct(entrez)
 go_entrez %>% distinct(num_cg)
 ```
+```{r}
+mm_hack_null <- readRDS("../output/mm_hack_null_res.rds")
+```
+```{r}
+test_b_null
+```
 
 ```{r}
 go_entrez <- go_entrez %>% mutate(array_cat_signif = ifelse(go %in% rownames(sig_terms_array), TRUE, FALSE),
                      array_cat_signif_bias = ifelse(go %in% rownames(sig_terms_array_biased), TRUE, FALSE),
                      seq_cat_signif = ifelse(go %in% GO.wall$category, TRUE, FALSE),
                      seq_cat_signif_bias = ifelse(go %in% GO.wall.null$category, TRUE, FALSE),
-                     mm_seq = ifelse(go %in% mm_hack$GOID, TRUE, FALSE))
+                     mm_seq = ifelse(go %in% mm_hack$GOID, TRUE, FALSE),
+                     mm_seq_null = ifelse(go %in% mm_hack_null$GOID, TRUE, FALSE),
+                     mm_fn_bin = ifelse(go %in% rownames(test_b), TRUE, FALSE),
+                     mm_fn_bin_null = ifelse(go %in% test_b_null$GOID, TRUE, FALSE),
+                     mm_fn_num = ifelse(go %in% test_b_num$GOID, TRUE, FALSE),
+                     mm_fn_num_null = ifelse(go %in% test_b_num_null$GOID, TRUE, FALSE))
 go_entrez
 ```
 - ok I'm actually getting close now
 ```{r}
-go_entrez <- go_entrez %>% mutate(mm_seq_bias = ifelse(go %in% mm_hack_null$GOID, TRUE, FALSE))
+saveRDS(go_entrez, "../output/go_res_compare.rds")
+```
+
+```{r}
+
 ```
 
 
