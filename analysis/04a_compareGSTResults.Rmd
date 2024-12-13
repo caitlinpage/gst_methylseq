@@ -74,6 +74,54 @@ go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% di
   theme_bw() +
   labs(y = "Average number of CpGs per ontology category", title = "Fn MM num_cg")
 ```
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_fn_num, mm_fn_num_null, mean_cg) %>% filter(mm_fn_num == TRUE | mm_fn_num_null == TRUE) %>%
+  mutate(Method = ifelse(mm_fn_num == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Fn MM num_cg")
+```
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_fn_num, mm_fn_num_null, mean_cg) %>% filter(mm_fn_num == TRUE | mm_fn_num_null == TRUE) %>%
+  mutate(Method = ifelse(mm_fn_num == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)"))
+```
+```{r}
+bsseq_dmrs[66000:67000,]
+```
+```{r}
+bsseq_dmrs 
+```
+```{r}
+bsseq_dmrs[20000:21000,]
+```
+
+```{r}
+tail(bsseq_dmrs)
+```
+```{r}
+bsseq_dmrs %>%
+  ggplot(aes(x = abs(areaStat))) +
+  geom_density()
+```
+```{r}
+bsseq_dmrs %>% mutate(less_250 = ifelse(abs(areaStat) <= 100, TRUE, FALSE)) %>% group_by(less_250) %>% summarise(n())
+```
+```{r}
+bsseq_dmrs %>% filter(abs(areaStat) > 100) %>%
+  ggplot(aes(x = abs(areaStat))) +
+  geom_density()
+```
+
+
+```{r}
+go_entrez
+test_b_num
+test_b_num_null
+```
+
+
+
 # change in rank plots
 ```{r}
 go_entrez
@@ -83,6 +131,9 @@ go_entrez2 <- go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm
 ```
 ```{r}
 go_entrez
+```
+```{r}
+go_entrez2
 ```
 
 
@@ -104,6 +155,9 @@ sig_terms_array_biased %>% mutate(unbiased_rank = sig_terms_array[match(rownames
 - ok I don't think that's what i want that to look like
 - maybe it would be better with all results
 
+```{r}
+test_b_num_unfilt
+```
 
 ```{r}
 test_b$rank <- 1:nrow(test_b)
