@@ -50,8 +50,10 @@ plotBiasGenomeBins <- function(counts, dmr, bin_size=2000) {
 
 
 sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter")) {
-  gene_source <- gene_source[1]
-  if(gene_source == "biomaRt") {
+  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub"))
+  gene_feature <- match.arg(tolower(gene_feature), c("gene", "promoter"))
+
+  if(gene_source == "biomart") {
     ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", version = "GRCh37")
     genes <- getBM(
       attributes = c("ensembl_gene_id", "external_gene_name", "ensembl_transcript_id",
@@ -65,7 +67,7 @@ sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gen
     colnames(genes) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
     genes <- genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup() %>% mutate(seqnames = as.character(seqnames), seqnames = paste0("chr", seqnames))
     genes <- genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:dplyr::n()) %>% filter(num_t == 1) %>% ungroup()
-  } else if (gene_source == "ExperimentHub") {
+  } else if (gene_source == "experimenthub") {
     eh <- ExperimentHub()
     genes <- eh[["EH3132"]]
   }
@@ -92,8 +94,8 @@ sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gen
   genes
 }
 
-annoGeneDmr <- function(counts, dmrs, gene_source = c("biomaRt", "ExperimentHub", "self"), genes) {
-  gene_source <- gene_source[1]
+annoGeneDmr <- function(counts, dmrs, gene_source = c("biomaRt", "ExperimentHub", "self"), genes) { #why do I have the gene source here?? why???
+  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub", "self"))
   genes <- data.frame(genes)
   # ensure ensembl_id name consistency
   colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
