@@ -87,13 +87,46 @@ go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% di
   mutate(Method = ifelse(mm_fn_num == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)"))
 ```
 ```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_fn_num_filt_dmr, mm_fn_num_filt_dmr_null, mean_cg) %>% filter(mm_fn_num_filt_dmr == TRUE | mm_fn_num_filt_dmr_null == TRUE) %>%
+  mutate(Method = ifelse(mm_fn_num_filt_dmr == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Fn MM num_cg filt dmr")
+```
+- still not as good as array
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_fn_num_filt_dmr, mm_fn_num_filt_dmr_null, mean_cg) %>%
+  mutate(Method = case_when(mm_fn_num_filt_dmr == FALSE & mm_fn_num_filt_dmr_null == FALSE ~ "Neither",
+                            mm_fn_num_filt_dmr == TRUE & mm_fn_num_filt_dmr_null == FALSE ~ "Corrected",
+                            mm_fn_num_filt_dmr == FALSE & mm_fn_num_filt_dmr_null == TRUE ~ "Biased",
+                            TRUE ~ "Both")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Fn MM num_cg filt dmr")
+```
+- ooh maybe like this? - try for array
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>%
+  mutate(Method = case_when(array_cat_signif == FALSE & array_cat_signif_bias == FALSE ~ "Neither",
+                            array_cat_signif == TRUE & array_cat_signif_bias == FALSE ~ "Corrected",
+                            array_cat_signif == FALSE & array_cat_signif_bias == TRUE ~ "Biased",
+                            TRUE ~ "Both")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Array")
+```
+
+```{r}
 bsseq_dmrs[66000:67000,]
 ```
 ```{r}
 bsseq_dmrs 
 ```
 ```{r}
-bsseq_dmrs[20000:21000,]
+bsseq_dmrs[20000:21000,] 
 ```
 
 ```{r}
@@ -173,12 +206,12 @@ test_b_null
 
 ```{r}
 test_b %>% mutate(rank_null = test_b_null[match(rownames(.), rownames(test_b_null)), "rank"], mean_cg_bin = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg_bin"]) %>% 
-  mutate(rank_change = rank - rank_null) %>%
+  mutate(rank_change = rank_null - rank) %>%
   ggplot(aes(x = mean_cg_bin, y = rank_change)) +
   geom_point(alpha=0.3)
 
 test_b %>% mutate(rank_null = test_b_null[match(rownames(.), rownames(test_b_null)), "rank"], mean_cg_bin = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg_bin"]) %>% 
-  mutate(rank_change = rank - rank_null) %>%
+  mutate(rank_change = rank_null - rank) %>%
   ggplot(aes(x = log10(mean_cg_bin), y = rank_change)) +
   geom_point(alpha=0.3)
 ```
@@ -189,3 +222,26 @@ test_b %>% filter(FDR < 0.01)
 test_b_null %>% filter(FDR < 0.01)
 ```
 - well that's less than it was the first time
+```{r}
+test_b_num_dmr$rank <- 1:nrow(test_b_num_dmr)
+test_b_num_dmr_null$rank <- 1:nrow(test_b_num_dmr_null)
+```
+```{r}
+go_entrez2
+```
+```{r}
+test_b_num_dmr %>% mutate(rank_null = test_b_num_dmr_null[match(rownames(.), rownames(test_b_num_dmr_null)), "rank"], mean_cg = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg"]) %>% mutate(rank_change = rank_null - rank)
+```
+
+```{r}
+test_b_num_dmr %>% mutate(rank_null = test_b_num_dmr_null[match(rownames(.), rownames(test_b_num_dmr_null)), "rank"], mean_cg = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg"]) %>% 
+  mutate(rank_change = rank_null - rank) %>%
+  ggplot(aes(x = mean_cg, y = rank_change)) +
+  geom_point(alpha=0.3)
+
+test_b_num_dmr %>% mutate(rank_null = test_b_num_dmr_null[match(rownames(.), rownames(test_b_num_dmr_null)), "rank"], mean_cg = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg"]) %>% 
+  mutate(rank_change = rank_null - rank) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_change)) +
+  geom_point(alpha=0.3)
+```
+

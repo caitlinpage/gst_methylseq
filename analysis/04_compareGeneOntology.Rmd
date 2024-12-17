@@ -231,6 +231,15 @@ go_entrez
 ```
 - ok I'm actually getting close now
 ```{r}
+go_entrez <- go_entrez %>% mutate(mm_fn_num_filt_dmr = ifelse(go %in% filter(test_b_num_dmr, FDR < 0.01)$GOID, TRUE, FALSE))
+
+go_entrez <- go_entrez %>% mutate(mm_fn_num_filt_dmr_null = ifelse(go %in% filter(test_b_num_dmr_null, FDR < 0.01)$GOID, TRUE, FALSE))
+```
+```{r}
+go_entrez
+```
+
+```{r}
 saveRDS(go_entrez, "../output/go_res_compare.rds")
 ```
 
