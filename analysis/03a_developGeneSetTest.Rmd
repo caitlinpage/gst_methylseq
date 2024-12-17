@@ -204,13 +204,19 @@ so the individual functions can stay, but we would have 1 thing that would just 
 ```{r}
 run_gst_seq <- function(dmrs, tested_cpgs, 
                         gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter"),
-                        plot_bias=TRUE) {
+                        correct_bias=TRUE, plot_bias=TRUE, ...) {
   gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub"))
   gene_feature <- match.arg(tolower(gene_feature), c("gene", "promoter"))
   genes <- sourceGenes(counts = tested_cpgs, gene_source = gene_source, gene_feature = gene_feature)
-  anno <- annoGeneDmr(counts=tested_cpgs, dmrs = dmrs, gene_source = gene_source, genes = genes)
-
   
+  if(nrow(dmrs) > 30000) {
+    stop("Please appropriately filter DMRs to most significant") #idk
+  }
+  anno <- annoGeneDmr(counts=tested_cpgs, dmrs = dmrs, gene_source = gene_source, genes = genes)
+  
+  out <- run_miss_methyl_a(genes, anno)
+  
+  results <- run_miss_methyl_b(out, correct_bias=correct_bias, plot_bias=plot_bias, ...)
 }
 run_gst_seq()
 ```
@@ -235,7 +241,7 @@ run_miss_methyl_a <- function(biomart_genes, test_anno) { # add something about 
                                 columns=c("ENTREZID","SYMBOL"), 
                                 keytype="ENTREZID")
   biomart_genes$entrez_id <- entrez_genes[match(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"]
-  biomart_genes_filt <- biomart_genes_filt[!biomart_genes_filt$entrez_id %in% NA,]
+  biomart_genes_filt <- biomart_genes[!biomart_genes$entrez_id %in% NA,]
   biomart_genes_filt <- biomart_genes_filt %>% group_by(gene_name) %>% filter(num_cg == max(num_cg)) %>% ungroup() #this line will be slow
   
   test_anno$entrez_id <- entrez_genes[match(test_anno$gene_name, entrez_genes$SYMBOL), "ENTREZID"]
@@ -273,6 +279,12 @@ run_miss_methyl_a <- function(biomart_genes, test_anno) { # add something about 
 #test_out <- run_miss_methyl_a(biomart_genes, test_anno)# ; beep(2)
 ```
 - think screw up was here - missed a filter so rerunning
+```{r}
+# filter the dmr
+test_anno %>% filter(abs(areaStat) > 100) #it's like 17k instead of 70k
+test_out_filt <- run_miss_methyl_a(biomart_genes, filter(test_anno, abs(areaStat) > 100))
+```
+
 ```{r}
 test_out_num <- run_miss_methyl_a(biomart_genes, test_anno, "num_cg")
 ```
@@ -393,6 +405,11 @@ run_miss_methyl_b <- function(out, correct_bias=TRUE, plot_bias=FALSE, ...) {
 test_b_num_unfilt <- run_miss_methyl_b(test_out)
 test_b_num_null_unfilt <- run_miss_methyl_b(test_out, correct_bias = FALSE)
 ```
+```{r}
+test_b_num_dmr <- run_miss_methyl_b(test_out_filt)
+test_b_num_dmr_null <- run_miss_methyl_b(test_out_filt, correct_bias = FALSE)
+```
+
 ```{r}
 mm_hack
 sig_terms_array
