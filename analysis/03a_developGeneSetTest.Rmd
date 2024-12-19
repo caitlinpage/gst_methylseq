@@ -208,17 +208,41 @@ run_gst_seq <- function(dmrs, tested_cpgs,
   gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub"))
   gene_feature <- match.arg(tolower(gene_feature), c("gene", "promoter"))
   genes <- sourceGenes(counts = tested_cpgs, gene_source = gene_source, gene_feature = gene_feature)
-  
+  if(nrow(genes) == 0) {
+    stop("sourceGenes failed")
+  }
   if(nrow(dmrs) > 30000) {
     stop("Please appropriately filter DMRs to most significant") #idk
   }
   anno <- annoGeneDmr(counts=tested_cpgs, dmrs = dmrs, gene_source = gene_source, genes = genes)
-  
-  out <- run_miss_methyl_a(genes, anno)
-  
+  if(nrow(anno) == 0) {
+    stop("anno failed")
+  }
+out <- run_miss_methyl_a(genes, anno)
   results <- run_miss_methyl_b(out, correct_bias=correct_bias, plot_bias=plot_bias, ...)
+
+  list(res = results, genes = genes, anno = anno)
 }
-run_gst_seq()
+test_fn_res <- run_gst_seq(bsseq_dmrs[1:1000,], bsseq_res, "biomaRt", "gene")
+```
+```{r}
+?return
+```
+
+```{r}
+test_fn_res
+```
+
+```{r}
+run_miss_methyl_a(test_fn_res$genes, test_fn_res$anno)
+```
+
+```{r}
+run_gst_seq(bsseq_dmrs[1:1000], bsseq_res, "biomaRt", "gene")
+```
+
+```{r}
+bsseq_res <- readRDS("../output/bsseq_res.rds")
 ```
 
 ```{r}
