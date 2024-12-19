@@ -3,7 +3,7 @@ library(dplyr)
 library(ggplot2)
 library(reshape2)
 library(ChIPseqSpikeInFree)
-
+library(biomaRt)
 
 
 plotBiasGenomeBins <- function(counts, dmr, bin_size=2000) {
@@ -65,7 +65,8 @@ sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gen
     )
     genes <- genes %>% .[order(.$chromosome_name, .$start_position), ]
     colnames(genes) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
-    genes <- genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup() %>% mutate(seqnames = as.character(seqnames), seqnames = paste0("chr", seqnames))
+    genes <- genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup()
+    genes$seqnames <- paste0("chr", as.character(genes$seqnames))
     genes <- genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:dplyr::n()) %>% filter(num_t == 1) %>% ungroup()
   } else if (gene_source == "experimenthub") {
     eh <- ExperimentHub()
@@ -81,20 +82,20 @@ sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gen
   genes$gene_num <- 1:nrow(genes)
   #is it promoter???
   if(length(gene_feature) == 1 & gene_feature == "promoter") {
-    genes <- genes %>% mutate(start = ifelse(.$strand == 1, .$start - 2000, .$end - 500),
-                              end = ifelse(.$strand == 1, .$start + 2500, .$end + 2000)) %>%
-      .[,!colnames(.) == "width"]
+    genes$start <- ifelse(genes$strand == 1, genes$start - 2000, genes$end - 500)
+    genes$end <- ifelse(genes$strand == 1, genes$start + 2500, genes$end + 2000)
+    genes <- genes[,!colnames(genes) == "width"]
   }
   # add number of cpgs overlapping gene
   gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
   gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = dplyr::n()) %>% ungroup() %>% data.frame()
 
-  genes <- genes %>% mutate(num_cg = gene_cpg[match(.$gene_num, gene_cpg$gene_num), "n_cpg"])
+  genes$num_cg <- gene_cpg[match(genes$gene_num, gene_cpg$gene_num), "n_cpg"]
   genes[is.na(genes)] <- 0
   genes
 }
 
-annoGeneDmr <- function(counts, dmrs, gene_source = c("biomaRt", "ExperimentHub", "self"), genes) { #why do I have the gene source here?? why???
+annoGeneDmr <- function(counts, dmrs, gene_source = c("biomart", "experimenthub", "self"), genes) { #why do I have the gene source here?? why???
   gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub", "self"))
   genes <- data.frame(genes)
   # ensure ensembl_id name consistency
@@ -108,10 +109,10 @@ annoGeneDmr <- function(counts, dmrs, gene_source = c("biomaRt", "ExperimentHub"
   gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
   gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = n()) %>% ungroup() %>% data.frame()
 
-  genes <- genes %>% mutate(num_cg = gene_cpg[match(.$gene_num, gene_cpg$gene_num), "n_cpg"])
+  genes$num_cg <- gene_cpg[match(genes$gene_num, gene_cpg$gene_num), "n_cpg"]
   genes[is.na(genes)] <- 0
   if(!"TSS" %in% colnames(genes)) {
-    genes <- genes %>% mutate(TSS = ifelse(strand == "+", start, end))
+    genes$TSS <- ifelse(genes$strand == "+", genes$start, genes$end) # above I have strand for 1/-1
   }
   # assume dmrs are already in order of most to least signif
   dmrs$rank <- 1:nrow(dmrs)
@@ -136,12 +137,11 @@ annoGeneDmr <- function(counts, dmrs, gene_source = c("biomaRt", "ExperimentHub"
 }
 
 plotBiasGrouped <- function(genes, anno_genes, regression_line=FALSE, log2_scale=FALSE) {
-  genes <- genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(anno_genes, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
-    group_by(num_cg) %>%
-    mutate(num_bins_same_cg = dplyr::n()) %>%
-    .[order(.$num_cg),] %>%
-    ungroup() %>%
-    mutate(bin_group = rep(1:ceiling(nrow(genes)/100), each = 100)[1:nrow(genes)]) %>%
+  genes$width <- genes$end - genes$start + 1
+  genes$has_dmr <- ifelse(genes$ensembl_gene_id %in% filter(anno_genes, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)
+  genes <- genes[order(.$num_cg),]
+  genes$bin_group <- rep(1:ceiling(nrow(genes)/100), each = 100)[1:nrow(genes)]
+  genes <- genes %>%
     group_by(bin_group) %>%
     mutate(num_cg_bin_group = mean(num_cg)) %>%
     group_by(num_cg_bin_group) %>%
