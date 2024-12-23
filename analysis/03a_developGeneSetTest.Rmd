@@ -221,21 +221,39 @@ run_gst_seq <- function(dmrs, tested_cpgs,
 out <- run_miss_methyl_a(genes, anno)
   results <- run_miss_methyl_b(out, correct_bias=correct_bias, plot_bias=plot_bias, ...)
 
-  list(res = results, genes = genes, anno = anno)
+  list(res = results, genes = genes, anno = anno, out = out)
 }
 test_fn_res <- run_gst_seq(bsseq_dmrs[1:1000,], bsseq_res, "biomaRt", "gene")
 ```
+
 ```{r}
-?return
+test_out_again <- run_miss_methyl_a(test_fn_res$genes, test_fn_res$anno)
 ```
 
 ```{r}
 test_fn_res
 ```
-
 ```{r}
-run_miss_methyl_a(test_fn_res$genes, test_fn_res$anno)
+library(microbenchmark)
 ```
+- we don't want this - only good for small bits - b/c it reps 1000
+```{r}
+bench_steps <- microbenchmark(
+  genes = sourceGenes(bsseq_res, "biomart", "gene"),
+ # genes_eh = sourceGenes(bsseq_res, "experimenthub", "gene"),
+  anno = annoGeneDmr(bsseq_res, bsseq_dmrs[1:1000,], "biomart", test_fn_res$genes),
+  out = run_miss_methyl_a(test_fn_res$genes, test_fn_res$anno),
+  res = run_miss_methyl_b(test_out_again, correct_bias = TRUE)
+)
+```
+```{r}
+system.time(sourceGenes(bsseq_res, "biomart", "gene"))
+system.time(annoGeneDmr(bsseq_res, bsseq_dmrs[1:1000,], "biomart", test_fn_res$genes))
+system.time(run_miss_methyl_a(test_fn_res$genes, test_fn_res$anno))
+system.time(run_miss_methyl_b(test_out_again, correct_bias = TRUE))
+system.time(run_miss_methyl_b(test_out_again, correct_bias = FALSE))
+```
+
 
 ```{r}
 run_gst_seq(bsseq_dmrs[1:1000], bsseq_res, "biomaRt", "gene")
@@ -277,11 +295,29 @@ run_miss_methyl_a <- function(biomart_genes, test_anno) { # add something about 
     
   test_uni_freq <- biomart_genes_filt %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, bias) %>% ungroup() %>% data.frame() # probs slow
   test_uni_freq <- test_uni_freq[test_uni_freq$bias > 0,]
+  test_uni_freq
+}
+test_loop <- run_miss_methyl_a(biomart_genes, test_anno)
+```
+```{r}
+rep(test_loop$entrez_id, test_loop$bias)
+```
+```{r}
+fn <- function(test_uni_freq) {
   freq_make_table <- character()
   for(i in 1:nrow(test_uni_freq)) {
     res <- rep(test_uni_freq$entrez_id[i], each = test_uni_freq$bias[i])
     freq_make_table <- c(freq_make_table, res)
   }
+}
+system.time(fn(test_loop))
+```
+
+
+```{r}
+
+  freq_make_table <- rep(test_uni_freq$entrez_id, test_uni_freq$bias)
+
   freq_make_table <- table(freq_make_table)
   biomart_genes_filt <- biomart_genes_filt[biomart_genes_filt$bias > 0,] 
   test_anno_filt <- test_anno_filt[test_anno_filt$ensembl_gene_id %in% biomart_genes_filt$ensembl_gene_id,]
@@ -303,6 +339,51 @@ run_miss_methyl_a <- function(biomart_genes, test_anno) { # add something about 
 #test_out <- run_miss_methyl_a(biomart_genes, test_anno)# ; beep(2)
 ```
 - think screw up was here - missed a filter so rerunning
+
+```{r}
+test_uni_freq <- biomart_genes_filt %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, bias) %>% ungroup() %>% data.frame() # probs slow
+  test_uni_freq <- test_uni_freq[test_uni_freq$bias > 0,]
+  freq_make_table <- character()
+  for(i in 1:nrow(test_uni_freq)) {
+    res <- rep(test_uni_freq$entrez_id[i], each = test_uni_freq$bias[i])
+    freq_make_table <- c(freq_make_table, res)
+  }
+```
+
+
+
+```{r}
+library(fastmatch)
+```
+```{r}
+entrez_genes <- AnnotationDbi::select(org.Hs.eg.db, 
+                                keys=AnnotationDbi::keys(org.Hs.eg.db), 
+                                columns=c("ENTREZID","SYMBOL"), 
+                                keytype="ENTREZID")
+entrez_genes[fmatch(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"]
+```
+```{r}
+microbenchmark(match = entrez_genes[match(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"],
+               fmatch = entrez_genes[fmatch(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"])
+```
+```{r}
+test_anno[test_anno$ensembl_gene_id %fin% biomart_genes$ensembl_gene_id,]
+```
+
+```{r}
+microbenchmark(test_in = test_anno[test_anno$ensembl_gene_id %in% biomart_genes$ensembl_gene_id,],
+               test_fin = test_anno[test_anno$ensembl_gene_id %fin% biomart_genes$ensembl_gene_id,])
+```
+```{r}
+test_anno$entrez_id <- entrez_genes[match(test_anno$gene_name, entrez_genes$SYMBOL), "ENTREZID"]
+```
+```{r}
+microbenchmark(test_in = test_anno[!test_anno$entrez_id %in% NA,],
+               fn = test_anno[!is.na(test_anno$entrez_id),])
+```
+
+
+
 ```{r}
 # filter the dmr
 test_anno %>% filter(abs(areaStat) > 100) #it's like 17k instead of 70k
