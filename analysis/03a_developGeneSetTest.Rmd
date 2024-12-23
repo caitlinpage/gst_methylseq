@@ -323,47 +323,7 @@ system.time(run_miss_methyl_a(biomart_genes, test_anno))
 - think screw up was here - missed a filter so rerunning
 
 
-```{r}
-test_uni_freq <- biomart_genes_filt %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, bias) %>% ungroup() %>% data.frame() # probs slow
-  test_uni_freq <- test_uni_freq[test_uni_freq$bias > 0,]
-  freq_make_table <- character()
-  for(i in 1:nrow(test_uni_freq)) {
-    res <- rep(test_uni_freq$entrez_id[i], each = test_uni_freq$bias[i])
-    freq_make_table <- c(freq_make_table, res)
-  }
-```
 
-
-
-```{r}
-library(fastmatch)
-```
-```{r}
-entrez_genes <- AnnotationDbi::select(org.Hs.eg.db, 
-                                keys=AnnotationDbi::keys(org.Hs.eg.db), 
-                                columns=c("ENTREZID","SYMBOL"), 
-                                keytype="ENTREZID")
-entrez_genes[fmatch(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"]
-```
-```{r}
-microbenchmark(match = entrez_genes[match(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"],
-               fmatch = entrez_genes[fmatch(biomart_genes$gene_name, entrez_genes$SYMBOL), "ENTREZID"])
-```
-```{r}
-test_anno[test_anno$ensembl_gene_id %fin% biomart_genes$ensembl_gene_id,]
-```
-
-```{r}
-microbenchmark(test_in = test_anno[test_anno$ensembl_gene_id %in% biomart_genes$ensembl_gene_id,],
-               test_fin = test_anno[test_anno$ensembl_gene_id %fin% biomart_genes$ensembl_gene_id,])
-```
-```{r}
-test_anno$entrez_id <- entrez_genes[match(test_anno$gene_name, entrez_genes$SYMBOL), "ENTREZID"]
-```
-```{r}
-microbenchmark(test_in = test_anno[!test_anno$entrez_id %in% NA,],
-               fn = test_anno[!is.na(test_anno$entrez_id),])
-```
 
 
 
