@@ -296,31 +296,14 @@ run_miss_methyl_a <- function(biomart_genes, test_anno) { # add something about 
   test_uni_freq <- biomart_genes_filt %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, bias) %>% ungroup() %>% data.frame() # probs slow
   test_uni_freq <- test_uni_freq[test_uni_freq$bias > 0,]
   test_uni_freq
-}
-test_loop <- run_miss_methyl_a(biomart_genes, test_anno)
-```
-```{r}
-rep(test_loop$entrez_id, test_loop$bias)
-```
-```{r}
-fn <- function(test_uni_freq) {
-  freq_make_table <- character()
-  for(i in 1:nrow(test_uni_freq)) {
-    res <- rep(test_uni_freq$entrez_id[i], each = test_uni_freq$bias[i])
-    freq_make_table <- c(freq_make_table, res)
-  }
-}
-system.time(fn(test_loop))
-```
 
-
-```{r}
-
-  freq_make_table <- rep(test_uni_freq$entrez_id, test_uni_freq$bias)
+  freq_make_table <- rep(test_uni_freq$entrez_id, test_uni_freq$bias) #this has replaced the loop and sped it up
 
   freq_make_table <- table(freq_make_table)
   biomart_genes_filt <- biomart_genes_filt[biomart_genes_filt$bias > 0,] 
   test_anno_filt <- test_anno_filt[test_anno_filt$ensembl_gene_id %in% biomart_genes_filt$ensembl_gene_id,]
+  biomart_genes_filt$is_de <- ifelse(biomart_genes_filt$entrez_id %in% test_anno_filt$entrez_id, 1, 0)
+  biomart_genes_filt$is_de <- as.integer(biomart_genes_filt$is_de)
   out <- list(
   #fract.counts = biomart_genes_filt %>%
    # mutate(sigid = entrez_id) %>% distinct(sigid) %>% .[order(.$sigid),] %>% data.frame() %>% 
@@ -330,15 +313,15 @@ system.time(fn(test_loop))
     .[order(.$entrez_id),] %>% .$entrez_id,
   freq = freq_make_table,
   equiv = as.array(freq_make_table), # column names wrong but maybe not too bad?
-  de = biomart_genes_filt %>% 
-    mutate(is_de = ifelse(entrez_id %in% test_anno_filt$entrez_id, 1, 0), is_de = as.integer(is_de)) %>%
-    .[order(.$entrez_id),] %>% distinct(entrez_id, is_de) %>% .$is_de
+  de = biomart_genes_filt[order(biomart_genes_filt$entrez_id),] %>% .$is_de
 )
   out
 }
+system.time(run_miss_methyl_a(biomart_genes, test_anno))
 #test_out <- run_miss_methyl_a(biomart_genes, test_anno)# ; beep(2)
 ```
 - think screw up was here - missed a filter so rerunning
+
 
 ```{r}
 test_uni_freq <- biomart_genes_filt %>% .[order(.$entrez_id),] %>% group_by(entrez_id) %>% distinct(entrez_id, bias) %>% ungroup() %>% data.frame() # probs slow
