@@ -454,6 +454,239 @@ test_b_num_unfilt <- run_miss_methyl_b(test_out)
 test_b_num_null_unfilt <- run_miss_methyl_b(test_out, correct_bias = FALSE)
 ```
 ```{r}
+just_test <- function(out) {
+  sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+  freq_genes <- out$freq
+  test.de <- out$de #res for each gene
+  #frac <- out$fract.counts
+  equiv <- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  go <- .getGO()
+  collection <- go$idList  
+  #only if it's not a list
+  #collection <- list(collection=go$idList)
+  collection <- lapply(collection, as.character)
+  # Make sure gene set collections don't have any NAs
+  collection <- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv <- sapply(collection, function(x) length(x) > 0)
+  collection <- collection[inUniv]
+  
+  
+  results <- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(results) <- c("N", "DE", "P.DE","FDR")
+  rownames(results) <- names(collection)
+  results[,"N"] <- unlist(lapply(collection,length))
+  SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+  
+  results[,"DE"] <- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+  Nuniverse <- length(eg.universe)
+  m <- length(sorted.eg.sig)
+  
+  test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+  
+  results[, c("P.DE")] <- 
+  t(sapply(1:length(collection), function(i) {
+    InSet <- eg.universe %in% collection[[i]]
+    pw.red <- sum(test_pwf[InSet], na.rm = TRUE) / results[i, "N"] # so i don't know why I get na's - or do i?
+    pw.white <- sum(test_pwf[!InSet], na.rm = TRUE) / (Nuniverse - results[i, "N"]) #anyway the na removal is not in original code
+    odds <- pw.red / pw.white
+    p_val <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+    #the optional thing
+      # Get gene symbols of significant genes
+    SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+    SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+    SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+    if(p_val==0){
+        message("Pvalue of exactly zero detected. Performing hypergeometric 
+                test for gene set ", rownames(results)[i])
+        p_val <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,"N"],
+                                           lower.tail=FALSE)
+    }
+    c(p_val)  # return the values as a vector
+    }))
+  results
+}
+```
+
+```{r}
+just_res_loop <- function(out) {
+  sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+  freq_genes <- out$freq
+  test.de <- out$de #res for each gene
+  #frac <- out$fract.counts
+  equiv <- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  go <- .getGO()
+  collection <- go$idList  
+  #only if it's not a list
+  #collection <- list(collection=go$idList)
+  collection <- lapply(collection, as.character)
+  # Make sure gene set collections don't have any NAs
+  collection <- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv <- sapply(collection, function(x) length(x) > 0)
+  collection <- collection[inUniv]
+  
+  
+  results <- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(results) <- c("N", "DE", "P.DE","FDR")
+  rownames(results) <- names(collection)
+  results[,"N"] <- unlist(lapply(collection,length))
+  SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+  
+  results[,"DE"] <- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+  Nuniverse <- length(eg.universe)
+  m <- length(sorted.eg.sig)
+  
+
+  pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+  
+
+  for(i in 1:length(collection)){
+      InSet <- eg.universe %in% collection[[i]]
+      pw.red <- sum(pwf[InSet])/results[i,"N"]
+      pw.white <- sum(pwf[!InSet])/(Nuniverse-results[i,"N"])
+      odds <- pw.red/pw.white
+      results[i,"P.DE"] <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+      
+        # Get gene symbols of significant genes
+        SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+        SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+        SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+      
+      if(results[i,"P.DE"]==0){
+        message("Pvalue of exactly zero detected. Performing hypergeometric 
+                test for gene set ", rownames(results)[i])
+        results[i,"P.DE"] <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,"N"],
+                                           lower.tail=FALSE)
+      }
+  }
+  results
+}
+just_res_loop(test_out_again)
+```
+```{r}
+just_res_loop2 <- function(out) {
+  sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+  freq_genes <- out$freq
+  test.de <- out$de #res for each gene
+  #frac <- out$fract.counts
+  equiv <- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  go <- .getGO()
+  collection <- go$idList  
+  #only if it's not a list
+  #collection <- list(collection=go$idList)
+  collection <- lapply(collection, as.character)
+  # Make sure gene set collections don't have any NAs
+  collection <- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv <- sapply(collection, function(x) length(x) > 0)
+  collection <- collection[inUniv]
+
+results <- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(results) <- c("N", "DE", "P.DE","FDR")
+  rownames(results) <- names(collection)
+  results[,"N"] <- unlist(lapply(collection,length))
+  SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+  
+  results[,"DE"] <- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+  Nuniverse <- length(eg.universe)
+  m <- length(sorted.eg.sig)
+  
+
+  pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+  
+
+  for(i in 1:length(collection)){
+      InSet <- eg.universe %in% collection[[i]]
+      pw.red <- sum(pwf[InSet])/results[i,"N"]
+      pw.white <- sum(pwf[!InSet])/(Nuniverse-results[i,"N"])
+      odds <- pw.red/pw.white
+      results[i,"P.DE"] <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+      
+        # Get gene symbols of significant genes
+        SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+        SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+        SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+      
+      if(results[i,"P.DE"]==0){
+        message("Pvalue of exactly zero detected. Performing hypergeometric 
+                test for gene set ", rownames(results)[i])
+        results[i,"P.DE"] <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,"N"],
+                                           lower.tail=FALSE)
+      }
+  }
+  results
+}
+```
+```{r}
+collection
+```
+
+```{r}
+microbenchmark(app = lapply(collection, function(x) test_out_again$universe %in% x),
+               loop = for(i in 1:length(collection)){
+      InSet <- test_out_again$universe %in% collection[[i]]})
+```
+```{r}
+system.time(lapply(collection, function(x) test_out_again$universe %in% x))
+system.time(for(i in 1:length(collection)){
+      InSet <- test_out_again$universe %in% collection[[i]]})
+```
+I'm not convinced this difference will change much with iterations
+
+```{r}
+1+2
+```
+
+```{r}
 test_b_num_dmr <- run_miss_methyl_b(test_out_filt)
 test_b_num_dmr_null <- run_miss_methyl_b(test_out_filt, correct_bias = FALSE)
 ```
