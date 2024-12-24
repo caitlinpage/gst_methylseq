@@ -76,6 +76,12 @@ gst <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
 gst2 <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
               plot.bias=TRUE)
 ```
+```{r}
+system.time(gometh(rownames(DMPs[1:10000,]), all.cpg = rownames(DMPs), collection = "GO", plot.bias = TRUE))
+```
+```{r}
+?gometh
+```
 
 ```{r}
 topGSA(gst, n=20)
