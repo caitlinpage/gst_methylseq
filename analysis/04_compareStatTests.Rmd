@@ -1,0 +1,851 @@
+---
+title: "04_compareStatTests"
+author: "Caitlin Page"
+date: "2025-02-10"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Packages
+
+```{r}
+library(BiasedUrn)
+library(missMethyl)
+library(goseq)
+library(GO.db)
+
+library(rbenchmark)
+
+library(dplyr)
+library(ggVennDiagram)
+library(ggplot2)
+```
+
+## Data
+* need inputs for GST
+```{r}
+DMPs <- readRDS("../output/array_dmps.rds")
+```
+
+
+## Microarray
+
+```{r}
+topCpGs <- DMPs[1:10000,]
+sigCpGs <- rownames(topCpGs)
+```
+```{r}
+mapped_entrez <- getMappedEntrezIDs(sig.cpg=sigCpGs, all.cpg=rownames(DMPs))
+```
+
+```{r}
+gst <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
+              plot.bias=TRUE)
+```
+
+```{r}
+sig_terms_array <- topGSA(gst, n = 1000) %>% filter(FDR < 0.05)
+sig_terms_array
+sig_terms_array <- readRDS("../output/mm_array_res.rds")
+```
+
+
+# Goseq version to compare approaches
+- except I need the genes and that's under the hood
+```{r}
+mapped_entrez$freq %>% data.frame()
+```
+```{r}
+length(mapped_entrez$sig.eg)
+length(mapped_entrez$de)
+length(mapped_entrez$universe)
+```
+
+```{r}
+gene.vector <- mapped_entrez$de
+names(gene.vector) <- mapped_entrez$universe
+
+pwf <- goseq::nullp(gene.vector, "hg19", "Entrez", bias.data = data.frame(mapped_entrez$freq)$Freq)
+pwf
+GO.wall <- goseq::goseq(pwf, "hg19", "Entrez")
+GO.wall <- GO.wall %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.wall
+```
+```{r}
+genes_symbol <- AnnotationDbi::select(org.Hs.eg.db, 
+                                keys=AnnotationDbi::keys(org.Hs.eg.db), 
+                                columns=c("ENTREZID","SYMBOL"), 
+                                keytype="ENTREZID")
+
+```
+
+```{r}
+universe <- data.frame(mapped_entrez$freq)
+universe$de <- mapped_entrez$de
+universe$eg.all <- as.character(universe$eg.all)
+universe$symbol <- genes_symbol[match(universe$eg.all, genes_symbol$ENTREZID), "SYMBOL"]
+universe
+```
+
+
+```{r}
+gene.vector <- universe$de
+names(gene.vector) <- universe$symbol
+pwf <- goseq::nullp(gene.vector, "hg19", "geneSymbol", bias.data = universe$Freq)
+pwf
+GO.wall <- goseq::goseq(pwf, "hg19", "geneSymbol")
+GO.wall <- GO.wall %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.wall
+```
+```{r}
+GO.samp <- goseq(pwf,"hg19","geneSymbol",method="Sampling",repcnt=1000)
+```
+```{r}
+GO.samp <- GO.samp %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+```
+
+```{r}
+GO.fish <- goseq_mod(pwf,"hg19","geneSymbol",method="Fishers")
+GO.fish <- GO.fish %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+```
+```{r}
+system.time(goseq(pwf, "hg19", "geneSymbol"))
+system.time(goseq(pwf,"hg19","geneSymbol",method="Sampling",repcnt=1000))
+system.time(goseq_mod(pwf,"hg19","geneSymbol",method="Fishers"))
+```
+```{r}
+benchmark(wall = goseq(pwf, "hg19", "geneSymbol"), fish = goseq_mod(pwf,"hg19","geneSymbol",method="Fishers"), replications = 50)
+```
+* interesting - basically no difference in timing
+
+## compare results - fishers and wallenius
+* can I do a correlation?
+* because that's basically just comparing how similar 2 lists are
+* if wants numbers - can just give diff terms diff numbers
+* ok its more an association thing but it could still work
+
+```{r}
+GO.wall <- GO.wall %>% .[order(.$FDR),] %>% mutate(wall_rank = 1:n())
+GO.samp <- GO.samp %>% .[order(.$FDR),] %>% mutate(samp_rank = 1:n())
+GO.fish <- GO.fish %>% .[order(.$FDR),] %>% mutate(fish_rank = 1:n())
+```
+
+```{r}
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = samp)) +
+  geom_point()
+
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish)) +
+  geom_point()
+
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = samp, y = fish)) +
+  geom_point()
+```
+```{r}
+ggVennDiagram(list(wall = filter(GO.wall, FDR < 0.05)$category, 
+              samp = filter(GO.samp, FDR < 0.05)$category,
+              fish = filter(GO.fish, FDR < 0.05)$category))
+```
+
+
+```{r}
+GO.wall 
+GO.samp
+GO.fish
+```
+* GO.samp - the results after adjustment are not significant
+* GOseq PDF: "However,
+the accuracy of the sampling method is limited by the number of samples generated, repcnt, such
+that very low p-values will not be correctly calculated. Significantly enriched GO terms may then
+be missed after correcting for multiple testing."
+* this may be why nothing is significant
+* but wasn't the sampling supposed to be the best version - and Wallenius an approximation?
+```{r}
+plot(log10(GO.wall[,2]), log10(GO.samp[match(GO.wall[,1],GO.samp[,1]),2]),
+xlab="log10(Wallenius p-values)",ylab="log10(Sampling p-values)",
+xlim=c(-3,0))
+abline(0,1,col=3,lty=2)
+```
+
+## WGBS
+```{r}
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+```
+```{r anno}
+source("../code/function_binBiasPlot.R")
+test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs, gene_source = "biomaRt", genes = biomart_genes)
+```
+```{r}
+test_anno_filt <- test_anno %>% filter(areaStat > 100)
+```
+
+
+```{r}
+test_bias <- biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(test_anno, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+    group_by(num_cg) %>%
+    mutate(num_bins_same_cg = dplyr::n()) %>%
+    .[order(.$num_cg),] %>%
+    ungroup() %>%
+    mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>%
+    group_by(bin_group) %>%
+    mutate(num_cg_bin_group = mean(num_cg)) %>%
+    ungroup() %>% mutate(has_dmr = ifelse(has_dmr == FALSE, 0, 1))
+test_bias
+test_bias_filt <- biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(test_anno_filt, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+    group_by(num_cg) %>%
+    mutate(num_bins_same_cg = dplyr::n()) %>%
+    .[order(.$num_cg),] %>%
+    ungroup() %>%
+    mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>%
+    group_by(bin_group) %>%
+    mutate(num_cg_bin_group = mean(num_cg)) %>%
+    ungroup() %>% mutate(has_dmr = ifelse(has_dmr == FALSE, 0, 1))
+test_bias_filt
+```
+
+# goseq
+```{r}
+gene.vector <- test_bias_filt$has_dmr
+names(gene.vector) <- test_bias_filt$ensembl_gene_id
+
+pwf_seq <- goseq::nullp(gene.vector, "hg19", "ensGene", bias.data = test_bias_filt$num_cg_bin_group)
+pwf_seq
+GO.wall_seq <- goseq::goseq(pwf_seq, "hg19", "ensGene")
+GO.wall_seq <- GO.wall_seq %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+
+GO.samp_seq <- goseq(pwf_seq,"hg19","ensGene",method="Sampling",repcnt=1000)
+GO.samp_seq <- GO.samp_seq %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+
+GO.fish_seq <- goseq_mod(pwf_seq,"hg19","ensGene",method="Fishers")
+GO.fish_seq <- GO.fish_seq %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+
+GO.wall_seq <- GO.wall_seq %>% .[order(.$FDR),] %>% mutate(wall_rank = 1:dplyr::n())
+GO.samp_seq <- GO.samp_seq %>% .[order(.$FDR),] %>% mutate(samp_rank = 1:dplyr::n())
+GO.fish_seq <- GO.fish_seq %>% .[order(.$FDR),] %>% mutate(fish_rank = 1:dplyr::n())
+```
+
+```{r}
+system.time(goseq(pwf_seq, "hg19", "ensGene"))
+system.time(goseq(pwf_seq,"hg19","ensGene",method="Sampling",repcnt=1000))
+system.time(goseq_mod(pwf_seq,"hg19","ensGene",method="Fishers"))
+```
+
+```{r}
+benchmark(wall = goseq(pwf_seq, "hg19", "ensGene"), fish = goseq_mod(pwf_seq,"hg19","ensGene",method="Fishers"), replications = 50)
+```
+
+
+# missMethyl
+```{r}
+test_out <- readRDS("../output/mm_fn_out_num.rds")
+test_out_filt <- run_miss_methyl_a(biomart_genes, filter(test_anno, abs(areaStat) > 100))
+```
+
+```{r}
+MM_fish <- run_miss_methyl_b(test_out, method = "Fishers")
+```
+
+```{r}
+system.time(run_miss_methyl_b(test_out, method = "Wallenius"))
+system.time(run_miss_methyl_b(test_out, method = "Fishers"))
+```
+* ok this implies no difference still
+```{r}
+system.time(run_miss_methyl_b(test_out_filt, method = "Wallenius"))
+system.time(run_miss_methyl_b(test_out_filt, method = "Fishers"))
+```
+* damn now it's not even faster?
+* trying to skip testing for 0 de for wallenius only
+```{r}
+system.time(run_miss_methyl_b(test_out_filt, method = "Wallenius"))
+system.time(run_miss_methyl_b(test_out_filt, method = "Fishers"))
+```
+
+* damn that made it longer than the previous - and worse it made the system time longer
+* ok but the other one took longer this time as well
+
+* but also thought of better way - just remove them before the testing
+```{r}
+system.time(run_miss_methyl_b(test_out_filt, method = "Wallenius"))
+system.time(run_miss_methyl_b(test_out_filt, method = "Fishers"))
+```
+* haha that is faster system wise
+* still slow overall
+* still don't get why it's so much slower than goseq
+* and now fishers is slower than wall again
+* why is it so much slower than goseq??
+```{r}
+GO.wall
+```
+
+```{r}
+run_miss_methyl_b(test_out_filt, method = "Wallenius")
+```
+
+```{r}
+test_out$freq %>% data.frame()
+test_out$de %>% data.frame()
+```
+```{r}
+universe
+```
+```{r}
+GO.fish %>% filter(numDEInCat == 0)
+```
+
+```{r}
+MM_fish %>% filter(DE == 0) %>% .[order(.$N),]
+```
+
+
+
+## Code
+# seq code - missmethyl
+
+* if Fishers is independent, I should be able to not do it as a loop or whatever
+* so I can have a vector for x - which is the num of red balls sampled
+* but we put in the de? - right the number of de genes
+* but this wouldn't change? because it's our list? - or its got something to do with something
+* maybe it still needs to be a loop because it's still an individual test for each category and we need a p val for each
+* and the speed should be that something else is happening under the hood of the test which might be faster
+* or maybe I can // it?
+*I'm not figuring out what goes under the hood of the tests - found the code - I think it's written in C++
+* I do not read C++
+* can say the Wallenius file is longer than the Fishers
+* ok so reviewed the what goes in and out and that all makes sense
+* guessing minimal speed difference in methods is because of the c++ efficiency
+
+# what to do for speed?
+* prefilter out go categories?? - so not test them if low?
+* can't tell if that's what is currently happening in goseq - all 1 for p, mm still has a p
+
+
+  if(prior.prob){
+    for(i in 1:length(collection)){
+      InSet <- eg.universe %in% collection[[i]]
+      pw.red <- sum(pwf[InSet])/results[i,"N"]
+      pw.white <- sum(pwf[!InSet])/(Nuniverse-results[i,"N"])
+      odds <- pw.red/pw.white
+      results[i,"P.DE"] <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+  }
+  }
+```{r}
+system.time(go_stuff(test_out_filt))
+```
+```{r}
+rbind(MM_fish[MM_fish$DE != 0,], MM_fish[MM_fish$DE == 0,])
+```
+```{r}
+try_res <- try_speed(test_out_filt)
+```
+```{r}
+class(try_res)
+```
+
+```{r}
+try_res %>% data.frame() %>% .[.$DE != 0,] %>% as.matrix() %>% class()
+data.frame(NA,ncol=4,nrow=10)
+```
+```{r}
+try_collect <- try_speed(test_out_filt)
+```
+
+```{r}
+go_stuff <- function(out) {
+  sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+  freq_genes <- out$freq
+  test.de <- out$de #res for each gene
+  #frac <- out$fract.counts
+  equiv <- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  go <- .getGO()
+  collection <- go$idList  
+  #only if it's not a list
+  #collection <- list(collection=go$idList)
+  collection <- lapply(collection, as.character)
+  # Make sure gene set collections don't have any NAs
+  collection <- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv <- sapply(collection, function(x) length(x) > 0)
+  collection <- collection[inUniv]
+}
+
+try_speed <- function(out) {
+  sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+  freq_genes <- out$freq
+  test.de <- out$de #res for each gene
+  #frac <- out$fract.counts
+  equiv <- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  go <- .getGO()
+  collection <- go$idList  
+  #only if it's not a list
+  #collection <- list(collection=go$idList)
+  collection <- lapply(collection, as.character)
+  # Make sure gene set collections don't have any NAs
+  collection <- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv <- sapply(collection, function(x) length(x) > 0)
+  collection <- collection[inUniv]
+  
+  
+  results <- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(results) <- c("N", "DE", "P.DE","FDR")
+  rownames(results) <- names(collection)
+  results[,"N"] <- unlist(lapply(collection,length))
+  SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+  
+  results[,"DE"] <- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+  Nuniverse <- length(eg.universe)
+  m <- length(sorted.eg.sig)
+  collection
+}
+```
+```{r}
+data.frame(try_res) %>% .[.$DE != 0,] %>% as.matrix() %>% nrow()
+```
+```{r}
+length(try_collect)
+length(try_collect[data.frame(try_res) %>% .[.$DE != 0,] %>% rownames()])
+```
+
+```{r}
+.getGO <- function(){
+  if(!requireNamespace("org.Hs.eg.db", quietly = TRUE))
+    stop("org.Hs.eg.db package required but not installed.")
+  egGO2ALLEGS <- utils::getFromNamespace("org.Hs.egGO2ALLEGS", "org.Hs.eg.db")
+  GeneID.PathID <- AnnotationDbi::toTable(egGO2ALLEGS)[,c("gene_id", "go_id", "Ontology")]
+  d <- !duplicated(GeneID.PathID[, c("gene_id", "go_id")])
+  GeneID.PathID <- GeneID.PathID[d, ]
+  GOID.TERM <- suppressMessages(AnnotationDbi::select(GO.db::GO.db, 
+                                                      keys=unique(GeneID.PathID$go_id), 
+                                                      columns=c("GOID","ONTOLOGY","TERM"), 
+                                                      keytype="GOID"))
+  go <- tapply(GeneID.PathID$gene_id, GeneID.PathID$go_id, list)
+    
+  list(idList=go, idTable=GOID.TERM)
+}
+
+.estimatePWF <- function(D,bias)
+  # An alternative to goseq function nullp, which is transformation invariant
+  # Belinda Phipson and Gordon Smyth
+  # 6 March 2015
+{
+  prior.prob <- bias
+  o <- order(bias)
+  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
+  prior.prob
+}
+
+run_miss_methyl_b <- function(out, method, plot_bias=FALSE, ...) {
+  sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes
+  freq_genes <- out$freq
+  test.de <- out$de #res for each gene
+  #frac <- out$fract.counts
+  equiv <- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  go <- .getGO()
+  collection <- go$idList  
+  #only if it's not a list
+  #collection <- list(collection=go$idList)
+  collection <- lapply(collection, as.character)
+  # Make sure gene set collections don't have any NAs
+  collection <- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection <- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv <- sapply(collection, function(x) length(x) > 0)
+  collection <- collection[inUniv]
+  
+  
+  results <- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(results) <- c("N", "DE", "P.DE","FDR")
+  rownames(results) <- names(collection)
+  results[,"N"] <- unlist(lapply(collection,length))
+  SigGenesInSet <- rep(NA,length(collection)) # this one is optional
+  
+  results[,"DE"] <- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+  Nuniverse <- length(eg.universe)
+  m <- length(sorted.eg.sig)
+  
+  results <- data.frame(results)
+  results_null <- results[results$DE == 0,]
+  results_null$P.DE <- 1
+  results_null$FDR <- 1
+  
+  results <- results[results$DE != 0,]
+  collection <- collection[rownames(results)]
+  results <- as.matrix(results)
+  
+  if(method != "None") {
+  test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+  #  if(plot_bias == TRUE) {
+   #   plotBiasGrouped(genes = genes, anno_genes = , ...)
+  #  }
+  # the testing
+  }
+  if(method == "Wallenius") {
+  results[, c("P.DE")] <- 
+  t(sapply(1:length(collection), function(i) {
+    # try to skip the 0 des to speed it up
+ #   if(results[i,"DE"] == 0) {
+ #     p_val <- 1
+  #  } else {
+    InSet <- eg.universe %in% collection[[i]]
+    pw.red <- sum(test_pwf[InSet], na.rm = TRUE) / results[i, "N"] # so i don't know why I get na's - or do i?
+    pw.white <- sum(test_pwf[!InSet], na.rm = TRUE) / (Nuniverse - results[i, "N"]) #anyway the na removal is not in original code
+    odds <- pw.red / pw.white
+    p_val <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+    #the optional thing
+      # Get gene symbols of significant genes
+    SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+    SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+    SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+    if(p_val==0){
+        message("Pvalue of exactly zero detected. Performing hypergeometric 
+                test for gene set ", rownames(results)[i])
+        p_val <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,"N"],
+                                           lower.tail=FALSE)
+    }
+  #  }
+    c(p_val)  # return the values as a vector
+    })) #chatgpt translated loop to apply
+  } else if(method == "None") {
+    results[, c("P.DE")] <- 
+    t(sapply(1:length(collection), function(i) {
+      p_val <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,"N"],
+                                           lower.tail=FALSE)
+      #the optional thing
+      # Get gene symbols of significant genes
+    SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+    SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+    SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+      c(p_val)
+    }))
+  } else if(method == "Fishers") {
+    results[, c("P.DE")] <- 
+  t(sapply(1:length(collection), function(i) {
+    InSet <- eg.universe %in% collection[[i]]
+    pw.red <- sum(test_pwf[InSet], na.rm = TRUE) / results[i, "N"] # so i don't know why I get na's - or do i?
+    pw.white <- sum(test_pwf[!InSet], na.rm = TRUE) / (Nuniverse - results[i, "N"]) #anyway the na removal is not in original code
+    odds <- pw.red / pw.white
+    p_val <- BiasedUrn::pFNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dFNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+    #the optional thing
+      # Get gene symbols of significant genes
+    SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+    SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = "SYMBOL"))
+    SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
+    if(p_val==0){
+        message("Pvalue of exactly zero detected. Performing hypergeometric 
+                test for gene set ", rownames(results)[i])
+        p_val <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,"N"],
+                                           lower.tail=FALSE)
+    }
+    c(p_val)  # return the values as a vector
+    }))
+  }
+  
+  
+  results <- results %>% data.frame()
+  results[,"FDR"] <- stats::p.adjust(results[,"P.DE"],method="BH")
+  results[,"DE"] <- floor(results[,"DE"])
+  results <- rbind(results, results_null)
+  results <- data.frame(results, SigGenesInSet)
+  
+  results <- merge(go$idTable,results,by.x="GOID",by.y="row.names")
+  rownames(results) <- results$GOID
+  results <- results %>% .[order(.$FDR),]
+  results
+  
+}
+
+```
+
+# microarray code
+# goseq code
+```{r}
+reversemapping=function(map){
+	tmp=unlist(map,use.names=FALSE)
+	names(tmp)=rep(names(map),times=as.numeric(summary(map)[,1]))
+	return(split(names(tmp),as.vector(tmp)))
+}
+goseq_mod <- function(pwf,genome,id,gene2cat=NULL,test.cats=c("GO:CC","GO:BP","GO:MF"),method="Wallenius",repcnt=2000,use_genes_without_cat=FALSE){
+	################# Input pre-processing and validation ###################
+	#Do some validation of input variables
+	if(any(!test.cats%in%c("GO:CC","GO:BP","GO:MF","KEGG"))){
+		stop("Invalid category specified.  Valid categories are GO:CC, GO:BP, GO:MF or KEGG")
+	}
+	if((missing(genome) | missing(id))){
+		if(is.null(gene2cat)){
+			stop("You must specify the genome and gene ID format when automatically fetching gene to GO category mappings.")
+		}
+		#If we're using user specified mappings, this obviously isn't a problem
+		genome='dummy'
+		id='dummy'
+	}
+	if(!any(method%in%c("Wallenius","Sampling","Hypergeometric", "Fishers"))){
+		stop("Invalid calculation method selected.  Valid options are Wallenius, Sampling & Hypergeometric.")
+	}
+	if(!is.null(gene2cat) && (!is.data.frame(gene2cat) & !is.list(gene2cat))){
+		stop("Was expecting a dataframe or a list mapping categories to genes.  Check gene2cat input and try again.")
+	}
+		
+	#Factors are evil
+	pwf=unfactor(pwf)
+	gene2cat=unfactor(gene2cat)
+
+	###################### Data fetching and processing ########################
+	if(is.null(gene2cat)){
+		#When we fetch the data using getgo it will be in the list format
+		message("Fetching GO annotations...")
+		gene2cat=getgo(rownames(pwf),genome,id,fetch.cats=test.cats)
+		names(gene2cat)=rownames(pwf)
+		#Do the two rebuilds to remove any nulls
+		cat2gene=reversemapping(gene2cat)
+		gene2cat=reversemapping(cat2gene)
+	}else{
+		#The gene2cat input accepts a number of formats, we need to check each of them in term
+		message("Using manually entered categories.")
+		#The options are a flat mapping (that is a data frame or matrix) or a list, where the list can be either gene->categories or category->genes
+		if(class(gene2cat)!="list"){
+			#it's not a list so it must be a data.frame, work out which column contains the genes
+			genecol_sum=as.numeric(apply(gene2cat,2,function(u){sum(u%in%rownames(pwf))}))
+			genecol=which(genecol_sum!=0)
+			if(length(genecol)>1){
+				genecol=genecol[order(-genecol_sum)[1]]
+				warning(paste("More than one possible gene column found in gene2cat, using the one headed",colnames(gene2cat)[genecol]))
+			}
+			if(length(genecol)==0){
+				genecol=1
+				warning(paste("Gene column could not be identified in gene2cat conclusively, using the one headed",colnames(gene2cat)[genecol]))
+			}
+			othercol=1
+			if(genecol==1){othercol=2}
+			#Now put it into our delicious listy format
+			gene2cat=split(gene2cat[,othercol],gene2cat[,genecol])
+			#Do the appropriate builds
+			cat2gene=reversemapping(gene2cat)
+			gene2cat=reversemapping(cat2gene)
+		}
+		#!!!!
+		#The following conditional has been flagged as a potential issue when using certain 
+		#types of input where the category names are the same as gene names (which seems like 
+		#something you should avoid anyway...).  Leave it for now
+		#!!!!
+		#We're now garunteed to have a list (unless the user screwed up the input) but it could 
+		#be category->genes rather than the gene->categories that we want. 
+		if(sum(unique(unlist(gene2cat,use.names=FALSE))%in%rownames(pwf))>sum(unique(names(gene2cat))%in%rownames(pwf))){
+			gene2cat=reversemapping(gene2cat)
+		}
+		#Alright, we're garunteed a list going in the direction we want now.  Throw out genes which we will not use
+		gene2cat=gene2cat[names(gene2cat)%in%rownames(pwf)]
+
+		#Rebuild because it's a fun thing to do
+		cat2gene=reversemapping(gene2cat)
+		gene2cat=reversemapping(cat2gene)
+
+		## make sure we remove duplicate entries .. e.g. see 
+		## http://permalink.gmane.org/gmane.science.biology.informatics.conductor/46876
+		cat2gene=lapply(cat2gene,function(x){unique(x)})
+		gene2cat=lapply(gene2cat,function(x){unique(x)})
+	}
+
+	nafrac=(sum(is.na(pwf$pwf))/nrow(pwf))*100
+	if(nafrac>50){
+		warning(paste("Missing length data for ",round(nafrac),"% of genes.  Accuarcy of GO test will be reduced.",sep=''))
+	}
+	#Give the genes with unknown length the weight used by the median gene (not the median weighting!)
+	pwf$pwf[is.na(pwf$pwf)]=pwf$pwf[match(sort(pwf$bias.data[!is.na(pwf$bias.data)])[ceiling(sum(!is.na(pwf$bias.data))/2)],pwf$bias.data)]
+
+	###################### Calculating the p-values ########################
+	# Remove all the genes with unknown GOterms
+	unknown_go_terms=nrow(pwf)-length(gene2cat)
+	if((!use_genes_without_cat) && unknown_go_terms>0 ){
+	   message(paste("For",unknown_go_terms,"genes, we could not find any categories. These genes will be excluded."))
+	   message("To force their use, please run with use_genes_without_cat=TRUE (see documentation).")
+	   message("This was the default behavior for version 1.15.1 and earlier.")
+	   pwf=pwf[rownames(pwf) %in% names(gene2cat),]
+	} 
+	#A few variables are always useful so calculate them
+	cats=names(cat2gene)
+	DE=rownames(pwf)[pwf$DEgenes==1]
+	num_de=length(DE)
+	num_genes=nrow(pwf)
+	pvals=data.frame(category=cats,over_represented_pvalue=NA,under_represented_pvalue=NA,stringsAsFactors=FALSE,numDEInCat=NA,numInCat=NA)
+	if(method=="Sampling"){
+		#We need to know the number of DE genes in each category, make this as a mask that we can use later...
+		num_DE_mask=rep(0,length(cats))
+		a=table(unlist(gene2cat[DE],FALSE,FALSE))
+		num_DE_mask[match(names(a),cats)]=as.numeric(a)
+		num_DE_mask=as.integer(num_DE_mask)
+		#We have to ensure that genes not associated with a category are included in the simulation, to do this they need an empty entry in the gene2cat list
+		gene2cat=gene2cat[rownames(pwf)]
+		names(gene2cat)=rownames(pwf)
+		message("Running the simulation...")
+		#Now do the actual simulating
+		lookup=matrix(0,nrow=repcnt,ncol=length(cats))
+		for(i in 1:repcnt){
+			#A more efficient way of doing weighted random sampling without replacment than the built in function
+			#The order(runif...)[1:n] bit picks n genes at random, weighting them by the PWF
+			#The table(as.character(unlist(...))) bit then counts the number of times this random set occured in each category
+			a=table(as.character(unlist(gene2cat[order(runif(num_genes)^(1/pwf$pwf),decreasing=TRUE)[1:num_de]],FALSE,FALSE)))
+			lookup[i,match(names(a),cats)]=a
+			pp(repcnt)
+		}
+		message("Calculating the p-values...")
+		#The only advantage of the loop is it uses less memory...
+		#for(i in 1:length(cats)){
+		#	pvals[i,2:3]=c((sum(lookup[,i]>=num_DE_mask[i])+1)/(repcnt+1),(sum(lookup[,i]<=num_DE_mask[i])+1)/(repcnt+1))
+		#	pp(length(cats))
+		#}
+		pvals[,2]=(colSums(lookup>=outer(rep(1,repcnt),num_DE_mask))+1)/(repcnt+1)
+		pvals[,3]=(colSums(lookup<=outer(rep(1,repcnt),num_DE_mask))+1)/(repcnt+1)
+	}
+	if(method=="Wallenius"){
+		message("Calculating the p-values...")
+		#All these things are just to make stuff run faster, mostly because comparison of integers is faster than string comparison
+		degenesnum=which(pwf$DEgenes==1)
+		#Turn all genes into a reference to the pwf object
+		cat2genenum=relist(match(unlist(cat2gene),rownames(pwf)),cat2gene)
+		#This value is used in every calculation, by storing it we need only calculate it once
+		alpha=sum(pwf$pwf)
+		#Each category will have a different weighting so needs its own test
+		pvals[,2:3]=t(sapply(cat2genenum,function(u){
+			#The number of DE genes in this category
+			num_de_incat=sum(degenesnum%in%u)
+			#The total number of genes in this category
+			num_incat=length(u)
+			#This is just a quick way of calculating weight=avg(PWF within category)/avg(PWF outside of category)
+			avg_weight=mean(pwf$pwf[u])
+			weight=(avg_weight*(num_genes-num_incat))/(alpha-num_incat*avg_weight)
+			if(num_incat==num_genes){ weight=1 } #case for the root GO terms			
+			#Now calculate the sum of the tails of the Wallenius distribution (the p-values)
+			c(dWNCHypergeo(num_de_incat,num_incat,num_genes-num_incat,num_de,weight)
+			+pWNCHypergeo(num_de_incat,num_incat,num_genes-num_incat,num_de,weight,lower.tail=FALSE),
+			pWNCHypergeo(num_de_incat,num_incat,num_genes-num_incat,num_de,weight))
+		}))
+	}
+	if(method=="Fishers"){
+		message("Calculating the p-values...")
+		#All these things are just to make stuff run faster, mostly because comparison of integers is faster than string comparison
+		degenesnum=which(pwf$DEgenes==1)
+		#Turn all genes into a reference to the pwf object
+		cat2genenum=relist(match(unlist(cat2gene),rownames(pwf)),cat2gene)
+		#This value is used in every calculation, by storing it we need only calculate it once
+		alpha=sum(pwf$pwf)
+		#Each category will have a different weighting so needs its own test
+		pvals[,2:3]=t(sapply(cat2genenum,function(u){
+			#The number of DE genes in this category
+			num_de_incat=sum(degenesnum%in%u)
+			#The total number of genes in this category
+			num_incat=length(u)
+			#This is just a quick way of calculating weight=avg(PWF within category)/avg(PWF outside of category)
+			avg_weight=mean(pwf$pwf[u])
+			weight=(avg_weight*(num_genes-num_incat))/(alpha-num_incat*avg_weight)
+			if(num_incat==num_genes){ weight=1 } #case for the root GO terms			
+			#Now calculate the sum of the tails of the Wallenius distribution (the p-values)
+			c(dFNCHypergeo(num_de_incat,num_incat,num_genes-num_incat,num_de,weight)
+			+pFNCHypergeo(num_de_incat,num_incat,num_genes-num_incat,num_de,weight,lower.tail=FALSE),
+			pFNCHypergeo(num_de_incat,num_incat,num_genes-num_incat,num_de,weight))
+		}))
+	}
+	if(method=="Hypergeometric"){
+		message("Calculating the p-values...")
+		#All these things are just to make stuff run faster, mostly because comparison of integers is faster than string comparison
+		degenesnum=which(pwf$DEgenes==1)
+		#Turn all genes into a reference to the pwf object
+		cat2genenum=relist(match(unlist(cat2gene),rownames(pwf)),cat2gene)
+		#Simple hypergeometric test, one category at a time
+		pvals[,2:3]=t(sapply(cat2genenum,function(u){
+			#The number of DE genes in this category
+			num_de_incat=sum(degenesnum%in%u)
+			#The total number of genes in this category
+			num_incat=length(u)
+			#Calculate the sum of the tails of the hypergeometric distribution (the p-values)
+			c(dhyper(num_de_incat,num_incat,num_genes-num_incat,num_de)+phyper(num_de_incat,num_incat,num_genes-num_incat,num_de,lower.tail=FALSE),phyper(num_de_incat,num_incat,num_genes-num_incat,num_de))
+		}))
+	}
+   #Populate the count columns...
+   degenesnum=which(pwf$DEgenes==1)
+   cat2genenum=relist(match(unlist(cat2gene),rownames(pwf)),cat2gene)
+   pvals[,4:5]=t(sapply(cat2genenum,function(u){
+      c(sum(degenesnum%in%u),length(u))
+   }))
+   
+   #Finally, sort by p-value
+   pvals=pvals[order(pvals$over_represented_pvalue),]
+
+   # Supplement the table with the GO term name and ontology group
+   # but only if the enrichment categories are actually GO terms
+   if(any(grep("^GO:",pvals$category))){
+      GOnames=select(GO.db,keys=pvals$category,columns=c("TERM","ONTOLOGY"))[,2:3]
+      colnames(GOnames)<-tolower(colnames(GOnames))
+      pvals=cbind(pvals,GOnames)
+   }
+
+   # And return
+   return(pvals)
+}
+```
+
+
+
+```{r}
+columns(org.Hs.eg.db)
+```
+```{r}
+keys(org.Hs.eg.db)
+```
+
+
+
