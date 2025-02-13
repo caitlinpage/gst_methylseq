@@ -1,0 +1,19 @@
+---
+title: "05_plots"
+author: "Caitlin Page"
+date: "2025-02-12"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+* 3 plots
+	- The boxplot
+	- A venn diagram of overlap
+And the change in rank plot - I was doing it wrong way around - want to match alicia - which is rank - unbiased rank
+```{r}
+
+```
+

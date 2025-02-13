@@ -1,0 +1,101 @@
+---
+title: "05_notes"
+author: "Caitlin Page"
+date: "2025-01-31"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+
+```
+
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(test_anno, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
+  group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>% 
+  .[order(.$num_cg),] %>%
+  ungroup() %>%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %>% 
+  group_by(bin_group) %>%
+  mutate(num_cg_bin_group = mean(num_cg)) %>%
+  group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = dplyr::n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = dplyr::n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE)
+```
+
+```{r}
+bsseq_dmrs
+```
+
+
+
+
+STEPS:
+```{r}
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
+bsseq_res <- readRDS("../output/bsseq_res.rds")
+```
+```{r}
+test_anno <- annoGeneDmr(bsseq_res, bsseq_dmrs, gene_source = "biomaRt", biomart_genes)
+test_anno
+```
+```{r}
+str(test_out_filt)
+```
+```{r}
+head(test_out_filt$freq)
+```
+```{r}
+renv::dependencies() %>% data.frame() %>% filter(Package == "gogadget")
+```
+
+
+overall
+```{r}
+run_gst_seq(dmrs, tested_cpgs, 
+                        gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter"),
+                        correct_bias=TRUE, plot_bias=TRUE, ...)
+```
+breakdown
+```{r}
+run_miss_methyl_a(biomart_genes, test_anno)
+```
+* coverts ensembl to entrez gene ids
+* sets up for testing - de info
+```{r}
+test_out_filt
+```
+
+
+```{r}
+run_miss_methyl_b(out, correct_bias=TRUE, plot_bias=FALSE, ...)
+```
+* does the testing
+* nature of the biasedUrn method is that it can't be // - each test must be done individually - so this is still slower then would be good
+
+```{r}
+res <- readRDS("../output/mm_fn_res_num.rds")
+res
+```
+
+```{r}
+compare <- readRDS("../output/go_res_compare.rds")
+compare
+```
+```{r}
+
+```
+
