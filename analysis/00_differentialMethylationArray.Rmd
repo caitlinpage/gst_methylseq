@@ -4,12 +4,294 @@ author: "Caitlin Page"
 date: "2024-10-25"
 output: workflowr::wflow_html
 editor_options:
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
+* dun dun dun i did it wrong - so it is epicv1 - which is 850k, v2 is more like 935k and is hg38
 ## Introduction
 
 ```{r}
+library(DMRcate)
 
+library(limma)
+library(minfi)
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylationEPICmanifest)
+library(RColorBrewer)
 ```
+
+* DMRcate can do array and sequencing
+
+* DMRcate wants the beta values
+* so do sample stuff following minfi (1_methods/analysis/1_limma_array)
+```{r}
+file_source <- c("natural_killer", "b_cell")
+files_new <- character()
+for(i in 1:2) {
+  files <- list.files(paste0("../data/microarray/", file_source[i])) %>% gsub(".idat.gz", "", .)
+  files <- files[!grepl("Red", files)]
+  files <- files %>% gsub("_Grn", "", .)
+  files <- paste0("../data/microarray/", file_source[i], "/", files)
+  files_new <- c(files_new, files)
+}
+files_new
+
+blood_samples <- cbind(sample_num = 1:12) %>% data.frame()
+blood_samples <- blood_samples %>% mutate(sample_group = rep(file_source, times = 6) %>% .[order(., decreasing = TRUE)])
+blood_samples <- blood_samples %>% mutate(sample_id = substring(files_new, first = stringr::str_locate(files_new, "G")[,1])
+)
+blood_samples <- blood_samples %>% mutate(short_group = ifelse(sample_group == "natural_killer", "NK", "B"))
+blood_samples <- blood_samples %>% mutate(id_group = paste0(short_group, "_", substring(sample_id, first = 1, last = stringr::str_locate(sample_id, "_")[,1] - 1)))
+blood_samples
+
+rgSet <- read.metharray(files_new)
+rgSet
+```
+
+```{r}
+sampleNames(rgSet) <- blood_samples$id_group
+rgSet
+
+# calculate the detection p-values
+detP <- detectionP(rgSet)
+head(detP)
+```
+
+
+```{r}
+# examine mean detection p-values across all samples to identify any failed samples
+pal <- brewer.pal(8,"Dark2")
+par(mfrow=c(1,2))
+barplot(colMeans(detP), col=pal[factor(blood_samples$short_group)], las=2,
+         cex.names=0.8,ylab="Mean detection p-values")
+abline(h=0.01,col="red")
+legend("topleft", legend=levels(factor(blood_samples$short_group)), fill=pal,
+        bg="white")
+
+barplot(colMeans(detP), col=pal[factor(blood_samples$short_group)], las=2,
+         cex.names=0.8, ylim = c(0,0.002), ylab="Mean detection p-values")
+legend("topleft", legend=levels(factor(blood_samples$short_group)), fill=pal,
+        bg="white")
+```
+
+```{r}
+# remove poor quality samples
+keep <- colMeans(detP) < 0.05
+keep
+rgSet <- rgSet[,keep]
+rgSet
+```
+
+```{r}
+# normalize the data; this results in a GenomicRatioSet object
+mSetSq <- preprocessQuantile(rgSet)
+mSetSq
+```
+
+```{r}
+# create a MethylSet object from the raw data for plotting
+mSetRaw <- preprocessRaw(rgSet)
+mSetRaw
+```
+
+```{r}
+# visualise what the data looks like before and after normalisation
+par(mfrow=c(1,2))
+densityPlot(rgSet, sampGroups=blood_samples$short_group,main="Raw", legend=FALSE)
+legend("top", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+densityPlot(getBeta(mSetSq), sampGroups=blood_samples$short_group,
+              main="Normalized", legend=FALSE)
+legend("top", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+```
+
+```{r}
+# MDS plots to look at largest sources of variation
+par(mfrow=c(1,2))
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)])
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$sample_num)])
+legend("top", legend=levels(factor(blood_samples$sample_num)), text.col=pal,
+        bg="white", cex=0.7)
+```
+
+```{r}
+par(mfrow=c(1,3))
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(1,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(2,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(3,4))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+```
+
+```{r}
+# ensure probes are in the same order in the mSetSq and detP objects
+detP <- detP[match(featureNames(mSetSq),rownames(detP)),]
+
+# remove any probes that have failed in one or more samples
+keep <- rowSums(detP < 0.01) == ncol(mSetSq)
+table(keep)
+```
+
+```{r}
+mSetSqFlt <- mSetSq[keep,]
+mSetSqFlt
+```
+
+```{r}
+anno_array <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+anno_array
+anno_array <- anno_array %>% data.frame() %>% mutate(seqnames = chr, start = pos, width = 1) %>% relocate(c(seqnames, start, width))
+anno_array 
+```
+
+```{r}
+anno_array
+```
+
+
+```{r}
+keep <- featureNames(mSetSqFlt) %in% anno_array$Name
+table(keep)
+mSetSqFlt <- mSetSqFlt[keep,]
+```
+
+
+```{r}
+# if your data includes males and females, remove probes on the sex chromosomes
+keep <- !(featureNames(mSetSqFlt) %in% anno_array$Name[anno_array$seqnames %in%
+                                                               c("chrX","chrY")])
+table(keep)
+mSetSqFlt <- mSetSqFlt[keep,]
+```
+
+```{r}
+# remove probes with SNPs at CpG site
+mSetSqFlt <- dropLociWithSnps(mSetSqFlt)
+mSetSqFlt
+```
+
+```{r}
+cross_reactive_probes <- read.table("../data/microarray/cross_reactive_probes_supp2.txt")
+cross_reactive_probes
+
+keep <- !(featureNames(mSetSqFlt) %in% cross_reactive_probes$V1)
+table(keep)
+```
+
+```{r}
+mSetSqFlt <- mSetSqFlt[keep,]
+mSetSqFlt
+```
+
+```{r}
+par(mfrow=c(1,2))
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], cex=0.8)
+legend("right", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        cex=0.65, bg="white")
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$sample_num)])
+legend("right", legend=levels(factor(blood_samples$sample_num)), text.col=pal,
+        cex=0.7, bg="white")
+```
+- the 1st component is even stronger now - not sure if that's supposed to happen
+
+```{r}
+par(mfrow=c(1,3))
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(1,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(2,3))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
+         col=pal[factor(blood_samples$short_group)], dim = c(3,4))
+legend("top", legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg="white", cex=0.7)
+```
+
+```{r}
+mVals <- getM(mSetSqFlt)
+head(mVals[,1:5])
+```
+
+```{r}
+bVals <- getBeta(mSetSqFlt)
+head(bVals[,1:5])
+```
+
+
+# now DMRcate
+* they convert beta to M - but I have beta and M from minfi
+
+* do their filtering
+```{r}
+nrow(mVals)
+ALLMs.noSNPs <- rmSNPandCH(mVals, rmcrosshyb = FALSE)
+nrow(ALLMs.noSNPs)
+```
+```{r}
+ALLMs.noSNPs %>% data.frame()
+```
+
+```{r}
+cellType <- factor(blood_samples$short_group)
+
+design <- model.matrix(~cellType)
+design
+myannotation <- cpg.annotate("array", ALLMs.noSNPs, arraytype = "EPICv1",
+analysis.type="differential", design=design, coef=2, what = "M")
+```
+```{r}
+design
+```
+
+```{r}
+dmrcate_array_anno <- myannotation@ranges %>% data.frame()
+```
+
+```{r}
+?dmrcate
+```
+
+```{r}
+dmrcoutput <- dmrcate(myannotation, lambda=1000, C=2)
+```
+
+```{r}
+saveRDS(myannotation, "../output/dmrcate_array_anno.rds")
+saveRDS(dmrcoutput, "../output/dmrcate_array_out.rds")
+```
+
+
+```{r}
+dmrcate_array_dmr <- extractRanges(dmrcoutput, genome = "hg19")
+```
+
+
+```{r}
+saveRDS(dmrcate_array_dmr, "../output/dmrcate_array_dmr.rds")
+```
+
+
 
