@@ -1,0 +1,32 @@
+---
+title: "04_compareAnnotation"
+author: "Caitlin Page"
+date: "2025-02-19"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+library(plyranges)
+library(ggplot2)
+```
+
+dmrcate: {00_differentialMethylationArray.Rmd}
+myannotation
+myannotation@ranges
+```{r}
+dmrcate_array_anno <- dmrcate_array_anno %>% .[order(.$ind.fdr),] %>% mutate(rank = 1:nrow(.))
+```
+```{r}
+array_dmps <- array_dmps %>% mutate(signif = ifelse(adj.P.Val < 0.05, TRUE, FALSE))
+```
+
+```{r}
+find_overlaps(as_granges(array_dmps), as_granges(dmrcate_array_anno)) %>% data.frame() %>%
+  ggplot(aes(x = rank.x, y = rank.y)) +
+  geom_point(alpha = 0.3)
+```
+* so that's nice
