@@ -9,3 +9,29 @@ editor_options:
 ---
 
 Welcome to my research website.
+
+* list of important objects and their contents
+* and important analysis files
+```{r}
+	
+save.image(file='myEnvironment.RData')
+```
+
+https://www.techcoil.com/blog/how-to-save-and-load-environment-objects-in-r/#google_vignette
+```{r}
+load('myEnvironment.RData')
+```
+
+```{r}
+library(plyranges)
+library(dplyr)
+
+library(ggplot2)
+library(ggVennDiagram)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(goseq)
+library(GO.db)
+library(missMethyl)
+library(BiasedUrn)
+```
+
