@@ -10,7 +10,7 @@ editor_options:
 ## Introduction
 
 ```{r}
-
+renv::dependencies() %>% data.frame()
 ```
 
 
@@ -40,6 +40,12 @@ bsseq_dmrs
 ```
 
 
+```{r}
+library(dplyr)
+library(rbenchmark)
+library(ggplot2)
+library(ggVennDiagram)
+```
 
 
 STEPS:
@@ -55,12 +61,7 @@ test_anno
 ```{r}
 str(test_out_filt)
 ```
-```{r}
-head(test_out_filt$freq)
-```
-```{r}
-renv::dependencies() %>% data.frame() %>% filter(Package == "gogadget")
-```
+
 
 
 overall
@@ -72,19 +73,284 @@ run_gst_seq(dmrs, tested_cpgs,
 breakdown
 ```{r}
 run_miss_methyl_a(biomart_genes, test_anno)
+str(test_out_filt)
 ```
 * coverts ensembl to entrez gene ids
 * sets up for testing - de info
 ```{r}
-test_out_filt
+go <- .getGO
+```
+```{r}
+goseq_go <- getgo(biomart_genes$ensembl_gene_id, "hg19", "ensGene", "GO:BP")
+```
+```{r}
+MM_array_wall <- readRDS("../output/mm_array_res.rds")
+```
+```{r}
+MM_wall_filt
 ```
 
 
 ```{r}
-run_miss_methyl_b(out, correct_bias=TRUE, plot_bias=FALSE, ...)
+ggVennDiagram(list(array_mm = rownames(MM_array_wall), seq_mm = filter(MM_wall_filt, FDR < 0.05)$GOID))
+```
+
+```{r}
+go <- 
+```
+
+```{r}
+benchmark(mm_a = run_miss_methyl_a(biomart_genes, test_anno_filt), replications = 50)
+```
+
+```{r}
+run_miss_methyl_b(out, method = c("Wallenius", "Fishers", "None"), plot_bias=FALSE, ...)
 ```
 * does the testing
 * nature of the biasedUrn method is that it can't be // - each test must be done individually - so this is still slower then would be good
+```{r}
+benchmark(wall = run_miss_methyl_b(test_out_filt, method = "Wallenius"), fish = run_miss_methyl_b(test_out_filt, method = "Fishers"), replications = 5)
+```
+```{r}
+# goseq version
+benchmark(wall = goseq(pwf_seq, "hg19", "ensGene"), fish = goseq_mod(pwf_seq,"hg19","ensGene",method="Fishers"), replications = 50)
+```
+```{r}
+GO.wall %>% filter(FDR >= 0.05)
+GO.samp %>% filter(FDR >= 0.05)
+GO.fish %>% filter(FDR >= 0.05)
+```
+* compare microarray ranking goseq
+```{r}
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = samp)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 1, colour = "blue")
+
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 461, colour = "green")
+
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = samp, y = fish)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 1, colour = "blue") +
+  geom_hline(yintercept = 461, colour = "green")
+```
+```{r}
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = samp)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 1, colour = "blue") +
+  lims(x=c(0,1000),y=c(0,1000))
+
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 461, colour = "green") +
+  lims(x=c(0,1000),y=c(0,1000))
+
+GO.wall %>% mutate(samp = GO.samp[match(GO.wall$category, GO.samp$category), "samp_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = samp, y = fish)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 1, colour = "blue") +
+  geom_hline(yintercept = 461, colour = "green") +
+  lims(x=c(0,1000),y=c(0,1000))
+```
+
+```{r}
+GO.wall_seq %>% filter(FDR >= 0.05)
+GO.fish_seq %>% filter(FDR >= 0.05)
+```
+* compare stat for WGBS goseq
+
+```{r}
+GO.wall_seq %>% mutate(fish_seq = GO.fish_seq[match(GO.wall_seq$category, GO.fish_seq$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 221, colour = "blue") +
+  geom_hline(yintercept = 256, colour = "purple")
+
+GO.wall_seq %>% mutate(fish_seq = GO.fish_seq[match(GO.wall_seq$category, GO.fish_seq$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 221, colour = "blue") +
+  geom_hline(yintercept = 256, colour = "purple") +
+  lims(x=c(0,1000),y=c(0,1000))
+```
+* compare microarray and WGBS ranking for goseq
+```{r}
+GO.wall %>% mutate(wall_seq = GO.wall_seq[match(GO.wall$category, GO.wall_seq$category), "wall_rank"],) %>%
+  ggplot(aes(x = wall_rank, y = wall_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 221, colour = "blue") +
+  lims(x=c(0,1000),y=c(0,1000))
+
+GO.wall %>% mutate(fish_seq = GO.fish_seq[match(GO.wall$category, GO.fish_seq$category), "fish_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = fish, y = fish_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 461, colour = "green") +
+  geom_hline(yintercept = 256, colour = "purple") +
+  lims(x=c(0,1000),y=c(0,1000))
+
+GO.wall %>% mutate(fish_seq = GO.fish_seq[match(GO.wall$category, GO.fish_seq$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 256, colour = "purple") +
+  lims(x=c(0,1000),y=c(0,1000))
+
+GO.wall %>% mutate(wall_seq = GO.wall_seq[match(GO.wall$category, GO.wall_seq$category), "wall_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = fish, y = wall_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 461, colour = "green") +
+  geom_hline(yintercept = 221, colour = "blue") +
+  lims(x=c(0,1000),y=c(0,1000))
+```
+
+```{r}
+GO.wall %>% mutate(wall_seq = GO.wall_seq[match(GO.wall$category, GO.wall_seq$category), "wall_rank"],) %>%
+  ggplot(aes(x = wall_rank, y = wall_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 221, colour = "blue") 
+
+
+GO.wall %>% mutate(fish_seq = GO.fish_seq[match(GO.wall$category, GO.fish_seq$category), "fish_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = fish, y = fish_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 461, colour = "green") +
+  geom_hline(yintercept = 256, colour = "purple") 
+
+
+GO.wall %>% mutate(fish_seq = GO.fish_seq[match(GO.wall$category, GO.fish_seq$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 453, colour = "red") +
+  geom_hline(yintercept = 256, colour = "purple") 
+
+
+GO.wall %>% mutate(wall_seq = GO.wall_seq[match(GO.wall$category, GO.wall_seq$category), "wall_rank"],
+                   fish = GO.fish[match(GO.wall$category, GO.fish$category), "fish_rank"]) %>%
+  ggplot(aes(x = fish, y = wall_seq)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 461, colour = "green") +
+  geom_hline(yintercept = 221, colour = "blue") 
+
+```
+
+* WGBS MM
+
+```{r}
+MM_fish_filt$rank <- 1:nrow(MM_fish_filt)
+MM_wall_filt$wall_rank <- 1:nrow(MM_wall_filt)
+MM_none_filt$rank <- 1:nrow(MM_none_filt)
+```
+```{r}
+MM_fish_filt %>% filter(FDR >= 0.05)
+```
+```{r}
+MM_wall_filt %>% mutate(wall_goseq = GO.wall_seq[match(MM_wall_filt$GOID, GO.wall_seq$category), "wall_rank"],
+                   fish = MM_fish_filt[match(MM_wall_filt$GOID, MM_fish_filt$GOID), "rank"]) %>%
+  ggplot(aes(y = wall_rank, x = wall_goseq)) +
+  geom_point(alpha = 0.3) 
+```
+```{r}
+ggVennDiagram(list(wall_mm = filter(MM_wall_filt, FDR < 0.05)$GOID, wall_goseq = filter(GO.wall_seq, FDR < 0.05)$category))
+```
+
+
+```{r}
+MM_wall_filt %>% mutate(none = MM_none_filt[match(MM_wall_filt$GOID, MM_none_filt$GOID), "rank"],
+                   fish = MM_fish_filt[match(MM_wall_filt$GOID, MM_fish_filt$GOID), "rank"]) %>%
+  ggplot(aes(y = wall_rank, x = none)) +
+  geom_point(alpha = 0.3) 
+#  geom_vline(xintercept = 453, colour = "red") +
+ # geom_hline(yintercept = 1, colour = "blue")
+
+MM_wall_filt %>% mutate(none = MM_none_filt[match(MM_wall_filt$GOID, MM_none_filt$GOID), "rank"],
+                   fish = MM_fish_filt[match(MM_wall_filt$GOID, MM_fish_filt$GOID), "rank"]) %>%
+  ggplot(aes(y = fish, x = none)) +
+  geom_point(alpha = 0.3) 
+#  geom_vline(xintercept = 453, colour = "red") +
+#  geom_hline(yintercept = 1, colour = "blue")
+
+MM_wall_filt %>% mutate(none = MM_none_filt[match(MM_wall_filt$GOID, MM_none_filt$GOID), "rank"],
+                   fish = MM_fish_filt[match(MM_wall_filt$GOID, MM_fish_filt$GOID), "rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish)) +
+  geom_point(alpha = 0.3) 
+#  geom_vline(xintercept = 453, colour = "red") +
+ # geom_hline(yintercept = 1, colour = "blue")
+```
+```{r}
+test_out_filt$de %>% data.frame() %>% filter(`.` == 1)
+```
+```{r}
+mm_array_res <- readRDS("../output/mm_array_res.rds")
+```
+
+
+## change in rank
+```{r}
+go_entrez2
+```
+```{r}
+MM_wall_filt %>% mutate(none = MM_none_filt[match(MM_wall_filt$GOID, MM_none_filt$GOID), "rank"],
+                   fish = MM_fish_filt[match(MM_wall_filt$GOID, MM_fish_filt$GOID), "rank"],
+                   mean_cg = go_entrez2[match(MM_wall_filt$GOID, go_entrez2$go), "mean_cg"]) +
+  ggplot(aes())
+```
+
+```{r}
+GO.wall_seq %>% mutate(none = GO.fish_seq[match(GO.wall_seq$category, GO.fish_seq$category), "fish_rank"]) %>%
+  ggplot(aes(x = wall_rank, y = fish_seq))
+```
+
+
+```{r}
+MM_fish
+```
+
+```{r}
+plotB
+```
+
+```{r}
+plotBiasGrouped(biomart_genes, test_anno) + 
+```
+```{r}
+.plotBias(D=test_out_filt$de, bias=as.vector(test_out_filt$freq_genes))
+```
+
+```{r}
+D <- test_out_filt$de
+
+prior.prob <- bias
+  o <- order(bias)
+  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
+  prior.prob
+```
+
+```{r}
+mapped_entrez$freq %>% data.frame()
+```
+
+
 
 ```{r}
 res <- readRDS("../output/mm_fn_res_num.rds")
