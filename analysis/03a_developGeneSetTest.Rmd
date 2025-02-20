@@ -157,14 +157,14 @@ biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_
   group_by(bin_group) %>%
   mutate(num_cg_bin_group = mean(num_cg)) %>%
   group_by(num_cg_bin_group) %>%
-    mutate(num_bins_group_same_cg = n()) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
     group_by(num_cg_bin_group, has_dmr) %>%
-    mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+    mutate(num_per_dmr = dplyr::n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
     distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
     group_by(num_cg_bin_group) %>%
     .[order(.$num_cg_bin_group),] %>%
     mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
-    mutate(num = n()) %>%
+    mutate(num = dplyr::n()) %>%
     mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE)
 ```
 ##############
@@ -233,19 +233,7 @@ test_out_again <- run_miss_methyl_a(test_fn_res$genes, test_fn_res$anno)
 ```{r}
 test_fn_res
 ```
-```{r}
-library(microbenchmark)
-```
-- we don't want this - only good for small bits - b/c it reps 1000
-```{r}
-bench_steps <- microbenchmark(
-  genes = sourceGenes(bsseq_res, "biomart", "gene"),
- # genes_eh = sourceGenes(bsseq_res, "experimenthub", "gene"),
-  anno = annoGeneDmr(bsseq_res, bsseq_dmrs[1:1000,], "biomart", test_fn_res$genes),
-  out = run_miss_methyl_a(test_fn_res$genes, test_fn_res$anno),
-  res = run_miss_methyl_b(test_out_again, correct_bias = TRUE)
-)
-```
+
 ```{r}
 system.time(sourceGenes(bsseq_res, "biomart", "gene"))
 system.time(annoGeneDmr(bsseq_res, bsseq_dmrs[1:1000,], "biomart", test_fn_res$genes))
@@ -331,6 +319,9 @@ system.time(run_miss_methyl_a(biomart_genes, test_anno))
 # filter the dmr
 test_anno %>% filter(abs(areaStat) > 100) #it's like 17k instead of 70k
 test_out_filt <- run_miss_methyl_a(biomart_genes, filter(test_anno, abs(areaStat) > 100))
+```
+```{r}
+library(org.Hs.eg.db)
 ```
 
 ```{r}
@@ -670,11 +661,7 @@ results <- matrix(NA,ncol=4,nrow=length(collection))
 collection
 ```
 
-```{r}
-microbenchmark(app = lapply(collection, function(x) test_out_again$universe %in% x),
-               loop = for(i in 1:length(collection)){
-      InSet <- test_out_again$universe %in% collection[[i]]})
-```
+
 ```{r}
 system.time(lapply(collection, function(x) test_out_again$universe %in% x))
 system.time(for(i in 1:length(collection)){
