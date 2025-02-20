@@ -96,6 +96,10 @@ go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% di
 ```
 - still not as good as array
 ```{r}
+go_entrez
+```
+
+```{r}
 go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_fn_num_filt_dmr, mm_fn_num_filt_dmr_null, mean_cg) %>%
   mutate(Method = case_when(mm_fn_num_filt_dmr == FALSE & mm_fn_num_filt_dmr_null == FALSE ~ "Neither",
                             mm_fn_num_filt_dmr == TRUE & mm_fn_num_filt_dmr_null == FALSE ~ "Corrected",
@@ -108,6 +112,29 @@ go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% di
 ```
 - ooh maybe like this? - try for array
 ```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_fn_num_filt_dmr, mm_fn_num_filt_dmr_null, mean_cg) %>%
+  mutate(Method = case_when(mm_fn_num_filt_dmr == FALSE & mm_fn_num_filt_dmr_null == FALSE ~ "Neither",
+                            mm_fn_num_filt_dmr == TRUE & mm_fn_num_filt_dmr_null == FALSE ~ "Corrected",
+                            mm_fn_num_filt_dmr == FALSE & mm_fn_num_filt_dmr_null == TRUE ~ "Biased",
+                            TRUE ~ "Both")) %>%
+  ggplot(aes(x = Method, y = log2(mean_cg + 1), fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Fn MM num_cg filt dmr")
+```
+
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>%
+  mutate(Method = case_when(array_cat_signif == FALSE & array_cat_signif_bias == FALSE ~ "Neither",
+                            array_cat_signif == TRUE & array_cat_signif_bias == FALSE ~ "Corrected",
+                            array_cat_signif == FALSE & array_cat_signif_bias == TRUE ~ "Biased",
+                            TRUE ~ "Both")) %>%
+  ggplot(aes(x = Method, y = log2(mean_cg + 1), fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Array")
+```
+```{r}
 go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>%
   mutate(Method = case_when(array_cat_signif == FALSE & array_cat_signif_bias == FALSE ~ "Neither",
                             array_cat_signif == TRUE & array_cat_signif_bias == FALSE ~ "Corrected",
@@ -117,6 +144,16 @@ go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% di
   geom_boxplot() +
   theme_bw() +
   labs(y = "Average number of CpGs per ontology category", title = "Array")
+```
+```{r}
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>%
+  mutate(Method = case_when(array_cat_signif == FALSE & array_cat_signif_bias == FALSE ~ "Neither",
+                            array_cat_signif == TRUE & array_cat_signif_bias == FALSE ~ "Corrected",
+                            array_cat_signif == FALSE & array_cat_signif_bias == TRUE ~ "Biased",
+                            TRUE ~ "Both")) %>% filter(Method == "Corrected")
+```
+```{r}
+go_entrez[,1:6] %>% filter(array_cat_signif == TRUE) %>% distinct(go, array_cat_signif, array_cat_signif_bias)
 ```
 
 ```{r}
@@ -160,7 +197,11 @@ test_b_num_null
 go_entrez
 ```
 ```{r}
-go_entrez2 <- go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE), mean_cg_bin = mean(num_cg_bin, na.rm=TRUE)) %>% ungroup() %>% distinct(go, mean_cg, mean_cg_bin) %>% data.frame()
+go_entrez <- compare
+```
+
+```{r}
+go_entrez2 <- compare %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE), mean_cg_bin = mean(num_cg_bin, na.rm=TRUE)) %>% ungroup() %>% distinct(go, mean_cg, mean_cg_bin) %>% data.frame()
 ```
 ```{r}
 go_entrez
@@ -187,6 +228,17 @@ sig_terms_array_biased %>% mutate(unbiased_rank = sig_terms_array[match(rownames
 ```
 - ok I don't think that's what i want that to look like
 - maybe it would be better with all results
+
+```{r}
+sig_terms_array_biased %>% mutate(unbiased_rank = sig_terms_array[match(rownames(.), rownames(sig_terms_array)), "rank"], mean_cg = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg"]) %>% mutate(rank_change = rank - unbiased_rank) %>%
+  ggplot(aes(x = mean_cg, y = rank_change)) +
+  geom_point()
+
+sig_terms_array_biased %>% mutate(unbiased_rank = sig_terms_array[match(rownames(.), rownames(sig_terms_array)), "rank"], mean_cg = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg"]) %>% mutate(rank_change = rank - unbiased_rank) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_change)) +
+  geom_point()
+```
+
 
 ```{r}
 test_b_num_unfilt
