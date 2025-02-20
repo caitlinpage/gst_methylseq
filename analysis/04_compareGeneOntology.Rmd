@@ -6,6 +6,9 @@ output: workflowr::wflow_html
 editor_options:
   chunk_output_type: inline
 ---
+```{r}
+1+1
+```
 
 ## Introduction
 ```{r}
