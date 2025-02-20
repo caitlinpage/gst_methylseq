@@ -4,10 +4,30 @@ author: "Caitlin Page"
 date: "2025-02-12"
 output: workflowr::wflow_html
 editor_options:
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ## Introduction
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggVennDiagram)
+```
+
+```{r}
+go_entrez <- readRDS("../output/go_res_compare.Rds")
+```
+
+```{r}
+GO.wall <- readRDS("../output/goseq_res.rds")
+GO.wall.null <- readRDS("../output/goseq_null_res.rds")
+
+mm_hack <- readRDS("../output/mm_hack_res.rds")
+mm_hack_null <- readRDS("../output/mm_hack_null_res.rds")
+
+sig_terms_array <- readRDS("../output/mm_array_res.rds")
+sig_terms_array_biased <- readRDS("../output/mm_array_null.rds")
+```
 
 * 3 plots
 	- The boxplot
@@ -16,4 +36,68 @@ And the change in rank plot - I was doing it wrong way around - want to match al
 ```{r}
 
 ```
+
+## Boxplot
+* Does correcting for bias result in categories with less CpGs
+
+```{r}
+go_entrez[,1:6] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE | array_cat_signif == TRUE) %>%
+  mutate(Method = ifelse(array_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "MM Array")
+
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, seq_cat_signif, seq_cat_signif_bias, mean_cg) %>% filter(seq_cat_signif_bias == TRUE | seq_cat_signif == TRUE) %>%
+  mutate(Method = ifelse(seq_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Seq Goseq")
+
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_seq, mm_seq_null, mean_cg) %>% filter(mm_seq == TRUE | mm_seq_null == TRUE) %>%
+  mutate(Method = ifelse(mm_seq == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Hacked MM")
+
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg_bin, na.rm=TRUE)) %>% distinct(go, mm_fn_bin, mm_fn_bin_null, mean_cg) %>% filter(mm_fn_bin == TRUE | mm_fn_bin_null == TRUE) %>%
+  mutate(Method = ifelse(mm_fn_bin == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Fn MM cg_bin")
+
+go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, mm_fn_num, mm_fn_num_null, mean_cg) %>% filter(mm_fn_num == TRUE | mm_fn_num_null == TRUE) %>%
+  mutate(Method = ifelse(mm_fn_num == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category", title = "Fn MM num_cg")
+```
+
+## change in rank
+```{r}
+go_entrez2 <- go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE), mean_cg_bin = mean(num_cg_bin, na.rm=TRUE)) %>% ungroup() %>% distinct(go, mean_cg, mean_cg_bin) %>% data.frame()
+```
+
+```{r}
+sig_terms_array$rank <- 1:nrow(sig_terms_array)
+sig_terms_array_biased$rank <- 1:nrow(sig_terms_array_biased)
+```
+
+```{r}
+sig_terms_array_biased %>% mutate(unbiased_rank = sig_terms_array[match(rownames(.), rownames(sig_terms_array)), "rank"], mean_cg = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg"]) %>% mutate(rank_change = rank - unbiased_rank) %>%
+  ggplot(aes(x = mean_cg, y = rank_change)) +
+  geom_point()
+
+sig_terms_array_biased %>% mutate(unbiased_rank = sig_terms_array[match(rownames(.), rownames(sig_terms_array)), "rank"], mean_cg = go_entrez2[match(rownames(.), go_entrez2$go), "mean_cg"]) %>% mutate(rank_change = rank - unbiased_rank) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_change)) +
+  geom_point()
+```
+
+## Venn diagram
+
+
 
