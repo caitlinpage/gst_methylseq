@@ -1,0 +1,270 @@
+---
+title: "00_longReadAnalysis"
+author: "Caitlin Page"
+date: "2025-02-14"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+install:
+org.Mm.eg.db
+TxDb.Mmusculus.UCSC.mm10.knownGene
+```{r}
+library(NanoMethViz)
+library(dplyr)
+library(stringr)
+library(bsseq)
+library(dmrseq)
+
+long_ratio <- read.csv("../data/long_read/log_methy_ratio.csv.gz")
+long_chrx <- read.table("../data/long_read/chrx_methy_data.tsv.gz", header = TRUE)
+```
+
+
+```{r}
+long_ratio
+long_chrx
+```
+* actually let's download the BAMS
+* and follow the workshop code
+
+```{r}
+if (!dir.exists("../data/long_read/bams")) {
+    options(timeout = 600)
+    download.file("https://zenodo.org/records/12747551/files/input.tar.gz?download=1", "input.tar.gz")
+    utils::untar("input.tar.gz")
+    file.remove("input.tar.gz")
+}
+```
+```{r}
+bam_files <- dir("../data/long_read/input", pattern = "*bam$", full.names = TRUE)
+bam_files
+```
+
+```{r}
+samples <- read.table("../data/long_read/input/sample_anno.tsv", header = TRUE)
+samples
+```
+* they just used exon 7 - that only left very few significant DMRs
+* workshop data is just chr7
+
+```{r}
+exon_anno <- get_exons_mm10() 
+  #  filter(chr %in% c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7"))
+exon_anno
+```
+
+```{r}
+mbr <- ModBamResult(
+    methy = ModBamFiles(
+        paths = bam_files,
+        samples = samples$sample
+    ),
+    samples = samples,
+    exons = exon_anno,
+    mod_code = "m"
+)
+
+plot_gene(mbr, "Peg3")
+```
+
+```{r}
+modbam_to_tabix(mbr, "../data/long_read/methy.tsv.bgz")
+```
+* oh this makes the file I downloaded from the paper - just with all chr instead of just X
+
+```{r}
+nmr <- NanoMethResult(
+    methy = "../data/long_read/methy.tsv.bgz",
+    samples = samples,
+    exons = exon_anno
+)
+nmr
+```
+
+```{r}
+plot_gene(nmr, "Peg3")
+```
+
+```{r}
+bss <- methy_to_bsseq(nmr)
+
+pat_cols <- str_detect(colnames(getCoverage(bss)), "pat")
+mat_cols <- str_detect(colnames(getCoverage(bss)), "mat")
+
+low_cov <- (rowSums(getCoverage(bss)[, pat_cols] == 0) == 3) |
+           (rowSums(getCoverage(bss)[, mat_cols] == 0) == 3)
+
+table(low_cov)/sum(table(low_cov))
+```
+
+```{r}
+bss <- bss[!low_cov, ]
+```
+```{r}
+cgi_anno <- readRDS("../data/long_read/cgi_mm10.rds")
+cgi_anno
+```
+* wrong package version so this is being annoying - just download the rds file and read it 
+
+```{r}
+lmr <- bsseq_to_log_methy_ratio(
+    bss,
+    regions = cgi_anno
+)
+
+groups <- colnames(lmr) %>%
+    str_extract("mat|pat")
+
+plot_mds(lmr, groups = groups)
+```
+* not strong differences, don't expect much in way of DM results
+
+```{r}
+gene_anno <- exons_to_genes(exons(nmr))
+plot_agg_regions(nmr, regions = slice_sample(gene_anno, n = 100), group_col = "group")
+```
+```{r}
+gene_anno
+```
+
+```{r}
+plot_agg_regions(nmr, cgi_anno, group_col = "group")
+```
+
+```{r}
+pData(bss)$condition <- NanoMethViz::samples(nmr)$group
+```
+```{r}
+bss@rowRanges
+```
+* hold on I tried to use all chromosomes - how did I end up with just 7 again?
+```{r}
+long_regions <- dmrseq(bss, testCovariate = "condition", minNumRegion = 20)
+```
+
+```{r}
+long_regions
+```
+
+```{r}
+gene_anno_gr <- as_granges(dplyr::rename(gene_anno, seqnames = "chr"))
+
+gene_anno_gr_tss <- gene_anno_gr %>%
+    anchor_5p() %>%
+    mutate(width = 1) %>%
+    stretch(10000)
+
+gene_dmr_overlaps <- join_overlap_intersect(long_regions, gene_anno_gr_tss)
+gene_dmr_overlaps
+```
+
+```{r}
+dmr_regions <- as_tibble(gene_dmr_overlaps) %>%
+    dplyr::rename(chr = "seqnames")
+
+long_regions_sig <- dmr_regions %>%
+    filter(qval < 0.05)
+
+long_regions_sig %>% as.data.frame() 
+```
+
+* well damn I've only got 8 genes significant
+* guess I just have to try it
+* hold up that's with TSS overlap
+* let's do a full gene overlap
+
+```{r}
+gene_anno$seqnames <- gene_anno$chr
+gene_anno %>% filter(seqnames == "chr7")
+```
+
+```{r}
+long_gene_overlap <- find_overlaps(long_regions, as_granges(gene_anno), maxgap = 300) %>% data.frame()
+long_gene_overlap %>% distinct(symbol)
+```
+* maxgap 300 to get a few extra genes
+```{r}
+long_gene_overlap %>%
+    filter(qval < 0.05)
+```
+```{r}
+gene_anno <- data.frame(gene_anno)
+```
+
+```{r}
+long_genes_tested <- long_gene_overlap[,c(16,15,17)] %>% distinct(chr, gene_id, symbol) %>% 
+  mutate(signif = ifelse(symbol %in% filter(long_gene_overlap, qval < 0.05)$symbol, 1, 0))
+long_genes_tested$start <- gene_anno[match(long_genes_tested$symbol, gene_anno$symbol), "start"]
+long_genes_tested$end <- gene_anno[match(long_genes_tested$symbol, gene_anno$symbol), "end"]
+long_genes_tested$seqnames <- long_genes_tested$chr
+long_genes_tested
+```
+
+```{r}
+cgi_anno$seqnames <- cgi_anno$chr
+```
+
+```{r}
+long_cg <- find_overlaps(as_granges(long_genes_tested), as_granges(cgi_anno), maxgap = 300) %>% data.frame() %>% 
+  group_by(gene_id.x, symbol.x, start, end, signif) %>% summarise(n_cg = sum(cpgNum)) %>% ungroup() %>% data.frame()
+```
+```{r}
+long_genes_tested$n_cg <- long_cg[match(long_genes_tested$symbol, long_cg$symbol.x), "n_cg"]
+long_genes_tested <- long_genes_tested %>% mutate(n_cg = ifelse(is.na(n_cg), 0, n_cg))
+long_genes_tested
+```
+* I have significant genes without any CG
+* come back to this because something is wrong
+```{r}
+cgi_anno
+gene_anno %>% filter(chr == "chr7", symbol == "Peg3")
+```
+```{r}
+3531843 - 3531624
+```
+
+## my way of getting cg annotation
+```{r get-cg}
+source("../code/runBsseqDMR.R")
+library(BSgenome.Mmusculus.UCSC.mm10)
+seqnames(BSgenome.Mmusculus.UCSC.mm10)
+cg_mouse <- get_cg_sites(BSgenome.Mmusculus.UCSC.mm10, 1, 19)
+```
+
+```{r}
+long_cg <- find_overlaps(as_granges(long_genes_tested), as_granges(cg_mouse)) %>% data.frame() %>% 
+  group_by(gene_id, symbol, n_cg) %>% summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+
+long_genes_tested$num_cg <- long_cg[match(long_genes_tested$symbol, long_cg$symbol), "num_cg"]
+long_genes_tested <- long_genes_tested %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg))
+long_genes_tested
+```
+* yeah this covers them better - replace it
+
+
+## Gene set testing - GOSEQ
+
+```{r}
+gene.vector <- long_genes_tested$signif
+names(gene.vector) <- long_genes_tested$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = long_genes_tested$num_cg)
+pwf
+GO.long <- goseq::goseq(pwf, "mm10", "knownGene")
+GO.long
+GO.long <- GO.long %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long
+```
+* ok the FDR is 1 but the top term is genomic imprinting which is correct - so yay
+
+```{r}
+GO.long_null <- goseq::goseq(pwf, "mm10", "knownGene", method = "Hypergeometric")
+GO.long_null <- GO.long_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long_null
+```
+* also imprinting
+* idk about the rest of the terms
