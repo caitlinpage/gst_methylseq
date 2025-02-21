@@ -1,0 +1,250 @@
+---
+title: "04_compareSteps"
+author: "Caitlin Page"
+date: "2025-02-14"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(ggVennDiagram)
+```
+
+
+## DM Analysis results
+```{r}
+anno_array <- readRDS("../output/anno_array.rds")
+array_dmps <- readRDS("../output/array_dmps.rds")
+```
+
+```{r}
+bsseq_res <- readRDS("../output/bsseq_res.rds")
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
+```
+```{r}
+dmrcate_array_dmr <- dmrcate_array_dmr %>% data.frame()
+dmrcate_array_dmr$rank <- 1:nrow(dmrcate_array_dmr)
+```
+```{r}
+summary(dmrcate_array_dmr$min_smoothed_fdr)
+summary(dmrcate_array_dmr$no.cpgs)
+dmrcate_array_dmr %>% .[order(.$min_smoothed_fdr),]
+```
+
+
+## Compare indiv CpGs
+* filter results 
+** Bsseq doesn't have a PValue - individual CpGs are combined into DMRs based on their tstat 
+** quantile cutoff (0.025, 0.975)
+** (assuming it would do this on the t.stat.corrected values)
+```{r}
+bsseq_res
+```
+```{r}
+quantile(bsseq_res$tstat.corrected, probs = c(0.025, 0.975))
+```
+
+```{r}
+bsseq_res_filt <- bsseq_res %>% filter(tstat.corrected <= quantile(bsseq_res$tstat.corrected, probs = c(0.025, 0.975))[[1]] | 
+                       tstat.corrected >= quantile(bsseq_res$tstat.corrected, probs = c(0.025, 0.975))[[2]])
+bsseq_res_filt <- bsseq_res_filt %>% .[order(abs(.$tstat.corrected), decreasing = TRUE),] %>% mutate(rank = 1:n())
+```
+```{r}
+overlap_pos <- find_overlaps(as_granges(bsseq_res_filt), as_granges(array_dmps_filt), maxgap = 100) %>% data.frame()
+
+ggVennDiagram(list(array_rank = array_dmps_filt$array_rank, overlap = unique(overlap_pos$array_rank)))
+ggVennDiagram(list(seq_rank = bsseq_res_filt$rank, overlap = unique(overlap_pos$rank.x)))
+```
+
+## Overlap array sites and Bsseq DMR
+```{r}
+array_dmps_filt <- array_dmps %>% filter(adj.P.Val < 0.01)
+bsseq_dmrs_filt <- bsseq_dmrs %>% filter(abs(areaStat) > 100)
+```
+
+```{r}
+array_dmps_filt$array_rank <- 1:nrow(array_dmps_filt)
+bsseq_dmrs_filt$seq_rank <- 1:nrow(bsseq_dmrs_filt)
+```
+
+```{r}
+overlap <- plyranges::find_overlaps(plyranges::as_granges(bsseq_dmrs_filt), plyranges::as_granges(array_dmps_filt), maxgap = 100) %>% data.frame()
+
+ggVennDiagram(list(array_rank = array_dmps_filt$array_rank, overlap = unique(overlap$array_rank)))
+ggVennDiagram(list(seq_rank = bsseq_dmrs_filt$seq_rank, overlap = unique(overlap$seq_rank)))
+```
+* only 13% of the DMPs overlap with DMRs
+* 56% of the DMRs overlap with DMPs
+```{r}
+overlap_10k <- plyranges::find_overlaps(plyranges::as_granges(bsseq_dmrs_filt), plyranges::as_granges(array_dmps_filt[1:10000,]), maxgap = 100) %>% data.frame()
+
+ggVennDiagram(list(array_rank = array_dmps_filt$array_rank, overlap_10k = unique(overlap_10k$array_rank)))
+ggVennDiagram(list(seq_rank = bsseq_dmrs_filt$seq_rank, overlap_10k = unique(overlap_10k$seq_rank)))
+```
+* 3% overlap
+* 18% overlap
+* adding maxgap=50 or 100 doesn't change stats
+
+## Overlap DMRs
+```{r}
+bsseq_dmrs$bsseq_rank <- 1:nrow(bsseq_dmrs)
+```
+
+```{r}
+overlap <- plyranges::find_overlaps(plyranges::as_granges(bsseq_dmrs), plyranges::as_granges(dmrcate_array_dmr), maxgap = 100) %>% data.frame()
+
+overlap %>% 
+  ggplot(aes(x = bsseq_rank, y = rank)) +
+  geom_point(alpha = 0.3)
+
+ggVennDiagram(list(array_rank = dmrcate_array_dmr$rank, overlap = unique(overlap$rank)))
+ggVennDiagram(list(seq_rank = bsseq_dmrs$bsseq_rank, overlap = unique(overlap$bsseq_rank)))
+```
+
+```{r}
+overlap <- plyranges::find_overlaps(plyranges::as_granges(bsseq_dmrs_filt), plyranges::as_granges(dmrcate_array_dmr), maxgap = 100) %>% data.frame()
+
+overlap %>% 
+  ggplot(aes(x = seq_rank, y = rank)) +
+  geom_point(alpha = 0.3)
+
+ggVennDiagram(list(array_rank = dmrcate_array_dmr$rank, overlap = unique(overlap$rank)))
+ggVennDiagram(list(seq_rank = bsseq_dmrs_filt$seq_rank, overlap = unique(overlap$seq_rank)))
+```
+
+
+```{r}
+overlap <- plyranges::find_overlaps(plyranges::as_granges(array_dmps), plyranges::as_granges(dmrcate_array_dmr), maxgap = 100) %>% data.frame()
+
+ggVennDiagram(list(array_dmr = dmrcate_array_dmr$rank, overlap = unique(overlap$rank.y)))
+ggVennDiagram(list(array_rank = array_dmps$rank, overlap = unique(overlap$rank.x)))
+```
+
+```{r}
+overlap <- plyranges::find_overlaps(plyranges::as_granges(array_dmps_filt), plyranges::as_granges(dmrcate_array_dmr), maxgap = 100) %>% data.frame()
+
+ggVennDiagram(list(array_dmr = dmrcate_array_dmr$rank, overlap = unique(overlap$rank.y)))
+ggVennDiagram(list(array_rank = array_dmps_filt$rank, overlap = unique(overlap$rank.x)))
+```
+
+```{r}
+overlap <- plyranges::find_overlaps(plyranges::as_granges(array_dmps_filt[1:10000,]), plyranges::as_granges(dmrcate_array_dmr), maxgap = 100) %>% data.frame()
+
+ggVennDiagram(list(array_dmr = dmrcate_array_dmr$rank, overlap = unique(overlap$rank.y)))
+ggVennDiagram(list(array_rank = array_dmps_filt[1:10000,]$rank, overlap = unique(overlap$rank.x)))
+```
+
+
+```{r}
+array_dmps_filt
+```
+```{r}
+overlap %>%
+  ggplot(aes(x = array_rank, y = seq_rank)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 10000, colour = "red")
+
+overlap_10k %>%
+  ggplot(aes(x = array_rank, y = seq_rank)) +
+  geom_point(alpha = 0.3) +
+  geom_vline(xintercept = 10000, colour = "red")
+```
+```{r}
+overlap_10k %>%
+  group_by(seq_rank) %>% filter(seq_rank <= 40) %>%
+  ggplot(aes(x = as.factor(seq_rank), y = array_rank)) +
+  geom_boxplot()
+```
+```{r}
+overlap_10k %>%
+  group_by(array_rank) %>% filter(array_rank <= 50) %>%
+  ggplot(aes(x = as.factor(array_rank), y = seq_rank)) +
+  geom_point()
+```
+
+* very little overlap
+* does this follow through to the genes?
+
+```{r}
+overlap
+```
+```{r}
+cor.test(overlap$array_rank, overlap$seq_rank)
+cor.test(overlap_10k$array_rank, overlap_10k$seq_rank)
+```
+
+
+## compare genes
+
+```{r}
+array_genes <- getMappedEntrezIDs(rownames(array_dmps[1:10000,]), rownames(array_dmps))
+```
+```{r}
+test_out_filt
+```
+```{r}
+ggVennDiagram(list(uni_array = array_genes$universe, uni_seq = test_out_filt$universe))
+ggVennDiagram(list(sig_array = array_genes$sig.eg, sig_seq = test_out_filt$sig.eg))
+```
+* little overlap
+```{r}
+cbind(entrez = mapped_entrez$sig.eg) %>% data.frame()
+cbind(entrez = test_out_filt$sig.eg) %>% data.frame()
+```
+
+```{r}
+genes_symbol %>% mutate(sig_array = ifelse(.$ENTREZID %in% mapped_entrez$sig.eg, TRUE, FALSE)) %>% group_by(sig_array) %>% summarise(dplyr::n())
+genes_symbol %>% mutate(sig_seq = ifelse(.$ENTREZID %in% test_out_filt$sig.eg, TRUE, FALSE)) %>% group_by(sig_seq) %>% summarise(dplyr::n())
+```
+* rows match
+```{r}
+genes_symbol %>% mutate(sig_array = ifelse(.$ENTREZID %in% mapped_entrez$sig.eg, TRUE, FALSE),
+                        sig_seq = ifelse(.$ENTREZID %in% test_out_filt$sig.eg, TRUE, FALSE)) %>% 
+  mutate(signif = case_when(sig_array == FALSE & sig_seq == FALSE ~ "None",
+                            sig_array == FALSE & sig_seq == TRUE ~ "Seq",
+                            sig_array == TRUE & sig_seq == FALSE ~ "Array",
+                            TRUE ~ "Both")) %>% 
+  group_by(signif) %>% summarise(n = dplyr::n()) %>% ungroup() %>% mutate(prop = n/sum(n))
+```
+
+```{r}
+genes_symbol %>% mutate(sig_array = ifelse(.$ENTREZID %in% mapped_entrez$sig.eg, TRUE, FALSE),
+                        sig_seq = ifelse(.$ENTREZID %in% test_out_filt$sig.eg, TRUE, FALSE)) %>% 
+  mutate(signif = case_when(sig_array == FALSE & sig_seq == FALSE ~ "None",
+                            sig_array == FALSE & sig_seq == TRUE ~ "Seq",
+                            sig_array == TRUE & sig_seq == FALSE ~ "Array",
+                            TRUE ~ "Both")) %>% 
+  filter(signif != "None") %>%
+  group_by(signif) %>% summarise(n = dplyr::n()) %>% ungroup() %>% mutate(prop = n/sum(n))
+```
+```{r}
+genes_both <- genes_symbol %>% mutate(sig_array = ifelse(.$ENTREZID %in% mapped_entrez$sig.eg, TRUE, FALSE),
+                        sig_seq = ifelse(.$ENTREZID %in% test_out_filt$sig.eg, TRUE, FALSE)) %>%
+  filter(sig_array == TRUE & sig_seq == TRUE)
+```
+
+## thoughts
+* I think the samples were more different than we thought
+* or I only analyse the overlap
+
+```{r}
+test_out_both <- run_miss_methyl_a(biomart_genes, filter(test_anno_filt, gene_name %in% genes_both$SYMBOL))
+```
+
+```{r}
+test_res_both <- run_miss_methyl_b(test_out_both, "Wallenius")
+```
+* ok there is some immune stuff there in the 20s and 30s
+
+```{r}
+go_
+```
+
+
+
