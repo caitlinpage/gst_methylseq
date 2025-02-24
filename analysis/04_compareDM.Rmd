@@ -1,0 +1,15 @@
+---
+title: "04_compareDM"
+author: "Caitlin Page"
+date: "2025-02-21"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+dmrcate_array_anno
+```
+
