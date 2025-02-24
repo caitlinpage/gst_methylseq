@@ -139,7 +139,7 @@ annoGeneDmr <- function(counts, dmrs, gene_source = c("biomart", "experimenthub"
 plotBiasGrouped <- function(genes, anno_genes, regression_line=FALSE, log2_scale=FALSE) {
   genes$width <- genes$end - genes$start + 1
   genes$has_dmr <- ifelse(genes$ensembl_gene_id %in% filter(anno_genes, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)
-  genes <- genes[order(.$num_cg),]
+  genes <- genes[order(genes$num_cg),]
   genes$bin_group <- rep(1:ceiling(nrow(genes)/100), each = 100)[1:nrow(genes)]
   genes <- genes %>%
     group_by(bin_group) %>%
