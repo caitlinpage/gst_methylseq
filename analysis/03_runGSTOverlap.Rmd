@@ -1,0 +1,32 @@
+---
+title: "03_runGSTOverlap"
+author: "Caitlin Page"
+date: "2025-02-21"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+```{r}
+DMPs$cg_id <- rownames(DMPs)
+```
+
+```{r}
+DMPs_overlap <- find_overlaps(as_granges(DMPs), as_granges(bsseq_dmrs)) %>% data.frame()
+```
+```{r}
+nrow(DMPs_overlap)
+length(unique(DMPs_overlap$rank))
+```
+
+```{r}
+gst_array_overlap <- gometh(sig.cpg=DMPs_overlap[1:10000,]$cg_id, all.cpg=DMPs_overlap$cg_id, collection="GO",
+              plot.bias=TRUE)
+```
+
+
+
+
+
+
