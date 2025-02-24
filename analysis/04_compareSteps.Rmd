@@ -56,11 +56,51 @@ bsseq_res_filt <- bsseq_res %>% filter(tstat.corrected <= quantile(bsseq_res$tst
 bsseq_res_filt <- bsseq_res_filt %>% .[order(abs(.$tstat.corrected), decreasing = TRUE),] %>% mutate(rank = 1:n())
 ```
 ```{r}
-overlap_pos <- find_overlaps(as_granges(bsseq_res_filt), as_granges(array_dmps_filt), maxgap = 100) %>% data.frame()
+nrow(bsseq_res)
+nrow(array_dmps)
+```
+
+```{r}
+actual_overlap_pos <- find_overlaps(as_granges(bsseq_res), as_granges(array_dmps)) %>% data.frame()
+ggVennDiagram(list(array_rank = array_dmps$rank, overlap = unique(actual_overlap_pos$rank)))
+ggVennDiagram(list(seq_rank = bsseq_res$position, overlap = unique(actual_overlap_pos$position)))
+```
+
+
+```{r}
+overlap_pos <- find_overlaps(as_granges(bsseq_res_filt), as_granges(array_dmps_filt), maxgap = 10) %>% data.frame()
+overlap_pos
+ggVennDiagram(list(array_rank = array_dmps_filt$array_rank, overlap = unique(overlap_pos$array_rank)))
+ggVennDiagram(list(seq_rank = bsseq_res_filt$rank, overlap = unique(overlap_pos$rank.x)))
+
+overlap_pos %>% 
+  ggplot(aes(x = array_rank, y = rank.x)) +
+  geom_point(alpha = 0.2)
+```
+```{r}
+nrow(bsseq_res_filt)
+nrow(array_dmps_filt)
+nrow(overlap_pos)
+```
+```{r}
+length(unique(overlap_pos$rank.x))
+length(unique(overlap_pos$array_rank))
+```
+
+```{r}
+overlap_pos
+
+```
+
+```{r}
+overlap_pos
+union_pos <- (as_granges(bsseq_res_filt), as_granges(array_dmps_filt), maxgap = 100) %>% data.frame()
 
 ggVennDiagram(list(array_rank = array_dmps_filt$array_rank, overlap = unique(overlap_pos$array_rank)))
 ggVennDiagram(list(seq_rank = bsseq_res_filt$rank, overlap = unique(overlap_pos$rank.x)))
 ```
+
+
 
 ## Overlap array sites and Bsseq DMR
 ```{r}
