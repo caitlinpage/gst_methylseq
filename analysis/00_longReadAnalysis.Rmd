@@ -166,10 +166,16 @@ gene_dmr_overlaps
 dmr_regions <- as_tibble(gene_dmr_overlaps) %>%
     dplyr::rename(chr = "seqnames")
 
+dmr_regions <- dmr_regions %>% data.frame()
+
 long_regions_sig <- dmr_regions %>%
     filter(qval < 0.05)
 
 long_regions_sig %>% as.data.frame() 
+```
+```{r}
+long_regions %>% data.frame() %>% filter(qval < 0.05)
+dmr_regions
 ```
 
 * well damn I've only got 8 genes significant
@@ -193,6 +199,9 @@ long_gene_overlap %>%
 ```
 ```{r}
 gene_anno <- data.frame(gene_anno)
+```
+```{r}
+long_gene_overlap
 ```
 
 ```{r}
@@ -245,8 +254,30 @@ long_genes_tested
 ```
 * yeah this covers them better - replace it
 
+* redoing with top 50 genes
+```{r}
+dmr_regions
+```
+* should it be all the genes on chr7? 
+* check how the data looks beforehand again
+```{r}
+dmr_regions$rank <- 1:nrow(dmr_regions)
+```
+
+```{r}
+gene_anno_7 <- gene_anno %>% filter(seqnames == "chr7")
+long_cg <- find_overlaps(as_granges(gene_anno_7), as_granges(cg_mouse)) %>% data.frame() %>% 
+  group_by(gene_id, symbol) %>% summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+
+gene_anno_7$num_cg <- long_cg[match(gene_anno_7$symbol, long_cg$symbol), "num_cg"]
+gene_anno_7 <- gene_anno_7 %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg), 
+                                      qval = dmr_regions[match(.$symbol, dmr_regions$symbol), "qval"],
+                                      rank = dmr_regions[match(.$symbol, dmr_regions$symbol), "rank"])
+gene_anno_7
+```
 
 ## Gene set testing - GOSEQ
+* ok actually I'm not convinced of this background either
 
 ```{r}
 gene.vector <- long_genes_tested$signif
@@ -260,11 +291,87 @@ GO.long <- GO.long %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represente
 GO.long
 ```
 * ok the FDR is 1 but the top term is genomic imprinting which is correct - so yay
+```{r}
+gene_anno_7 %>% filter(is.na(qval)) mutate(qval = ifelse(is.na(qva)))
+```
 
 ```{r}
+gene_anno_7 <- gene_anno_7 %>% mutate(qval = ifelse(is.na(qval), 1.1, qval), signif = ifelse(qval < 0.05, 1, 0))
+gene.vector <- gene_anno_7$signif
+names(gene.vector) <- gene_anno_7$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
+pwf
+GO.long <- goseq::goseq(pwf, "mm10", "knownGene")
+GO.long
+GO.long <- GO.long %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long
+```
+
+```{r}
+gene_anno_7 <- gene_anno_7 %>% mutate(rank = ifelse(is.na(rank), nrow(.) + 1, rank), signif = ifelse(rank <= 50, 1, 0))
+gene.vector <- gene_anno_7$signif
+names(gene.vector) <- gene_anno_7$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
+pwf
+GO.long.50 <- goseq::goseq(pwf, "mm10", "knownGene")
+GO.long.50
+GO.long.50 <- GO.long.50 %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long.50
+```
+* yeah ok taking top 50 genes made it worse
+
+
+# null version
+```{r}
+gene.vector <- long_genes_tested$signif
+names(gene.vector) <- long_genes_tested$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = long_genes_tested$num_cg)
+
 GO.long_null <- goseq::goseq(pwf, "mm10", "knownGene", method = "Hypergeometric")
 GO.long_null <- GO.long_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
 GO.long_null
 ```
 * also imprinting
 * idk about the rest of the terms
+
+```{r}
+gene_anno_7 <- gene_anno_7 %>% mutate(qval = ifelse(is.na(qval), 1.1, qval), signif = ifelse(qval < 0.05, 1, 0))
+gene.vector <- gene_anno_7$signif
+names(gene.vector) <- gene_anno_7$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
+pwf
+GO.long_null <- goseq::goseq(pwf, "mm10", "knownGene", method = "Hypergeometric")
+GO.long_null
+GO.long_null <- GO.long_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long_null
+```
+
+
+```{r}
+gene_anno_7 <- gene_anno_7 %>% mutate(rank = ifelse(is.na(rank), nrow(.) + 1, rank), signif = ifelse(rank <= 50, 1, 0))
+gene.vector <- gene_anno_7$signif
+names(gene.vector) <- gene_anno_7$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
+pwf
+GO.long.50_null <- goseq::goseq(pwf, "mm10", "knownGene", method = "Hypergeometric")
+GO.long.50_null
+GO.long.50_null <- GO.long.50_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long.50_null
+```
+## now for my function
+
+```{r}
+ggVennDiagram(list(wall = filter(GO.long, over_represented_pvalue < 0.05)$category, 
+                   null = filter(GO.long_null, over_represented_pvalue < 0.05)$category))
+```
+
+```{r}
+GO.long_null
+GO.long
+```
+
