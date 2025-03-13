@@ -12,7 +12,7 @@ navbar:
   right:
   - icon: fab fa-github
     text: Source code
-    href: https://github.com/caitlinpage/methyl-seq-gst
+    href: https://github.com/caitlinpage/gst_methylseq
 output:
   workflowr::wflow_html:
     toc: yes
