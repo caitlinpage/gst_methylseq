@@ -1,0 +1,379 @@
+---
+title: "03_foundProblemGST"
+author: "Caitlin Page"
+date: "2025-02-28"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+* from 03_checkGSTInputs.Rmd
+* compared dmrcate array 
+mm getMappedEntrez vs
+me miss_methyl_a
+
+basically that out object - primarily the genes
+```{r}
+dmrcate_array_anno <- readRDS("../output/dmrcate_array_anno.rds")
+dmrcate_array_anno <- data.frame(dmrcate_array_anno@ranges)
+```
+```{r}
+dmrcate_array_anno$pos <- paste0(dmrcate_array_anno$seqnames, "-", dmrcate_array_anno$start)
+dmrcate_overlap <- find_overlaps(as_granges(dmrcate_array_dmr), as_granges(dmrcate_array_anno)) %>% data.frame()
+```
+```{r}
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(in_dmr = ifelse(pos %in% dmrcate_overlap$pos, TRUE, FALSE))
+```
+```{r}
+dmrcate_array_anno <- find_overlaps(as_granges(dmrcate_array_anno), as_granges(mutate(anno_array, cg_id = rownames(anno_array)))) %>% data.frame()
+```
+```{r}
+mm_map_dmrcate_array <- getMappedEntrezIDs(filter(dmrcate_array_anno, in_dmr == TRUE)$cg_id, dmrcate_array_anno$cg_id, "EPIC")
+mm_map_dmrcate_array_body <- getMappedEntrezIDs(filter(dmrcate_array_anno, in_dmr == TRUE)$cg_id, dmrcate_array_anno$cg_id, "EPIC", genomic.features = "Body")
+```
+
+```{r}
+me_gst_dmrcate_array_out <- run_miss_methyl_a(biomart_genes, annoGeneDmr(anno_array, dmrcate_array_anno, gene_source = "biomart", biomart_genes))
+```
+
+
+```{r}
+ggVennDiagram(list(mm = mm_map_dmrcate_array$sig.eg, mm_body = mm_map_dmrcate_array_body$sig.eg, me = me_gst_dmrcate_array_out$sig.eg))
+ggVennDiagram(list(mm = mm_map_dmrcate_array$universe, mm_body = mm_map_dmrcate_array_body$universe, me = me_gst_dmrcate_array_out$universe))
+```
+- so what we want is to make genes the same and re-run this universe
+* oh duh - just use the out object and run it through miss_methyl_b
+```{r}
+me_gst_mm_map_dmrcate_array <- run_miss_methyl_b(mm_map_dmrcate_array, method = "Wallenius")
+me_gst_mm_map_dmrcate_array_null <- run_miss_methyl_b(mm_map_dmrcate_array, method = "Hypergeometric")
+me_gst_dmrcate_array_null <- run_miss_methyl_b(me_gst_dmrcate_array_out, method = "Hypergeometric")
+```
+```{r}
+mm_dmrcate_array %>% .[order(.$FDR),]
+```
+* it's looking the same
+* but it's not the nicest terms - nothing immune system specific so that's a bit concerning
+* right maybe the bias is wrong - is it just the sites from the array only
+* check the plots and see if they're ok
+* and other way around?
+```{r}
+me_mm_dmrcate_array <- mm_cheat(me_gst_dmrcate_array_out)
+me_mm_dmrcate_array <- me_mm_dmrcate_array %>% .[order(.$FDR),]
+me_mm_dmrcate_array_null <- mm_cheat(me_gst_dmrcate_array_out, prior.prob = FALSE) %>% .[order(.$FDR),]
+mm_dmrcate_array_null <- mm_cheat(mm_map_dmrcate_array, prior.prob = FALSE) %>% .[order(.$FDR),]
+
+```
+```{r}
+me_gst_dmrcate_array
+```
+```{r}
+me_gst_dmrcate_array_null
+me_gst_mm_map_dmrcate_array_null
+mm_dmrcate_array_null
+me_mm_dmrcate_array_null
+```
+
+# the plots
+* which means I need the null versions - done
+* now also want to redo this go term stuff
+* oh and actually
+```{r}
+go <- go()
+```
+* need to find that code
+```{r}
+xx <- as.list(org.Hs.egGO2ALLEGS)
+if(length(xx) > 0){
+    # Gets the Entrez Gene identifiers for the top 2nd and 3nd GO identifiers
+    goids <- xx[2:3]
+    # Gets all the Entrez Gene identifiers for the first element of goids
+    goids[[1]]
+    # Evidence code for the mappings
+    names(goids[[1]])
+}
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+```
+```{r}
+go_entrez_dmrcate <- go_entrez[,1:2]
+go_entrez_dmrcate <- go_entrez_dmrcate %>% mutate(mm_array_num_cg = data.frame(mm_map_dmrcate_array$freq)[match(.$entrez, data.frame(mm_map_dmrcate_array$freq)$eg.all), "Freq"],
+                             me_array_num_cg = data.frame(me_gst_dmrcate_array_out$freq)[match(.$entrez, data.frame(me_gst_dmrcate_array_out$freq)$freq_make_table), "Freq"])
+go_entrez_dmrcate <- go_entrez_dmrcate %>% mutate(mm_array_num_cg = ifelse(is.na(mm_array_num_cg),0,mm_array_num_cg),
+                                                 me_array_num_cg = ifelse(is.na(me_array_num_cg),0,me_array_num_cg) )
+
+go_entrez_dmrcate <- go_entrez_dmrcate %>% 
+  mutate(mm_array = ifelse(go %in% rownames(filter(mm_dmrcate_array, FDR < 0.05)), TRUE, FALSE),
+         mm_array_null = ifelse(go %in% rownames(filter(mm_dmrcate_array_null, FDR < 0.05)), TRUE, FALSE))
+
+go_entrez_dmrcate <- go_entrez_dmrcate %>% 
+  mutate(mm_array2 = ifelse(go %in% rownames(filter(mm_dmrcate_array2, FDR < 0.05)), TRUE, FALSE),
+         mm_array_null2 = ifelse(go %in% rownames(filter(mm_dmrcate_array2_null, FDR < 0.05)), TRUE, FALSE))
+```
+* ok I think my thing even though I'm saying array - it's been coming from the sequencing
+* so the me_array is more like me_seq
+* are they at least correlated?
+```{r}
+cor.test(go_entrez_dmrcate$mm_array_num_cg, go_entrez_dmrcate$me_array_num_cg)
+```
+
+```{r}
+go_entrez_dmrcate %>%
+  ggplot(aes(x = mm_array_num_cg, y = me_array_num_cg)) +
+  geom_point(alpha = 0.2)
+```
+* so this is good - but still not great
+```{r}
+dmrcate_array_anno
+mm_map_dmrcate_array$freq %>% data.frame()
+```
+
+# first need to check with just dmrcate array
+```{r}
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate, mm_array == TRUE)$go), 
+                   hyper = unique(filter(go_entrez_dmrcate, mm_array_null == TRUE)$go)))
+
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate, mm_array2 == TRUE)$go), 
+                   hyper = unique(filter(go_entrez_dmrcate, mm_array_null2 == TRUE)$go)))
+```
+
+```{r}
+go_entrez_dmrcate %>% group_by(go, mm_array, mm_array_null) %>% summarise(mean_array_cg = mean(mm_array_num_cg)) %>% filter(mm_array_null == TRUE) %>% 
+  mutate(Method = ifelse(mm_array == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_array_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+
+go_entrez_dmrcate %>% group_by(go, mm_array2, mm_array_null2) %>% summarise(mean_array_cg = mean(mm_array_num_cg)) %>% filter(mm_array_null2 == TRUE) %>% 
+  mutate(Method = ifelse(mm_array2 == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_array_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+```{r}
+go_entrez_dmrcate <- go_entrez_dmrcate %>% group_by(go) %>% mutate(mean_array_cg = mean(mm_array_num_cg)) %>% ungroup() %>% .[,c(1:4,7,5:6)]
+```
+```{r}
+go_entrez_dmrcate %>% distinct(go, mean_array_cg, mm_array, mm_array_null) %>% melt(id = c("go", "mean_array_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_array_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+go_entrez_dmrcate %>% distinct(go, mean_array_cg, mm_array2, mm_array_null2) %>% melt(id = c("go", "mean_array_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_array_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+* damn why doesn't it like the dmrcate results??
+```{r}
+go_entrez_dmrcate %>% distinct(go, mean_array_cg, mm_array2, mm_array_null2) %>% melt(id = c("go", "mean_array_cg")) %>% filter(value == TRUE)
+```
+```{r}
+t.test(unique(filter(go_entrez_dmrcate, mm_array == TRUE)$mean_array_cg), unique(filter(go_entrez_dmrcate, mm_array_null == TRUE)$mean_array_cg))
+
+t.test(unique(filter(go_entrez_dmrcate, mm_array2 == TRUE)$mean_array_cg), unique(filter(go_entrez_dmrcate, mm_array_null2 == TRUE)$mean_array_cg))
+```
+
+```{r}
+mm_dmrcate_array_indiv %>% .[order(.$FDR),]
+```
+```{r}
+sig_terms_array
+```
+
+```{r}
+go_entrez
+go_entrez_dmrcate
+```
+
+
+```{r}
+go_entrez[,1:7] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% filter(array_cat_signif_bias == TRUE) %>% 
+  mutate(Method = ifelse(array_cat_signif == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+
+go_entrez[,1:7] %>% group_by(go) %>% mutate(mean_cg = mean(num_cg, na.rm=TRUE)) %>% distinct(go, array_cat_signif, array_cat_signif_bias, mean_cg) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+```{r}
+go_entrez
+go_entrez2
+```
+
+
+# this is the flat annotation file
+```{r}
+anno_array
+```
+```{r}
+anno_flat <- .getFlatAnnotation("EPIC")
+```
+```{r}
+unique(rownames(anno_flat)) %>% length() # all unique - this is saying 1 cpg per gene
+unique(anno_flat$symbol) %>% length() # here it is - same cpg, multiple genes - only 25829 genes
+```
+
+- So I think I want to use this on the sequencing?
+```{r}
+dmrcate_seq_anno
+```
+
+
+
+# find the unique genes
+```{r}
+anno_problem_fix <- cbind(entrez = c(me_gst_dmrcate_array_out$universe, mm_map_dmrcate_array$universe)) %>% data.frame()
+anno_problem_fix <- distinct(anno_problem_fix, entrez)
+anno_problem_fix <- anno_problem_fix %>% mutate(in_array = ifelse(entrez %in% mm_map_dmrcate_array$universe, TRUE, FALSE),
+                            in_seq = ifelse(entrez %in% me_gst_dmrcate_array_out$universe, TRUE, FALSE),
+                            where = case_when(in_array == FALSE & in_seq == FALSE ~ "Neither",
+                                              in_array == FALSE & in_seq == TRUE ~ "Seq",
+                                              in_array == TRUE & in_seq == FALSE ~ "Array",
+                                              TRUE ~ "Both")) %>% .[,c(1,4)]
+anno_problem_fix <- anno_problem_fix %>% mutate(in_array = ifelse(entrez %in% mm_map_dmrcate_array$sig.eg, TRUE, FALSE),
+                            in_seq = ifelse(entrez %in% me_gst_dmrcate_array_out$sig.eg, TRUE, FALSE),
+                            is_sig = case_when(in_array == FALSE & in_seq == FALSE ~ "Neither",
+                                              in_array == FALSE & in_seq == TRUE ~ "Seq",
+                                              in_array == TRUE & in_seq == FALSE ~ "Array",
+                                              TRUE ~ "Both")) %>% .[,c(1,2,5)]
+```
+```{r}
+anno_problem_fix %>% group_by(where) %>% summarise(n())
+anno_problem_fix %>% group_by(is_sig) %>% summarise(n())
+anno_problem_fix %>% group_by(where, is_sig) %>% summarise(n())
+```
+
+```{r}
+me_gst_dmrcate_array_out$freq %>% data.frame()
+me_gst_dmrcate_array_out$universe %>% length()
+```
+
+
+
+```{r}
+.getFlatAnnotation <- function(array.type=c("450K","EPIC"),anno=NULL)
+  # flatten 450k or EPIC array annotation
+  # Jovana Maksimovic
+  # 18 September 2018
+  # Updated 18 September 2018
+  # Modified version of Belida Phipson's .flattenAnn code
+{
+  if(is.null(anno)){
+    if(array.type=="450K"){
+      anno <- minfi::getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19::IlluminaHumanMethylation450kanno.ilmn12.hg19)
+    } else {
+      anno <- minfi::getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19::IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+    }
+  }
+  
+  # get rid of the non-CpG sites
+  ann.keep<-anno[grepl("^cg",anno$Name),]
+  
+  # get rid of CpGs that are not annotated
+  missing<-ann.keep$UCSC_RefGene_Name==""
+  ann.keep<-ann.keep[!missing,]
+  
+  # get individual gene names for each CpG
+  geneslist<-strsplit(ann.keep$UCSC_RefGene_Name,split=";")
+  names(geneslist)<-rownames(ann.keep)
+  
+  grouplist<-strsplit(ann.keep$UCSC_RefGene_Group,split=";")
+  names(grouplist)<-rownames(ann.keep)
+  
+  flat<-data.frame(symbol=unlist(geneslist),group=unlist(grouplist))
+  flat$symbol<-as.character(flat$symbol)
+  flat$group <- as.character(flat$group)
+  
+  flat$cpg<- substr(rownames(flat),1,10)
+  
+  #flat$cpg <- rownames(flat)
+  flat$alias <- suppressWarnings(limma::alias2SymbolTable(flat$symbol))
+  
+  #eg <- toTable(org.Hs.egSYMBOL2EG)
+  eg <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                keys=AnnotationDbi::keys(org.Hs.eg.db), 
+                                columns=c("ENTREZID","SYMBOL"), 
+                                keytype="ENTREZID"))
+  colnames(eg) <- c("gene_id","symbol")
+  
+  m <- match(flat$alias,eg$symbol)
+  flat$entrezid <- eg$gene_id[m]
+  flat <- flat[!is.na(flat$entrezid),]
+  
+  # keep unique cpg by gene name annotation
+  id<-paste(flat$cpg,flat$entrezid,sep=".")
+  d <- duplicated(id)
+  flat.u <- flat[!d,]
+  flat.u
+  # This randomly samples only 1 gene ID for multimapping CpGs
+  #.reduceMultiMap(flat.u)
+}
+
+```
+
+.getFlatAnnotation <- function(array.type=c("450K","EPIC"),anno=NULL)
+  # flatten 450k or EPIC array annotation
+  # Jovana Maksimovic
+  # 18 September 2018
+  # Updated 18 September 2018
+  # Modified version of Belida Phipson's .flattenAnn code
+{
+  if(is.null(anno)){
+    if(array.type=="450K"){
+      anno <- minfi::getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19::IlluminaHumanMethylation450kanno.ilmn12.hg19)
+    } else {
+      anno <- minfi::getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19::IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+    }
+  }
+  
+  # get rid of the non-CpG sites
+  ann.keep<-anno[grepl("^cg",anno$Name),]
+  
+  # get rid of CpGs that are not annotated
+  missing<-ann.keep$UCSC_RefGene_Name==""
+  ann.keep<-ann.keep[!missing,]
+  
+  # get individual gene names for each CpG
+  geneslist<-strsplit(ann.keep$UCSC_RefGene_Name,split=";")
+  names(geneslist)<-rownames(ann.keep)
+  
+  grouplist<-strsplit(ann.keep$UCSC_RefGene_Group,split=";")
+  names(grouplist)<-rownames(ann.keep)
+  
+  flat<-data.frame(symbol=unlist(geneslist),group=unlist(grouplist))
+  flat$symbol<-as.character(flat$symbol)
+  flat$group <- as.character(flat$group)
+  
+  flat$cpg<- substr(rownames(flat),1,10)
+  
+  #flat$cpg <- rownames(flat)
+  flat$alias <- suppressWarnings(limma::alias2SymbolTable(flat$symbol))
+  
+  #eg <- toTable(org.Hs.egSYMBOL2EG)
+  eg <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                keys=AnnotationDbi::keys(org.Hs.eg.db), 
+                                columns=c("ENTREZID","SYMBOL"), 
+                                keytype="ENTREZID"))
+  colnames(eg) <- c("gene_id","symbol")
+  
+  m <- match(flat$alias,eg$symbol)
+  flat$entrezid <- eg$gene_id[m]
+  flat <- flat[!is.na(flat$entrezid),]
+  
+  # keep unique cpg by gene name annotation
+  id<-paste(flat$cpg,flat$entrezid,sep=".")
+  d <- duplicated(id)
+  flat.u <- flat[!d,]
+  flat.u
+  # This randomly samples only 1 gene ID for multimapping CpGs
+  #.reduceMultiMap(flat.u)
+}
