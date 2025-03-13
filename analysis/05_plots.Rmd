@@ -7,6 +7,146 @@ editor_options:
   chunk_output_type: inline
 ---
 
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate[,1:2] %>% data.frame()
+```
+```{r}
+compare_filt
+```
+```{r}
+mm_cheat_gst_5k
+mm_cheat_gst_5k_null
+mm_cheat_gst_1k
+mm_cheat_gst_1k_null
+```
+```{r}
+go_dmrcate_seq_rank <- mm_cheat_gst_1k %>% mutate()
+```
+
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% data.frame() %>%
+  mutate(num_cg = data.frame(me_gst_dmrcate_seq_out_5k$freq)[match(.$entrez, data.frame(me_gst_dmrcate_seq_out_5k$freq)$freq_make_table), "Freq"],
+         dmrcate_1k = ifelse(go %in% rownames(filter(mm_cheat_gst_1k, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_1k_null = ifelse(go %in% rownames(filter(mm_cheat_gst_1k_null, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_5k = ifelse(go %in% rownames(filter(mm_cheat_gst_5k, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_5k_null = ifelse(go %in% rownames(filter(mm_cheat_gst_5k_null, FDR < 0.05)), TRUE, FALSE))
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg))
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% group_by(go) %>% mutate(mean_cg = mean(num_cg)) %>% ungroup()
+
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>%
+  mutate(rank_5k = mm_cheat_gst_5k[match(.$go, mm_cheat_gst_5k$GOID), "rank_fdr"],
+         rank_5k_null = mm_cheat_gst_5k_null[match(.$go, mm_cheat_gst_5k_null$GOID), "rank_fdr"],
+         rank_1k = mm_cheat_gst_1k[match(.$go, mm_cheat_gst_1k$GOID), "rank_fdr"],
+         rank_1k_null = mm_cheat_gst_1k_null[match(.$go, mm_cheat_gst_1k_null$GOID), "rank_fdr"])
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_5k, dmrcate_5k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+* ah why does it look like this
+* wait could i use like top 100 and fix??
+
+```{r}
+go_entrez_dmrcate_seq %>% filter(rank_1k <= 100 | rank_1k_null <= 100) %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+go_entrez_dmrcate_seq %>% filter(rank_5k <= 100 | rank_5k_null <= 100) %>% distinct(go, mean_cg, dmrcate_5k, dmrcate_5k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+* still looks terrible
+* only thing I can think is that it's doing the num_cg wrong still
+
+```{r}
+ggVennDiagram(list(wall_5k = filter(mm_cheat_gst_5k, FDR < 0.05)$GOID, hyper_5k = filter(mm_cheat_gst_5k_null, FDR < 0.05)$GOID))
+ggVennDiagram(list(wall_1k = filter(mm_cheat_gst_1k, FDR < 0.05)$GOID, hyper_1k = filter(mm_cheat_gst_1k_null, FDR < 0.05)$GOID))
+
+ggVennDiagram(list(wall_5k = filter(mm_cheat_gst_5k, FDR < 0.05)$GOID, hyper_5k = filter(mm_cheat_gst_5k_null, FDR < 0.05)$GOID,
+              wall_1k = filter(mm_cheat_gst_1k, FDR < 0.05)$GOID, hyper_1k = filter(mm_cheat_gst_1k_null, FDR < 0.05)$GOID))
+```
+
+```{r}
+mm_cheat_gst_1k
+mm_cheat_gst_1k_null
+```
+
+```{r}
+upset(data.frame(distinct(go_entrez_dmrcate_seq, go, dmrcate_1k, dmrcate_1k_null, dmrcate_5k, dmrcate_5k_null)), data = colnames(go_entrez_dmrcate_seq)[4:7])
+```
+
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, rank_5k, rank_5k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_1k - rank_1k_null)) +
+  geom_point(alpha = 0.2)
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, rank_5k, rank_5k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_1k_null - rank_1k)) +
+  geom_point(alpha = 0.2)
+```
+
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, rank_5k, rank_5k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_5k - rank_5k_null)) +
+  geom_point(alpha = 0.2)
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, rank_5k, rank_5k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_5k_null - rank_5k)) +
+  geom_point(alpha = 0.2)
+```
+
+
+# set up go
+```{r}
+xx <- as.list(org.Hs.egGO2ALLEGS)
+if(length(xx) > 0){
+    # Gets the Entrez Gene identifiers for the top 2nd and 3nd GO identifiers
+    goids <- xx[2:3]
+    # Gets all the Entrez Gene identifiers for the first element of goids
+    goids[[1]]
+    # Evidence code for the mappings
+    names(goids[[1]])
+}
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+```
+```{r}
+go_entrez_dmrcate <- go_entrez[,1:2]
+go_entrez_dmrcate <- go_entrez_dmrcate %>% mutate(mm_array_num_cg = data.frame(mm_map_dmrcate_array$freq)[match(.$entrez, data.frame(mm_map_dmrcate_array$freq)$eg.all), "Freq"],
+                             me_array_num_cg = data.frame(me_gst_dmrcate_array_out$freq)[match(.$entrez, data.frame(me_gst_dmrcate_array_out$freq)$freq_make_table), "Freq"])
+go_entrez_dmrcate <- go_entrez_dmrcate %>% mutate(mm_array_num_cg = ifelse(is.na(mm_array_num_cg),0,mm_array_num_cg),
+                                                 me_array_num_cg = ifelse(is.na(me_array_num_cg),0,me_array_num_cg) )
+
+go_entrez_dmrcate <- go_entrez_dmrcate %>% 
+  mutate(mm_array = ifelse(go %in% rownames(filter(mm_dmrcate_array, FDR < 0.05)), TRUE, FALSE),
+         mm_array_null = ifelse(go %in% rownames(filter(mm_dmrcate_array_null, FDR < 0.05)), TRUE, FALSE))
+
+go_entrez_dmrcate <- go_entrez_dmrcate %>% 
+  mutate(mm_array2 = ifelse(go %in% rownames(filter(mm_dmrcate_array2, FDR < 0.05)), TRUE, FALSE),
+         mm_array_null2 = ifelse(go %in% rownames(filter(mm_dmrcate_array2_null, FDR < 0.05)), TRUE, FALSE))
+```
+
+
+
+
+
+##########################
+
 ## Introduction
 ```{r}
 library(dplyr)
@@ -99,5 +239,672 @@ sig_terms_array_biased %>% mutate(unbiased_rank = sig_terms_array[match(rownames
 
 ## Venn diagram
 
+####################################################
+## Conf report plots
+
+# DM analysis:
+
+# 
+```{r}
+dmrcate_seq_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
+```
+
+```{r}
+dmrseq_
+```
+
+```{r}
+rbind(cbind(width = dmrcate_seq_dmr$width, method = "dmrcate"),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = "dmrcate_5k"),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = "dmrcate_1k"),
+      cbind(width = bsseq_dmrs_filt$width, method = "bsseq_area100")) %>% data.frame() %>% mutate(width = as.double(width)) %>%
+  ggplot(aes(x = width, colour = method)) +
+  geom_density()
+
+rbind(cbind(width = dmrcate_seq_dmr$width, method = "dmrcate"),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = "dmrcate_5k"),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = "dmrcate_1k"),
+      cbind(width = bsseq_dmrs_filt$width, method = "bsseq_area100")) %>% data.frame() %>% mutate(width = as.double(width)) %>%
+  ggplot(aes(x = log2(width), colour = method)) +
+  geom_density()
+```
+
+```{r}
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = no.cpgs, colour = method)) +
+  geom_density()
+
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = log2(no.cpgs), colour = method)) +
+  geom_density()
+```
+```{r}
+ggarrange(rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = no.cpgs, colour = method)) +
+  geom_density(),
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = log2(no.cpgs), colour = method)) +
+  geom_density())
+```
+
+* upset plot
+
+
+# the evaulate plots
+```{r}
+truth_gst_100
+```
+
+```{r}
+truth_gst_100 %>% 
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets")
+```
+* cant find boxplot - of course
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>%
+  filter(dmrcate_1k_null == TRUE) %>%
+  mutate(Method = ifelse(dmrcate_1k == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggboxplot(data = .,x = "Method", y = "mean_cg", fill = "Method") +
+  stat_compare_means(comparisons = list("Biased (Hypergeometric)", "Bias corrected (Wallenius)")) +
+  stat_compare_means(label.y = 3000) +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+```{r}
+go_entrez_dmrcate_seq
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k == TRUE)$go),
+                   hyper = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k_null == TRUE)$go)))
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>%
+  filter(dmrcate_1k_null != TRUE | dmrcate_1k != TRUE) %>% filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = ifelse(dmrcate_1k == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>%
+  filter(dmrcate_1k_null == TRUE) %>%
+  mutate(Method = ifelse(dmrcate_1k == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+  
+```
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>% filter(rank_1k_null < rank_1k) %>% summarise(mean(mean_cg), median(mean_cg))
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>% filter(rank_1k_null > rank_1k) %>% summarise(mean(mean_cg), median(mean_cg))
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = rank_1k_null, y = rank_1k)) +
+  geom_point() 
+```
+
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>% filter(rank_1k_null < rank_1k) %>%
+  ggplot(aes(y = mean_cg)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0,1000))
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>% filter(rank_1k_null > rank_1k) %>%
+  ggplot(aes(y = mean_cg)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0,1000))
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>% filter(rank_1k_null < rank_1k) %>%
+  ggplot(aes(y = mean_cg)) +
+  geom_boxplot()
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>% filter(rank_1k_null > rank_1k) %>%
+  ggplot(aes(y = mean_cg)) +
+  geom_boxplot()
+```
+
+
+```{r}
+summary(unique(go_entrez_dmrcate_seq$mean_cg))
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(y = mean_cg)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0,1000))
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>% .[order(.$mean_cg),] %>% filter(mean_cg != 0)
+```
+
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point()
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point()
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 10000, rank_1k_null <= 10000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point()
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 5000, rank_1k_null <= 5000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point()
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 5000, rank_1k_null <= 5000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point() +
+  scale_x_continuous(limits = c(0,5000))
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 1000, rank_1k_null <= 1000) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_1k_null - rank_1k)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") 
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 1000, rank_1k_null <= 1000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius")
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 1000, rank_1k_null <= 1000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") +
+  scale_x_continuous(limits = c(0, 1500))
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  ggplot(aes(x = log10(mean_cg), y = rank_1k_null - rank_1k)) + 
+  geom_point() 
+  scale_x_continuous(limits = c(0,2500))
+```
+
+
+```{r}
+go_entrez_dmrcate_seq
+```
+
+```{r}
+go_entrez_filt_simp %>%
+  ggplot(aes(x = n_genes_go, y = av_cg_go)) +
+  geom_point()
+```
+
+# bias plots
+```{r}
+mm_cheat_plot(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)))
+```
+
+
+```{r}
+mm_cheat_plot(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes)))
+```
+
+```{r}
+library(ggpubr)
+```
+
+
+```{r}
+mm_cheat_plot(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)))
+```
+
+```{r}
+mm_cheat_plot(run_miss_methyl_a(mutate(biomart_genes, num_cg = width), mutate(annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes), num_cg = granges.y.width)))
+```
+
+```{r}
+input <-mutate(annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", mutate(biomart_genes, num_cg = end - start + 1)), num_cg = granges.y.width)
+```
+```{r}
+run_miss_methyl_a(mutate(biomart_genes, num_cg = end - start + 1), input[1:50,])
+```
+
+```{r}
+mm_cheat_plot(run_miss_methyl_a(mutate(biomart_genes, num_cg = end - start + 1), mutate(annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes), num_cg = granges.y.width)))
+```
+
+
+```{r}
+biomart_genes %>% filter(gene_name == "CD247")
+```
+```{r}
+plotBiasGroupedMedian(mutate(biomart_genes, num_cg = end - start + 1), input)
+```
+
+```{r}
+plotBiasGroupedMedian(biomart_genes, input)
+```
+
+```{r}
+bsseq_dmrs %>%
+  ggplot(aes(x = width)) +
+  geom_boxplot()
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = width)) +
+  geom_boxplot()
+
+dmrcate_seq_dmr[1:1000,] %>%
+  ggplot(aes(x = width)) +
+  geom_boxplot()
+```
+
+```{r}
+plotBiasGenomeBins(wgbs_counts, dmrcate_seq_dmr, bin_size = 5000)
+```
+
+
+```{r}
+plotBiasGenomeBins(wgbs_counts, dmrcate_seq_dmr, bin_size = 500)
+```
+
+```{r}
+dmrcate_seq_dmr
+```
+
+```{r}
+input <-mutate(annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", mutate(biomart_genes, num_cg = end - start + 1)), num_cg = granges.y.width)
+```
+
+```{r}
+biomart_genes %>% mutate(width = end - start + 1) %>%
+  ggplot(aes(x = width, y = num_cg)) +
+  geom_point(alpha = 0.4) +
+  labs(x = "Gene length", y = "Number of CpGs") +
+  theme_bw()
+```
+
+```{r}
+rbind(bsseq_dmrs %>% mutate(method = "bsseq") %>% .[,c(9,19)], dmrcate_seq_dmr %>% mutate(method = "dmrcate") %>% .[,c(4,15)]) %>%
+  ggplot(aes(x = log2(width), fill = method)) +
+  geom_density(alpha = 0.4) +
+  theme_bw()
+```
+
+```{r}
+bsseq_dmrs %>%
+  ggplot(aes(x = width)) +
+  geom_density() +
+  geom_density(mapping = dmrcate_seq_dmr, aes(x = width, colour = "red"))
+```
+
+
+```{r}
+biomart_genes %>% mutate(has_dmr = ifelse(ensembl_gene_id %in% input$ensembl_gene_id, TRUE, FALSE), width = end - start + 1) %>%
+  .[order(.$width),] %>%
+  mutate(bin_group = rep(1:ceiling(nrow(.)/100), each = 100)[1:nrow(.)]) %>%
+    group_by(bin_group) %>%
+    mutate(num_cg_bin_group = mean(width)) %>%
+    group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = dplyr::n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+    geom_point(alpha = 0.4) +
+  scale_x_continuous(limits = c(0,500000)) +
+  labs(x = "Length of gene (bin size = 100)", y = "Proportion differential methylation") +
+  theme_bw()
+
+biomart_genes %>% mutate(has_dmr = ifelse(ensembl_gene_id %in% input$ensembl_gene_id, TRUE, FALSE), width = end - start + 1) %>%
+  .[order(.$width),] %>%
+  mutate(bin_group = rep(1:ceiling(nrow(.)/200), each = 200)[1:nrow(.)]) %>%
+    group_by(bin_group) %>%
+    mutate(num_cg_bin_group = mean(width)) %>%
+    group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = dplyr::n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+    geom_point(alpha = 0.4) +
+  scale_x_continuous(limits = c(0,500000)) +
+  labs(x = "Length of gene (bin size = 200)", y = "Proportion differential methylation") +
+  theme_bw()
+```
+
+
+```{r}
+ bin_dmr_overlap <- find_overlaps(as_granges(genome_bins), as_granges(dmr)) %>% data.frame()
+  bin_dmr_overlap <- bin_dmr_overlap %>% group_by(bin_pos) %>%
+    summarise(n_dmr = n()) %>% ungroup() %>% data.frame()
+  genome_bins <- genome_bins %>% mutate(n_dmr = bin_dmr_overlap[match(.$bin_pos, bin_dmr_overlap$bin_pos), "n_dmr"])
+
+  genome_bins[is.na(genome_bins)] <- 0
+
+  genome_bins <- genome_bins %>% mutate(has_dmr = ifelse(n_dmr == 0, FALSE, TRUE))
+
+  plot <- genome_bins %>%
+    group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>%
+    group_by(num_cg, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_cg) %>%
+    distinct(num_cg, num_bins_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg) %>%
+    .[order(.$num_cg),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg, y = prop)) +
+    geom_point(alpha = 0.4) +
+    geom_smooth()
+```
+
+
+#################
+
+# microarray plots
+
+```{r}
+DMPs
+dmrcate_array_anno
+```
+```{r}
+anno_array[,c(1:3,6:7)] %>% mutate(minfi_fdr = DMPs[match(.$Name, DMPs$cg_id), "adj.P.Val"],
+                                   dmrcate_fdr = dmrcate_array_anno[match(.$Name, dmrcate_array_anno$Name), "ind.fdr"]) %>%
+  ggplot(aes(x = minfi_fdr, y = dmrcate_fdr)) +
+  geom_point()
+```
+```{r}
+gst2 <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
+              plot.bias=TRUE)
+```
+
+```{r}
+topGSA(gst2, n=20)
+```
+
+```{r}
+sig_terms_array
+```
+
+
+```{r}
+sig_terms_array_biased <- readRDS("../output/mm_array_null.rds")
+```
+
+```{r}
+compare_filt$dmr_all
+```
+
+```{r}
+truth_gst_100
+```
+```{r}
+sig_terms_array$GOID <- rownames(sig_terms_array)
+sig_terms_array$rank <- 1:nrow(sig_terms_array)
+sig_terms_array_biased$GOID <- rownames(sig_terms_array_biased)
+sig_terms_array_biased$rank <- 1:nrow(sig_terms_array_biased)
+```
+```{r}
+truth_gst_100 <- rbind(
+  compare_filt$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_All") %>% .[,8:10],
+  compare_filt_hyper$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_All") %>% .[,8:10],
+  compare_filt$dmr_5k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_5k") %>% .[,8:10], 
+  compare_filt_hyper$dmr_5k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_5k") %>% .[,8:10],
+  compare_filt$dmr_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1k") %>% .[,8:10],
+  compare_filt_hyper$dmr_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1k") %>% .[,8:10],
+  compare_filt$dmr_3n_0.1b[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_3n0.1b") %>% .[,8:10],
+  compare_filt_hyper$dmr_3n_0.1b[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_3n0.1b") %>% .[,8:10])
+```
+
+```{r}
+truth_gst_100_array <- rbind(
+  sig_terms_array[1:100,] %>% mutate(in_imm = cumsum(rownames(.) %in% immuneGO$GOID), method = "Wall") %>% .[,7:10],
+  sig_terms_array_biased[1:100,] %>% mutate(in_imm = cumsum(rownames(.) %in% immuneGO$GOID), method = "Hyper") %>% .[,7:10])
+```
+```{r}
+sig_terms_array
+-log10(0.0000000000000000000003778514)
+```
+factor(.data$TERM, levels = .data$TERM)
+```{r}
+sig_terms_array[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE, FALSE)) %>% .[order(.$FDR, decreasing = TRUE),] %>%
+  ggplot(aes(x = -log10(FDR), y = factor(.data$TERM, levels = .data$TERM), colour = in_imm, size = N)) +
+  geom_point() +
+  geom_vline(xintercept = 0.05, type = "dotted") 
+```
+
+```{r}
+mm_dmrcate_array2
+```
+
+
+
+```{r}
+truth_gst_100_array %>%
+  ggplot(aes(x = rank, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets")
+```
+
+
+```{r}
+compare_dm
+```
+
+
+
+```{r}
+compare_pos_res
+```
+
+
+
+
+###########
+# dm figure
+```{r}
+dmrcate_array_dmr_filt <- dmrcate_array_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
+DMPs$pos <- paste0(DMPs$seqnames, "-", DMPs$start)
+```
+
+```{r}
+compare_dm <- wgbs_counts[,1:4]
+```
+```{r}
+dmrcate_seq_anno
+bsseq_res_filt %>% tail()
+bsseq_res %>% tail()
+```
+
+
+```{r}
+overlap_dm <- find_overlaps(as_granges(filter(dmrcate_seq_anno, is.sig == TRUE)), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(seq_dmrcate_anno = ifelse(pos %in% overlap_dm$pos.y, TRUE, FALSE))
+overlap_dm <- find_overlaps(as_granges(bsseq_res_filt), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(bsseq_res = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+
+compare_dm
+```
+
+```{r}
+overlap_dm <- find_overlaps(as_granges(dmrcate_seq_dmr), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(seq_dmrcate_dmr = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+overlap_dm <- find_overlaps(as_granges(bsseq_res_filt), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(bsseq_res = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+```
+```{r}
+overlap_dm
+compare_dm
+```
+
+```{r}
+compare_dm %>% filter(seq_dmrcate_anno == TRUE)
+```
+```{r}
+compare_dm <- compare_dm %>% replace(is.na(.), FALSE)
+```
+```{r}
+upset_in <- filter(compare_dm, seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| seq_dmrcate_anno != FALSE| bsseq_res != FALSE| seq_edger_pos != FALSE| array_dmrcate_filt != FALSE| array_minfi_filt != FALSE)
+```
+```{r}
+saveRDS(upset_in, "../output/upset_in.rds")
+```
+
+```{r}
+upset(upset_in, intersect = colnames(compare_dm)[5:11])
+```
+
+
+```{r}
+upset(filter(compare_dm, seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| seq_edger_pos != FALSE| array_dmrcate_filt != FALSE| array_minfi_filt != FALSE), intersect = colnames(compare_dm)[5:9])
+```
+
+```{r}
+compare_dm
+```
+
+
+########
+```{r}
+dmrcate_fish_5k <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Fishers")
+```
+
+
+```{r}
+dmrcate_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Fishers")
+dmrcate_fish$rank_fdr <- 1:nrow(dmrcate_fish)
+dmrcate_fish <- dmrcate_fish %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+
+dmrcate_fish_5k$rank_fdr <- 1:nrow(dmrcate_fish_5k)
+dmrcate_fish_5k <- dmrcate_fish_5k %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+```
+
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>%
+  mutate(dmrcate_1k_fishers = dmrcate_fish[match(.$go, dmrcate_fish$GOID), "is.sig"],
+         rank_1k_fishers = dmrcate_fish[match(.$go, dmrcate_fish$GOID), "rank_fdr"],
+         dmrcate_5k_fishers = dmrcate_fish_5k[match(.$go, dmrcate_fish_5k$GOID), "is.sig"],
+         rank_5k_fishers = dmrcate_fish_5k[match(.$go, dmrcate_fish_5k$GOID), "rank_fdr"])
+```
+
+```{r}
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate_seq, rank_1k <= 20)$go),
+                   hyper = unique(filter(go_entrez_dmrcate_seq, rank_1k_null <= 20)$go),
+                   fishers = unique(filter(go_entrez_dmrcate_seq, rank_1k_fishers <= 20)$go)))
+```
+
+
+```{r}
+go_entrez_dmrcate_seq
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k == TRUE)$go),
+                   hyper = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k_null == TRUE)$go),
+                   fishers = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k_fishers == TRUE)$go)))
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  compare_filt$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_All") %>% .[,8:10],
+  compare_filt_hyper$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_All") %>% .[,8:10],
+  compare_filt$dmr_5k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_5k") %>% .[,8:10], 
+  compare_filt_hyper$dmr_5k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_5k") %>% .[,8:10],
+  compare_filt$dmr_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1k") %>% .[,8:10],
+  compare_filt_hyper$dmr_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1k") %>% .[,8:10],
+  compare_filt$dmr_3n_0.1b[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_3n0.1b") %>% .[,8:10],
+  compare_filt_hyper$dmr_3n_0.1b[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_3n0.1b") %>% .[,8:10])
+```
+```{r}
+compare_filt$dmr_all
+```
+
+
+```{r}
+truth_gst_100 <- rbind(truth_gst_100, 
+      dmrcate_fish[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Fish_1k") %>% .[,c(11:13)],
+      dmrcate_fish_5k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Fish_5k") %>% .[,c(11:13)])
+```
+
+```{r}
+truth_gst_100 %>% filter(!method %in% c("Hyper_3n0.1b", "Wall_3n0.1b")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets")
+
+truth_gst_100 %>% filter(method %in% c("Fish_1k", "Wall_1k", "Hyper_1k")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets")
+```
+* cant find boxplot - of course
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, dmrcate_1k_fishers) %>%
+  filter(dmrcate_1k_null == TRUE) %>%
+  mutate(Method = ifelse(dmrcate_1k_fishers == FALSE, "Biased (Hypergeometric)", "Bias corrected (Fishers)")) %>%
+  ggboxplot(data = .,x = "Method", y = "mean_cg", fill = "Method") +
+  stat_compare_means(comparisons = list("Biased (Hypergeometric)", "Bias corrected (Fishers)")) +
+  stat_compare_means(label.y = 3000) +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+```{r}
+go_entrez_dmrcate_seq
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k == TRUE)$go),
+                   hyper = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k_null == TRUE)$go)))
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>%
+  filter(dmrcate_1k_null != TRUE | dmrcate_1k != TRUE) %>% filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = ifelse(dmrcate_1k == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, dmrcate_1k_fishers) %>%
+  filter(dmrcate_1k_null != TRUE | dmrcate_1k_fishers != TRUE) %>% filter(dmrcate_1k_null == TRUE | dmrcate_1k_fishers == TRUE) %>% 
+  mutate(Method = ifelse(dmrcate_1k_fishers == FALSE, "Biased (Hypergeometric)", "Bias corrected (Fishers)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
 
 
