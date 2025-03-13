@@ -25,8 +25,45 @@ gst_array_overlap <- gometh(sig.cpg=DMPs_overlap[1:10000,]$cg_id, all.cpg=DMPs_o
               plot.bias=TRUE)
 ```
 
+```{r}
+overlap_go_array <- topGSA(gst_array_overlap, n = 1000) 
+```
+```{r}
+sig_terms_array <- readRDS("../output/mm_array_res.rds")
+```
+
+```{r}
+ggVennDiagram(list(og_array = sig_terms_array$TERM, overlap_array = overlap_go_array[1:13,]$TERM))
+ggVennDiagram(list(og_array = sig_terms_array$TERM, overlap_array = filter(overlap_go_array, P.DE < 0.05)$TERM))
+```
+* they overlap so that's good
+* let's ignore the dodgy p-values and repeat for sequencing
 
 
+
+```{r}
+dmrs_overlap <- find_overlaps(as_granges(bsseq_dmrs), as_granges(DMPs)) %>% data.frame()
+dmrs_overlap_filt <- dmrs_overlap %>% filter(abs(areaStat) > 100)
+```
+
+```{r}
+dmrs_genes_overlap <- annoGeneDmr(wgbs_counts, dmrs_overlap_filt, gene_source = "biomart", biomart_genes)
+```
+```{r}
+library(org.Hs.eg.db)
+```
+
+```{r}
+gst_seq_prep <- run_miss_methyl_a(biomart_genes, dmrs_genes_overlap)
+```
+
+```{r}
+gst_seq_overlap <- run_miss_methyl_b(gst_seq_prep, method = "Wallenius")
+```
+
+```{r}
+gst_seq_overlap_null <- run_miss_methyl_b(gst_seq_prep, method = "None")
+```
 
 
 
