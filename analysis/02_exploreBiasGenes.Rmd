@@ -17,56 +17,6 @@ library(ggplot2)
 library(ExperimentHub)
 library(BSgenome.Hsapiens.UCSC.hg19)
 ```
-```{r}
-library(AnnotationHub)
-ah <- AnnotationHub()
-```
-```{r}
-ah$genome
-query(query(query(ah, "hg19"), "Homo sapiens"), "Ensembl genes")
-```
-```{r}
-ah_a <- ah[["AH5046"]]
-ah_a[1:5,] %>% data.frame()
-```
-```{r}
-query(query(query(ah, "hg19"), "Homo sapiens"), "UCSC genes")
-ah[["AH5036"]][1:5,] %>% data.frame()
-```
-- where is the TSS hiding??
-- dont want to have to need biomart
-
-```{r}
-#query(query(query(query(ah, "hg19"), "Homo sapiens"), "GRanges"), "GENCODE")
-```
-- ensembl, ucsc, and gencode don't give tss coords
-```{r}
-library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-TxDb.Hsapiens.UCSC.hg19.knownGene
-```
-```{r}
-genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
-```
-- maybe like a combination of trancripts and genes?
-- but that seems terrible
-
-
-```{r}
-eh <- ExperimentHub()
-eh_genes <- eh[["EH3132"]]
-eh_genes
-```
-```{r}
-eh["EH3132"]
-```
-
-```{r}
-eh$
-head(unique(eh$species))
-```
-```{r}
-query(eh, "Homo sapiens")
-```
 
 ```{r}
 wgbs_counts <- readRDS("../output/wgbs_counts.rds")
@@ -74,18 +24,58 @@ bsseq_res <- readRDS("../output/bsseq_res.rds")
 bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
 bsseq_dmrs$rank <- 1:nrow(bsseq_dmrs)
 ```
+# gene source
+
+```{r}
+eh <- ExperimentHub()
+eh_genes <- eh[["EH3132"]]
+eh_genes
+```
 
 
 # overlap genes and dmrs
 
-* Distribution of gene widths
+# Distribution of gene widths
 ```{r}
-eh_genes %>% data.frame() %>%
-  ggplot(aes(x = width)) +
-  geom_density()
 eh_genes %>% data.frame() %>%
   ggplot(aes(x = log2(width))) +
   geom_density()
+```
+
+# gene length and number of CpGs
+```{r}
+eh_genes <- eh_genes %>% data.frame() %>% mutate(num = 1:n())
+eh_genes <- eh_genes %>% mutate(bin_pos = paste0(seqnames, "-", start))
+counts_per_gene <- find_overlaps(as_granges(eh_genes), as_granges(wgbs_counts)) %>% data.frame()
+cg_per_bin <- counts_per_gene %>% group_by(num, bin_pos) %>% summarise(n_region = n())
+cg_per_bin <- cg_per_bin %>% ungroup() %>% data.frame()
+
+eh_genes <- eh_genes %>% mutate(num_cg = cg_per_bin[match(.$num, cg_per_bin$num), "n_region"])
+eh_genes[is.na(eh_genes)] <- 0
+```
+
+```{r}
+eh_genes %>%
+  ggplot(aes(x = num_cg, y = width)) +
+  geom_point(alpha = 0.4)
+```
+```{r}
+cor.test(eh_genes$num_cg, eh_genes$width)
+```
+## Number of CpGs in genes
+```{r gene-bias}
+source("../code/function_binBiasPlot.R")
+plotBiasGrouped(biomart_genes, test_anno)
+plotBiasGrouped(biomart_genes, test_anno_filt)
+
+plotBiasGrouped(biomart_genes, test_anno, log2_scale = TRUE)
+plotBiasGrouped(biomart_genes, test_anno_filt, log2_scale = TRUE)
+```
+
+
+```{r}
+biomart_genes
+anno_
 ```
 
 
@@ -93,9 +83,8 @@ eh_genes %>% data.frame() %>%
 find_overlaps(as_granges(bsseq_dmrs), eh_genes) %>% data.frame()
 ```
 ```{r}
-bsseq_dmrs <- bsseq_dmrs %>% mutate(rank = 1:n())
-find_overlaps(as_granges(bsseq_dmrs), eh_genes) %>% data.frame() %>% group_by(rank) %>% summarise(n_genes =n())
-find_overlaps(as_granges(bsseq_dmrs), eh_genes) %>% data.frame() %>% group_by(rank) %>% summarise(n_genes =n()) %>%
+find_overlaps(as_granges(bsseq_dmrs), eh_genes) %>% data.frame() %>% group_by(bsseq_rank) %>% summarise(n_genes =n())
+find_overlaps(as_granges(bsseq_dmrs), eh_genes) %>% data.frame() %>% group_by(bsseq_rank) %>% summarise(n_genes =n()) %>%
   ungroup() %>% group_by(n_genes) %>% summarise(n())
 
 find_overlaps(as_granges(bsseq_dmrs), eh_genes) %>% data.frame() %>% group_by(symbol) %>% summarise(n_dmr =n())
@@ -194,7 +183,7 @@ eh_genes <- eh_genes %>% data.frame() %>% mutate(has_dmr = overlap_gene_dmr[matc
 # what prop of dmrs overlap to gene?
 
 ```{r}
-bsseq_dmrs %>% mutate(overlap_gene = overlap_gene_dmr[match(.$rank, overlap_gene_dmr$rank), "gene"],
+bsseq_dmrs %>% mutate(overlap_gene = overlap_gene_dmr[match(.$bsseq_rank, overlap_gene_dmr$bsseq_rank), "gene"],
                       has_gene = ifelse(is.na(overlap_gene), FALSE, TRUE)) %>% group_by(has_gene) %>% summarise(n=n()) %>%
   ungroup() %>% mutate(prop = n/sum(n))
 
