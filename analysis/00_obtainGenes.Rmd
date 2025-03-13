@@ -7,6 +7,98 @@ editor_options:
   chunk_output_type: inline
 ---
 
+```{r}
+sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter")) {
+  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub"))
+  gene_feature <- match.arg(tolower(gene_feature), c("gene", "promoter"))
+
+  if(gene_source == "biomart") {
+    ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", version = "GRCh37")
+    genes <- getBM(
+      attributes = c("ensembl_gene_id", "external_gene_name", "ensembl_transcript_id",
+                     "chromosome_name", "start_position", "end_position", "strand",
+                     "transcription_start_site" , "transcript_start", "transcript_end", "transcript_length"),
+      filters = "chromosome_name",
+      values = gsub("chr", "", unique(counts$seqnames)[1:22]),
+      mart = ensembl
+    )
+    genes <- genes %>% .[order(.$chromosome_name, .$start_position), ]
+    colnames(genes) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
+    genes <- genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup()
+    genes$seqnames <- paste0("chr", as.character(genes$seqnames))
+    genes <- genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:dplyr::n()) %>% filter(num_t == 1) %>% ungroup()
+  } else if (gene_source == "experimenthub") {
+    eh <- ExperimentHub()
+    genes <- eh[["EH3132"]]
+  }
+  genes <- genes %>% data.frame() %>% ungroup()
+  # ensure ensembl_id name consistency
+  colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
+  # double check only 1 ensembl id per gene entry
+  genes$width <- genes$end - genes$start + 1
+  genes <- genes %>% group_by(ensembl_gene_id) %>% filter(width == max(width)) %>% ungroup()
+  # add random identifier
+  genes$gene_num <- 1:nrow(genes)
+  #is it promoter???
+  if(length(gene_feature) == 1 & gene_feature == "promoter") {
+    genes$start <- ifelse(genes$strand == 1, genes$start - 2000, genes$end - 500)
+    genes$end <- ifelse(genes$strand == 1, genes$start + 2500, genes$end + 2000)
+    genes <- genes[,!colnames(genes) == "width"]
+  }
+  # add number of cpgs overlapping gene
+  gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
+  gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = dplyr::n()) %>% ungroup() %>% data.frame()
+
+  genes$num_cg <- gene_cpg[match(genes$gene_num, gene_cpg$gene_num), "n_cpg"]
+  genes[is.na(genes)] <- 0
+  genes
+}
+
+annoGeneDmr <- function(counts, dmrs, gene_source = c("biomart", "experimenthub", "self"), genes) { #why do I have the gene source here?? why???
+  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub", "self"))
+  genes <- data.frame(genes)
+  # ensure ensembl_id name consistency
+  colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
+  # double check only 1 ensembl id per gene entry
+  genes$width <- genes$end - genes$start + 1
+  genes <- genes %>% group_by(ensembl_gene_id) %>% filter(width == max(width)) %>% ungroup()
+  # add random identifier
+  genes$gene_num <- 1:nrow(genes)
+  # add number of cpgs overlapping gene
+  gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
+  gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = n()) %>% ungroup() %>% data.frame()
+
+  genes$num_cg <- gene_cpg[match(genes$gene_num, gene_cpg$gene_num), "n_cpg"]
+  genes[is.na(genes)] <- 0
+  if(!"TSS" %in% colnames(genes)) {
+    genes$TSS <- ifelse(genes$strand == "+", genes$start, genes$end) # above I have strand for 1/-1
+  }
+  # assume dmrs are already in order of most to least signif
+  dmrs$rank <- 1:nrow(dmrs)
+  # add if gene overlaps dmr
+  overlap_dmr <- find_overlaps(as_granges(dmrs), as_granges(genes)) %>% data.frame() %>%
+    mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
+  anno_dmr <- pair_nearest(as_granges(dmrs), as_granges(genes)) %>% data.frame() %>%
+    mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
+  #dist gene to dmr
+  anno_dmr <- anno_dmr %>%
+    mutate(tss_start = TSS - granges.x.start, tss_end = TSS - granges.x.end) %>%
+    mutate(tss_rel_peak = ifelse(combo %in% overlap_dmr$combo, "Overlap", NA),
+            tss_rel_peak = case_when(is.na(tss_rel_peak) & tss_start > 0 & tss_end > 0 & tss_end < tss_start ~ "Peak_upstream",
+                                     is.na(tss_rel_peak) & tss_start < 0 & tss_end < 0 &  tss_end < tss_start ~ "Peak_downstream", TRUE ~ tss_rel_peak),
+           tss_rel_peak = case_when(tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ "Peak_downstream",
+                                   tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ "Peak_upstream", TRUE ~ tss_rel_peak),
+          min_dist = case_when(tss_rel_peak == "Overlap" ~ 0, tss_rel_peak == "Peak_downstream" & granges.y.strand == "+" ~ tss_start,
+                                tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ tss_end, tss_rel_peak == "Peak_upstream" & granges.y.strand == "+" ~ tss_end,
+                                tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ tss_start))
+  anno_dmr
+
+}
+```
+
+
+
+
 ## Introduction
 
 ```{r}
