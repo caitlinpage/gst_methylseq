@@ -1,0 +1,160 @@
+---
+title: "03_runGST"
+author: "Caitlin Page"
+date: "2025-02-27"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+* hold on - mm as it runs is set to all - which includes cpgs/dmrs in front of the gene - tss200, and tss1500
+* and my genes are just overlap right now
+* could restrict array to body and see if it changes anything
+
+## Introduction
+
+```{r}
+```
+
+```{r}
+find_overlaps(as_granges(biomart_genes), as_granges(filter(DMPs, adj.P.Val < 0.05))) %>% data.frame() %>% distinct(gene_name)
+```
+```{r}
+dmrcate_array_anno <- readRDS("../output/dmrcate_array_anno.rds")
+dmrcate_array_anno <- data.frame(dmrcate_array_anno@ranges)
+```
+```{r}
+dmrcate_array_anno$pos <- paste0(dmrcate_array_anno$seqnames, "-", dmrcate_array_anno$start)
+dmrcate_overlap <- find_overlaps(as_granges(dmrcate_array_dmr), as_granges(dmrcate_array_anno)) %>% data.frame()
+```
+```{r}
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(in_dmr = ifelse(pos %in% dmrcate_overlap$pos, TRUE, FALSE))
+```
+```{r}
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(rank_dmr = dmrcate_overlap[match(.$pos.x, dmrcate_overlap$pos), "rank"], rank_dmr = ifelse(is.na(rank_dmr), max(rank_dmr, na.rm = TRUE) + 1, rank_dmr))
+```
+
+```{r}
+dmrcate_array_anno <- find_overlaps(as_granges(dmrcate_array_anno), as_granges(mutate(anno_array, cg_id = rownames(anno_array)))) %>% data.frame()
+```
+```{r}
+getMapped
+```
+
+```{r}
+mm_map_dmrcate_array <- getMappedEntrezIDs(filter(dmrcate_array_anno, in_dmr == TRUE)$cg_id, dmrcate_array_anno$cg_id, "EPIC")
+```
+
+
+```{r}
+tail(dmrcate_array_dmr)
+dmrcate_array_bio_anno <- annoGeneDmr(anno_array, dmrcate_array_anno, gene_source = "biomart", biomart_genes)
+```
+* I can run - MM
+* and just the gsa-meth bit using my input beforehand
+* and see if results change
+* big brain moment
+* and can just run the mapped entrez bit
+* and can really compare results
+* dmrcate array stuff, and also just regular array
+```{r}
+me_gst_dmrcate_array_out <- run_miss_methyl_a(biomart_genes, dmrcate_array_bio_anno)
+```
+
+```{r}
+dmrcate_array_
+```
+
+```{r}
+getMappedEntrezIDs()
+```
+
+
+```{r}
+me_gst_dmrcate_array <- run_miss_methyl_b(run_miss_methyl_a(me_gst_dmrcate_array_out, method = "Wallenius")
+```
+
+```{r}
+goregion()
+```
+
+```{r}
+DMPs
+```
+
+## run sequencing
+```{r}
+dmrcate_seq_anno
+dmrcate_seq_dmr
+```
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")
+```
+
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")
+```
+
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")
+```
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno), dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")
+```
+
+```{r}
+dmrcate_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno), dmrcate_seq_dmr, "biomart", biomart_genes)), "Fisher")
+```
+
+
+```{r}
+annoGeneDmr()
+```
+
+```{r}
+annoGeneDmr <- function(counts, dmrs, gene_source = c("biomart", "experimenthub", "self"), genes) { #why do I have the gene source here?? why???
+  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub", "self"))
+  genes <- data.frame(genes)
+  # ensure ensembl_id name consistency
+  colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
+  # double check only 1 ensembl id per gene entry
+  genes$width <- genes$end - genes$start + 1
+  genes <- genes %>% group_by(ensembl_gene_id) %>% filter(width == max(width)) %>% ungroup()
+  # add random identifier
+  genes$gene_num <- 1:nrow(genes)
+  # add number of cpgs overlapping gene
+  gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
+  gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = n()) %>% ungroup() %>% data.frame()
+
+  genes$num_cg <- gene_cpg[match(genes$gene_num, gene_cpg$gene_num), "n_cpg"]
+  genes[is.na(genes)] <- 0
+  if(!"TSS" %in% colnames(genes)) {
+    genes$TSS <- ifelse(genes$strand == "+", genes$start, genes$end) # above I have strand for 1/-1
+  }
+  # assume dmrs are already in order of most to least signif
+  dmrs$rank <- 1:nrow(dmrs)
+  # add if gene overlaps dmr
+  overlap_dmr <- find_overlaps(as_granges(dmrs), as_granges(genes)) %>% data.frame() %>%
+    mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
+  anno_dmr <- pair_nearest(as_granges(dmrs), as_granges(genes)) %>% data.frame() %>%
+    mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
+  #dist gene to dmr
+  anno_dmr <- anno_dmr %>%
+    mutate(tss_start = TSS - granges.x.start, tss_end = TSS - granges.x.end) %>%
+    mutate(tss_rel_peak = ifelse(combo %in% overlap_dmr$combo, "Overlap", NA),
+            tss_rel_peak = case_when(is.na(tss_rel_peak) & tss_start > 0 & tss_end > 0 & tss_end < tss_start ~ "Peak_upstream",
+                                     is.na(tss_rel_peak) & tss_start < 0 & tss_end < 0 &  tss_end < tss_start ~ "Peak_downstream", TRUE ~ tss_rel_peak),
+           tss_rel_peak = case_when(tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ "Peak_downstream",
+                                   tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ "Peak_upstream", TRUE ~ tss_rel_peak),
+          min_dist = case_when(tss_rel_peak == "Overlap" ~ 0, tss_rel_peak == "Peak_downstream" & granges.y.strand == "+" ~ tss_start,
+                                tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ tss_end, tss_rel_peak == "Peak_upstream" & granges.y.strand == "+" ~ tss_end,
+                                tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ tss_start))
+  anno_dmr
+
+}
+```
+
+
