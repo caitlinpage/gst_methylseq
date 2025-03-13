@@ -365,3 +365,27 @@ compare
 
 ```
 
+--------------------
+
+```{r}
+bsseq_dmrs %>%
+  ggplot(aes(x = width)) +
+  geom_density()
+
+bsseq_dmrs_filt %>%
+  ggplot(aes(x = width)) +
+  geom_density()
+
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = width)) +
+  geom_density()
+
+dmrcate_seq_dmr[1:5000,] %>%
+  ggplot(aes(x = width)) +
+  geom_density()
+
+dmrcate_seq_dmr[1:1000,] %>%
+  ggplot(aes(x = width)) +
+  geom_density()
+```
+
