@@ -21,8 +21,26 @@ library(BiasedUrn)
 
 library(ggVennDiagram)
 ```
+```{r}
+test_anno_filt
+```
+```{r}
+biomart_genes <- data.frame(biomart_genes)
+```
 
+```{r}
 
+```
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(filter(biomart_genes, num_cg > 0), test_anno_filt), method = "Wallenius")
+```
+```{r}
+run_miss_methyl_a(filter(biomart_genes, num_cg > 0), test_anno_filt)
+```
+* it ran but sig.eg is null??
+
+###############################
 ## Introduction
 
 
