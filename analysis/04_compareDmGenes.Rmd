@@ -1,0 +1,108 @@
+---
+title: "04_compareDmGenes"
+author: "Caitlin Page"
+date: "2025-02-26"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+library(ggVennDiagram)
+library(ComplexUpset)
+```
+
+
+## Introduction
+
+
+
+## compare DMRcate 
+* gene annotation is done within the DMR function
+
+```{r}
+genes_dmrcate_array <- character()
+for (x in 1:length(dmrcate_array_dmr$overlapping.genes)) {
+  genes_dmrcate_array <- c(genes_dmrcate_array, strsplit(dmrcate_array_dmr$overlapping.genes[x],split=", ",fixed=TRUE)[[1]])
+}
+
+length(genes_dmrcate_array)
+length(unique(genes_dmrcate_array))
+genes_dmrcate_array <- unique(genes_dmrcate_array)
+genes_dmrcate_array <- genes_dmrcate_array[!is.na(genes_dmrcate_array)] 
+length(genes_dmrcate_array)
+```
+
+```{r}
+genes_dmrcate_seq <- character()
+for (x in 1:length(dmrcate_seq_dmr$overlapping.genes)) {
+  genes_dmrcate_seq <- c(genes_dmrcate_seq, strsplit(dmrcate_seq_dmr$overlapping.genes[x],split=", ",fixed=TRUE)[[1]])
+}
+length(genes_dmrcate_seq)
+length(unique(genes_dmrcate_seq))
+genes_dmrcate_seq <- unique(genes_dmrcate_seq)
+genes_dmrcate_seq <- genes_dmrcate_seq[!is.na(genes_dmrcate_seq)] 
+length(genes_dmrcate_seq)
+```
+
+# overlap all
+
+```{r}
+ggVennDiagram(list(array = genes_dmrcate_array, seq = genes_dmrcate_seq))
+```
+
+```{r}
+dmrcate_array_dmr_filt
+```
+
+```{r}
+genes_dmrcate_array <- character()
+for (x in 1:length(dmrcate_array_dmr_filt$overlapping.genes)) {
+  genes_dmrcate_array <- c(genes_dmrcate_array, strsplit(dmrcate_array_dmr_filt$overlapping.genes[x],split=", ",fixed=TRUE)[[1]])
+}
+
+length(genes_dmrcate_array)
+length(unique(genes_dmrcate_array))
+genes_dmrcate_array <- unique(genes_dmrcate_array)
+genes_dmrcate_array <- genes_dmrcate_array[!is.na(genes_dmrcate_array)] 
+length(genes_dmrcate_array)
+```
+
+```{r}
+genes_dmrcate_seq <- character()
+for (x in 1:length(dmrcate_seq_dmr[1:5000,]$overlapping.genes)) {
+  genes_dmrcate_seq <- c(genes_dmrcate_seq, strsplit(dmrcate_seq_dmr[1:5000,]$overlapping.genes[x],split=", ",fixed=TRUE)[[1]])
+}
+length(genes_dmrcate_seq)
+length(unique(genes_dmrcate_seq))
+genes_dmrcate_seq <- unique(genes_dmrcate_seq)
+genes_dmrcate_seq <- genes_dmrcate_seq[!is.na(genes_dmrcate_seq)] 
+length(genes_dmrcate_seq)
+```
+
+```{r}
+ggVennDiagram(list(array = genes_dmrcate_array, seq = genes_dmrcate_seq))
+```
+
+```{r}
+genes_dmrcate_seq <- character()
+for (x in 1:length(dmrcate_seq_dmr[1:1000,]$overlapping.genes)) {
+  genes_dmrcate_seq <- c(genes_dmrcate_seq, strsplit(dmrcate_seq_dmr[1:1000,]$overlapping.genes[x],split=", ",fixed=TRUE)[[1]])
+}
+length(genes_dmrcate_seq)
+length(unique(genes_dmrcate_seq))
+genes_dmrcate_seq <- unique(genes_dmrcate_seq)
+genes_dmrcate_seq <- genes_dmrcate_seq[!is.na(genes_dmrcate_seq)] 
+length(genes_dmrcate_seq)
+```
+
+```{r}
+ggVennDiagram(list(array = genes_dmrcate_array, seq = genes_dmrcate_seq))
+```
+
+
