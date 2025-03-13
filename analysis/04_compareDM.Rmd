@@ -7,9 +7,225 @@ editor_options:
   chunk_output_type: inline
 ---
 
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+```
+
+
 ## Introduction
+```{r}
+dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds")
+
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds") # we want bsseq_dmrs_filt # abs(areaStat) > 100
+bsseq_res <- readRDS("../output/bsseq_res.rds")
+```
+
+```{r}
+seq_edge_res <- readRDS("../output/seq_edge_res.rds")
+```
+
+```{r}
+library(ComplexUpset)
+```
+```{r}
+dmrcate_array_anno
+dmrcate_seq_anno$pos <- paste0(dmrcate_seq_anno$seqnames, "-", dmrcate_seq_anno$start)
+```
+```{r}
+bsseq_dmrs_filt
+```
+```{r}
+dmrcate_array_dmr_filt <- dmrcate_array_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
+DMPs$pos <- paste0(DMPs$seqnames, "-", DMPs$start)
+```
+
+```{r}
+compare_dm <- wgbs_counts[,1:4]
+```
+```{r}
+rownames(seq_edge_res) %in% wgbs_counts$pos %>% summary()
+```
+
+```{r}
+overlap_dm <- find_overlaps(as_granges(dmrcate_seq_dmr[1:5000,]), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(seq_dmrcate_dmr_5k = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+overlap_dm <- find_overlaps(as_granges(bsseq_dmrs_filt), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(bsseq_dmr_area100 = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+
+compare_dm <- compare_dm %>% mutate(seq_edger_pos = seq_edge_res[match(.$pos, rownames(seq_edge_res)), "signif.05"])
+
+overlap_dm <- find_overlaps(as_granges(dmrcate_array_dmr_filt), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(array_dmrcate_filt = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE),
+                                    array_minfi_filt = ifelse(pos %in% DMPs[1:10000,]$pos, TRUE, FALSE))
+```
+
+```{r}
+dmrcate_seq_dmr
+```
+```{r}
+dmrcate_seq_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
+```
+
+```{r}
+compare_dm 
+```
+```{r}
+compare_dm[1:10,c(1,5:9)] %>% t(.) %>% data.frame()
+```
+```{r}
+compare_dm %>% filter(seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| seq_edger_pos != FALSE| array_dmrcate_filt != FALSE| array_minfi_filt != FALSE)
+```
+
+```{r}
+upset(filter(compare_dm, seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| seq_edger_pos != FALSE| array_dmrcate_filt != FALSE| array_minfi_filt != FALSE), intersect = colnames(compare_dm)[5:9])
+```
+```{r}
+rbind(cbind(width = dmrcate_seq_dmr$width, method = "dmrcate"),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = "dmrcate_5k"),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = "dmrcate_1k"),
+      cbind(width = bsseq_dmrs_filt$width, method = "bsseq_area100")) %>% data.frame() %>% mutate(width = as.double(width)) %>%
+  ggplot(aes(x = width, colour = method)) +
+  geom_density()
+
+rbind(cbind(width = dmrcate_seq_dmr$width, method = "dmrcate"),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = "dmrcate_5k"),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = "dmrcate_1k"),
+      cbind(width = bsseq_dmrs_filt$width, method = "bsseq_area100")) %>% data.frame() %>% mutate(width = as.double(width)) %>%
+  ggplot(aes(x = log2(width), colour = method)) +
+  geom_density()
+```
+
+```{r}
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = no.cpgs, colour = method)) +
+  geom_density()
+
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = log2(no.cpgs), colour = method)) +
+  geom_density()
+```
+
+```{r}
+dmrcate_seq_dmr
+```
+
+```{r}
+compare_dm
+```
+
+```{r}
+upset(compare_dm[1:100000,], intersect = colnames(compare_dm)[5:9])
+```
+
+```{r}
+overlap_dmr
+```
+
+
+```{r}
+dmrcate_seq_dmr <- dmrcate_seq_dmr %>% data.frame()
+dmrcate_seq_anno <- dmrcate_seq_anno@ranges %>% data.frame()
+```
+```{r}
+dmrcate_seq_anno <- dmrcate_seq_anno %>% .[order(.$ind.fdr),] %>% mutate(rank = 1:n())
+```
+
+
+* ditch the overlapping DMRs for a minute because the venn diagrams are always ugly and they get messy
+
+* upset plot
+* and we can look at all cpgs - and is that cpg in a dmr for that method?
+** this probably won't help with comparing to microarray - as diff starting cpgs
+** but could shove it in anyway - or could just run on overlap
+
+```{r}
+cg_pos <- wgbs_counts[,c("pos", "seqnames", "start")]
+cg_pos$end <- cg_pos$start
+```
+```{r}
+cg_in_dmr <- cg_pos
+```
+```{r}
+overlap <- find_overlaps(as_granges(cg_in_dmr), as_granges(bsseq_dmrs_filt)) %>% data.frame()
+cg_in_dmr$bsseq <- ifelse(cg_in_dmr$pos %in% overlap$pos, TRUE, FALSE)
+
+overlap <- find_overlaps(as_granges(cg_in_dmr), as_granges(dmrcate_seq_dmr)) %>% data.frame()
+cg_in_dmr$dmrcate <- ifelse(cg_in_dmr$pos %in% overlap$pos, TRUE, FALSE)
+
+overlap <- find_overlaps(as_granges(cg_in_dmr), as_granges(dmrcate_array_dmr)) %>% data.frame()
+cg_in_dmr$dmrcate_array <- ifelse(cg_in_dmr$pos %in% overlap$pos, TRUE, FALSE)
+```
+```{r}
+ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq == TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate == TRUE)$pos))
+ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq != TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate != TRUE)$pos))
+```
+* agree best about what is not significant
+* most of dmrcate significant is also identified by bsseq
+** this was higher when using the unfiltered bsseq dmrs 
+
+```{r}
+ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq == TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate == TRUE)$pos, 
+                   array_dmr = filter(cg_in_dmr, dmrcate_array == TRUE)$pos))
+ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq != TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate != TRUE)$pos, 
+                   array_dmr = filter(cg_in_dmr, dmrcate_array != TRUE)$pos))
+```
+* this doesn't acknowledge that the array does not cover all the sites seq does - it would just add to the FALSE
+```{r}
+cg_in_dmr
+```
+
+
+
+##################################################
+
+```{r}
+dmrcate_overlap_pos <- find_overlaps(as_granges(dmrcate_seq_anno), as_granges(dmrcate_array_anno), maxgap = 2) %>% data.frame()
+ggVennDiagram(list(array_rank = dmrcate_array_anno$rank, overlap = unique(dmrcate_overlap_pos$rank.y)))
+ggVennDiagram(list(seq_rank = dmrcate_seq_anno$rank, overlap = unique(dmrcate_overlap_pos$rank.x)))
+
+# just the significant
+dmrcate_overlap_pos <- find_overlaps(as_granges(filter(dmrcate_seq_anno, is.sig == TRUE)), as_granges(filter(dmrcate_array_anno, is.sig == TRUE)), maxgap = 2) %>% data.frame()
+ggVennDiagram(list(array_rank = filter(dmrcate_array_anno, is.sig == TRUE)$rank, overlap = unique(dmrcate_overlap_pos$rank.y)))
+ggVennDiagram(list(seq_rank = filter(dmrcate_seq_anno, is.sig == TRUE)$rank, overlap = unique(dmrcate_overlap_pos$rank.x)))
+```
+
+
 
 ```{r}
 dmrcate_array_anno
+dmrcate_seq_anno
+```
+
+```{r}
+dmrcate_array_dmr
+dmrcate_seq_dmr$num <- 1:nrow(dmrcate_seq_dmr)
+```
+
+```{r}
+dmrcate_overlap_dmr <- find_overlaps(as_granges(dmrcate_seq_dmr), as_granges(dmrcate_array_dmr)) %>% data.frame()
+ggVennDiagram(list(array_rank = dmrcate_array_dmr$rank, overlap = unique(dmrcate_overlap_dmr$rank)))
+ggVennDiagram(list(seq_rank = dmrcate_seq_dmr$num, overlap = unique(dmrcate_overlap_dmr$num)))
+```
+
+* same method - still very little results overlap
+
+* I need to find myself a matched dataset
+
+
+#########
+
+```{r}
+overlap_dmr <- find_overlaps(as_granges(dmrcate_seq_dmr), as_granges(bsseq_dmrs)) %>% data.frame()
+ggVennDiagram(list(bsseq_rank = bsseq_dmrs$bsseq_rank, overlap = unique(overlap_dmr$bsseq_rank)))
+ggVennDiagram(list(seq_rank = dmrcate_seq_dmr$num, overlap = unique(dmrcate_overlap_dmr$num)))
 ```
 
