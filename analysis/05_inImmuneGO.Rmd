@@ -1,0 +1,93 @@
+---
+title: "05_inImmuneGO"
+author: "Caitlin Page"
+date: "2025-03-04"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r}
+library(dplyr)
+```
+
+## Introduction
+```{r}
+mm_dmrcate_array2
+```
+
+```{r}
+immuneGO <- unique(read.csv("../data/gene_sets/GO-immune-system-process.txt", 
+                            stringsAsFactors = FALSE, header = FALSE, 
+                            col.names = "GOID"))
+immuneGO <- immuneGO %>% mutate(ontology = mm_dmrcate_array2[match(.$GOID, rownames(mm_dmrcate_array2)), "ONTOLOGY"],
+                    term = mm_dmrcate_array2[match(.$GOID, rownames(mm_dmrcate_array2)), "TERM"])
+```
+
+```{r}
+filter(immuneGO, is.na(term))
+```
+* damn - oh well have to hope they're not too important
+* they may have 0 CpGs among them actually
+
+```{r}
+truth_gst_100 <- rbind(
+  compare_filt$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_All") %>% .[,8:10],
+  compare_filt_hyper$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_All") %>% .[,8:10],
+  compare_filt$dmr_5k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_5k") %>% .[,8:10], 
+  compare_filt_hyper$dmr_5k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_5k") %>% .[,8:10],
+  compare_filt$dmr_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1k") %>% .[,8:10],
+  compare_filt_hyper$dmr_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1k") %>% .[,8:10],
+  compare_filt$dmr_3n_0.1b[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_3n0.1b") %>% .[,8:10],
+  compare_filt_hyper$dmr_3n_0.1b[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_3n0.1b") %>% .[,8:10])
+
+```
+
+```{r}
+truth_gst_100 %>% 
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+
+truth_gst_100 %>% filter(str_detect(method, "Wall")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+
+truth_gst_100 %>% filter(str_detect(method, "Hyper")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+
+truth_gst_100 %>% filter(str_detect(method, "1k")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+```
+
+```{r}
+truth_gst <- rbind(
+  compare_filt$dmr_all %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_All") %>% .[,8:10],
+  compare_filt_hyper$dmr_all %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_All") %>% .[,8:10],
+  compare_filt$dmr_5k %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_5k") %>% .[,8:10], 
+  compare_filt_hyper$dmr_5k %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_5k") %>% .[,8:10],
+  compare_filt$dmr_1k %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1k") %>% .[,8:10],
+  compare_filt_hyper$dmr_1k %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1k") %>% .[,8:10],
+  compare_filt$dmr_3n_0.1b %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_3n0.1b") %>% .[,8:10],
+  compare_filt_hyper$dmr_3n_0.1b %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_3n0.1b") %>% .[,8:10])
+```
+
+```{r}
+truth_gst %>% 
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+
+truth_gst %>% filter(str_detect(method, "Wall")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+
+truth_gst %>% filter(str_detect(method, "Hyper")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+
+truth_gst %>% filter(str_detect(method, "5k")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line()
+```
+
