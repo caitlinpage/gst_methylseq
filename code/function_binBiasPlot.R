@@ -6,8 +6,8 @@ library(ChIPseqSpikeInFree)
 library(biomaRt)
 
 
-plotBiasGenomeBins <- function(counts, dmr, bin_size=2000) {
-  genome_bins <- GenerateBins("hg19", binSize = bin_size)
+plotBiasGenomeBins <- function(counts, dmr, plot_style = c("bin", "indiv"), genome = "hg19", bin_size=2000) {
+  genome_bins <- GenerateBins(genome, binSize = bin_size)
   colnames(genome_bins) <- c("seqnames", "start", "end")
   genome_bins <- genome_bins %>% mutate(bin_pos = paste0(seqnames, "-", start), num = 1:n())
 
@@ -29,7 +29,32 @@ plotBiasGenomeBins <- function(counts, dmr, bin_size=2000) {
   genome_bins[is.na(genome_bins)] <- 0
 
   genome_bins <- genome_bins %>% mutate(has_dmr = ifelse(n_dmr == 0, FALSE, TRUE))
-
+  if(length(plot_style) > 1) {
+    plot_style <- "bin"
+  }
+  if(plot_style == "bin") {
+    plot <- genome_bins %>%
+      group_by(num_cg) %>%
+      mutate(num_bins_same_cg = n()) %>%
+      .[order(.$num_cg),] %>%
+      ungroup() %>%
+      mutate(bin_group = rep(1:ceiling(nrow(genome_bins)/100), each = 100)[1:nrow(genome_bins)]) %>%
+      group_by(bin_group) %>%
+      mutate(num_cg_bin_group = sum(num_cg)) %>%
+      group_by(num_cg_bin_group) %>%
+      mutate(num_bins_group_same_cg = n()) %>%
+      group_by(num_cg_bin_group, has_dmr) %>%
+      mutate(num_per_dmr = n(), prop = n()/num_bins_group_same_cg) %>%
+      distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+      group_by(num_cg_bin_group) %>%
+      .[order(.$num_cg_bin_group),] %>%
+      mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+      mutate(num = n()) %>%
+      mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+      ggplot(aes(x = num_cg_bin_group, y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+  } else {
   plot <- genome_bins %>%
     group_by(num_cg) %>%
     mutate(num_bins_same_cg = n()) %>%
@@ -44,7 +69,7 @@ plotBiasGenomeBins <- function(counts, dmr, bin_size=2000) {
     ggplot(aes(x = num_cg, y = prop)) +
       geom_point(alpha = 0.4) +
       geom_smooth()
-
+  }
   list(genome_bins, plot)
 }
 
@@ -199,4 +224,66 @@ plotBiasGroupedMedian <- function(genes, anno_genes, regression_line=FALSE, log2
     plot <- plot + geom_smooth()
   }
   plot
+}
+
+######################
+plotBiasByGroup <- function(counts, dmr, bias_type=c("gene", "bin"), bin_size=2000) {
+  if(length(bias_type) > 1) {
+    bias_type <- "gene"
+  }
+  if(bias_type == "bin") {
+    genome_bins <- GenerateBins("hg19", binSize = bin_size)
+    colnames(genome_bins) <- c("seqnames", "start", "end")
+  } else {
+    ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", version = "GRCh37")
+    genome_bins <- getBM(
+      attributes = c("ensembl_gene_id", "external_gene_name", "ensembl_transcript_id",
+                     "chromosome_name", "start_position", "end_position", "strand",
+                     "transcription_start_site" , "transcript_start", "transcript_end", "transcript_length"),
+      filters = "chromosome_name",
+      values = gsub("chr", "", unique(wgbs_counts$seqnames)[1:22]),
+      mart = ensembl
+    )
+    genome_bins <- genome_bins %>% .[order(.$chromosome_name, .$start_position), ]
+    colnames(genome_bins) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
+    genome_bins <- genome_bins %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup() %>% mutate(seqnames = as.character(seqnames), seqnames = paste0("chr", seqnames))
+  }
+
+  genome_bins <- genome_bins %>% mutate(bin_pos = paste0(seqnames, "-", start), num = 1:n())
+
+  counts_per_bin <- find_overlaps(as_granges(genome_bins), as_granges(counts)) %>% data.frame()
+
+  cg_per_bin <- counts_per_bin[,6:7] %>% group_by(num, bin_pos) %>% summarise(n_region = n())
+  cg_per_bin <- cg_per_bin %>% ungroup() %>% data.frame()
+
+  genome_bins <- genome_bins %>% mutate(num_cg = cg_per_bin[match(.$num, cg_per_bin$num), "n_region"])
+  genome_bins[is.na(genome_bins)] <- 0
+  genome_bins <- genome_bins %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
+
+
+  bin_dmr_overlap <- find_overlaps(as_granges(genome_bins), as_granges(dmr)) %>% data.frame()
+  bin_dmr_overlap <- bin_dmr_overlap %>% group_by(bin_pos) %>%
+    summarise(n_dmr = n()) %>% ungroup() %>% data.frame()
+  genome_bins <- genome_bins %>% mutate(n_dmr = bin_dmr_overlap[match(.$bin_pos, bin_dmr_overlap$bin_pos), "n_dmr"])
+
+  genome_bins[is.na(genome_bins)] <- 0
+
+  genome_bins <- genome_bins %>% mutate(has_dmr = ifelse(n_dmr == 0, FALSE, TRUE))
+
+  plot <- genome_bins %>%
+    group_by(num_cg) %>%
+    mutate(num_bins_same_cg = n()) %>%
+    group_by(num_cg, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_cg) %>%
+    distinct(num_cg, num_bins_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg) %>%
+    .[order(.$num_cg),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg, y = prop)) +
+    geom_point(alpha = 0.4) +
+    geom_smooth()
+
+  list(genome_bins, plot)
 }
