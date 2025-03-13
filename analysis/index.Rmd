@@ -35,3 +35,10 @@ library(missMethyl)
 library(BiasedUrn)
 ```
 
+
+[analysis/00_exploreCpGDistribution]
+* plots comparing array and sequencing
+** distance between cpgs, annotation to cpg and gene features
+
+
+
