@@ -363,6 +363,35 @@ GO.long.50_null
 GO.long.50_null <- GO.long.50_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
 GO.long.50_null
 ```
+
+## fisher for lols?
+
+```{r}
+gene.vector <- long_genes_tested$signif
+names(gene.vector) <- long_genes_tested$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = long_genes_tested$num_cg)
+pwf
+GO.long_fish <- goseq_mod(pwf, "mm10", "knownGene", method = "Fishers")
+GO.long_fish
+GO.long_fish <- GO.long_fish %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long_fish
+```
+
+```{r}
+gene_anno_7 <- gene_anno_7 %>% mutate(rank = ifelse(is.na(rank), nrow(.) + 1, rank), signif = ifelse(rank <= 50, 1, 0))
+gene.vector <- gene_anno_7$signif
+names(gene.vector) <- gene_anno_7$gene_id
+
+pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
+pwf
+GO.long.50_fish <- goseq_mod(pwf, "mm10", "knownGene", method = "Fishers")
+GO.long.50_fish
+GO.long.50_fish <- GO.long.50_fish %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
+GO.long.50_fish
+```
+
+
 ## now for my function
 
 ```{r}
