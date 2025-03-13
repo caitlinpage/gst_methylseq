@@ -1,0 +1,388 @@
+---
+title: "03_signifCutoff"
+author: "Caitlin Page"
+date: "2025-03-04"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+```{r}
+library(plyranges)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(ggVennDiagram)
+
+library(GO.db)
+library(missMethyl)
+library(goseq)
+```
+
+## DMRcate array Indiv CpGs
+# Wallenius
+```{r}
+gometh(filter(dmrcate_array_anno, is.sig == TRUE)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC")
+```
+
+
+```{r}
+gometh(filter(dmrcate_array_anno, rank <= 10000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC") %>% .[order(.$FDR),]
+gometh(filter(dmrcate_array_anno, rank <= 50000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC") %>% .[order(.$FDR),]
+gometh(filter(dmrcate_array_anno, rank <= 100000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC") %>% .[order(.$FDR),]
+```
+
+# Hypergeometric
+```{r}
+gometh(filter(dmrcate_array_anno, is.sig == TRUE)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE)
+```
+
+```{r}
+gometh(filter(dmrcate_array_anno, rank <= 10000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE) %>% .[order(.$FDR),]
+gometh(filter(dmrcate_array_anno, rank <= 50000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE) %>% .[order(.$FDR),]
+gometh(filter(dmrcate_array_anno, rank <= 100000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE) %>% .[order(.$FDR),]
+```
+
+# difference between Wallenius and Hypergeometric
+* When using all CpGs - seems similar - likely because there is too much noise
+* As filtering happens:
+* Hyper: no change in top 10 terms for 10k and 50k - plus all terms are vague
+* Wall: 10k and 50k are similar - and are all immune relevant
+
+
+## DMRcate Array DMRs
+
+```{r}
+goregion(as_granges(dmrcate_array_dmr), dmrcate_array_anno$cg_id, "GO", "EPIC") %>% .[order(.$FDR),]
+```
+* gives same top results as my cheat way of gometh and labelling signif cpg as in_dmr
+
+```{r}
+goregion(as_granges(dmrcate_array_dmr[1:500,]), dmrcate_array_anno$cg_id, "GO", "EPIC") %>% .[order(.$FDR),]
+goregion(as_granges(dmrcate_array_dmr[1:1000,]), dmrcate_array_anno$cg_id, "GO", "EPIC") %>% .[order(.$FDR),]
+goregion(as_granges(dmrcate_array_dmr[1:5000,]), dmrcate_array_anno$cg_id, "GO", "EPIC") %>% .[order(.$FDR),]
+```
+
+# Hypergeometric
+
+```{r}
+goregion(as_granges(dmrcate_array_dmr), dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE) %>% .[order(.$FDR),]
+```
+
+
+```{r}
+goregion(as_granges(dmrcate_array_dmr[1:500,]), dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE) %>% .[order(.$FDR),]
+goregion(as_granges(dmrcate_array_dmr[1:1000,]), dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE) %>% .[order(.$FDR),]
+goregion(as_granges(dmrcate_array_dmr[1:5000,]), dmrcate_array_anno$cg_id, "GO", "EPIC", prior.prob = FALSE) %>% .[order(.$FDR),]
+```
+
+# difference between Wallenius and Hypergeom
+* seeing similar patterns as with the array
+* hyper: do get some immune terms - but they are vaguer and that could be because of very strong filtering of DMRs
+* as 5k DMRs are vaguer terms
+
+## Problem
+* my consistent problem has been poor output from the sequencing gene set testing
+* hypothesis: too much noise in the DMRs, didn't filter enough
+* evidence: filtering the array DMRs brought out specific immune system terms
+
+# Sequenving
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")
+```
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Wallenius")
+```
+
+
+* hmm kind of working - need to see what hyper does
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Hypergeometric")
+```
+*thats more like it
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes)), "Wallenius")
+```
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes)), "Hypergeometric")
+```
+* ok so it is slighyly concerning the way it's all 1s
+* badabing badaboom
+
+* right can run the cheat version
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes)))
+```
+
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), plot.bias = FALSE) %>% .[order(.$FDR),] 
+```
+
+
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes)), prior.prob = FALSE, plot.bias = FALSE) %>% .[order(.$FDR),]
+```
+
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)))
+
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), plot.bias = FALSE) %>% .[order(.$FDR),] 
+
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), prior.prob = FALSE, plot.bias = FALSE) %>% .[order(.$FDR),]
+```
+
+
+# check the plot
+
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes)))
+```
+* it keeps looking worse as the dmrs are filtered
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)))
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)))
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes)))
+```
+
+
+```{r}
+goregion(as_granges(dmrcate_array_dmr), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+goregion(as_granges(dmrcate_array_dmr[1:5000,]), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+goregion(as_granges(dmrcate_array_dmr[1:1000,]), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+goregion(as_granges(dmrcate_array_dmr[1:500,]), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+```
+
+* at least its consistent in the fit being bad
+
+```{r}
+gometh(filter(dmrcate_array_anno, is.sig == TRUE)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+gometh(filter(dmrcate_array_anno, rank <= 50000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+gometh(filter(dmrcate_array_anno, rank <= 10000)$cg_id, dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+```
+
+* of course this stays consistent when it's filtered (don't know how to eye roll here)
+* ok this i need to figure out
+* because the results say filter
+* but we need the fit to look good
+
+* oh I was so happy with it
+* was about to say significance doesn't matter but it does
+* because that's how you get the proportion
+
+* is there a way I could be happy with it??
+```{r}
+dmrcate_array_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
+```
+
+
+# look at the array
+```{r}
+dmrcate_array_anno %>% filter(is.sig == TRUE) %>% nrow(.)
+dmrcate_array_anno %>% filter(in_dmr == TRUE) %>% nrow(.)
+```
+
+```{r}
+dmrcate_array_anno %>%
+  ggplot(aes(x = rank, y = rank_dmr)) +
+  geom_point(alpha = 0.3)
+
+dmrcate_array_anno %>% filter(is.sig == TRUE) %>%
+  ggplot(aes(x = rank, y = rank_dmr)) +
+  geom_point(alpha = 0.3)
+
+dmrcate_array_anno[1:10000,] %>%
+  ggplot(aes(x = rank, y = rank_dmr)) +
+  geom_point(alpha = 0.3)
+
+dmrcate_array_anno %>% filter(in_dmr == TRUE) %>%
+  ggplot(aes(x = rank, y = rank_dmr)) +
+  geom_point(alpha = 0.3)
+
+dmrcate_array_anno %>% filter(rank_dmr <= 5000) %>%
+  ggplot(aes(x = rank, y = rank_dmr)) +
+  geom_point(alpha = 0.3)
+
+dmrcate_array_anno %>% filter(rank_dmr <= 1000) %>%
+  ggplot(aes(x = rank, y = rank_dmr)) +
+  geom_point(alpha = 0.3)
+```
+
+
+```{r}
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(rank_dmr = dmrcate_overlap[match(.$pos.x, dmrcate_overlap$pos), "rank"], rank_dmr = ifelse(is.na(rank_dmr), max(rank_dmr, na.rm = TRUE) + 1, rank_dmr))
+```
+
+```{r}
+max()
+```
+
+
+## can I filter another way?
+* missmethyl goregion paper
+* filtered dmrs: n_cpg > 3, |mean_beta| > 0.1
+
+```{r}
+nrow(dmrcate_array_dmr)
+nrow(dmrcate_seq_dmr)
+dmrcate_array_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
+dmrcate_seq_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
+```
+
+```{r}
+goregion(as_granges(filter(dmrcate_array_dmr, no.cpgs > 3, abs(meandiff) > 0.1)), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+goregion(as_granges(filter(dmrcate_array_dmr, no.cpgs > 3, abs(meandiff) > 0.1)), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = FALSE) %>% .[order(.$FDR),]
+goregion(as_granges(filter(dmrcate_array_dmr, no.cpgs > 3, abs(meandiff) > 0.1)), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = FALSE, prior.prob = FALSE) %>% .[order(.$FDR),]
+```
+
+* the hypergeom are not as bad as I was hoping
+
+```{r}
+dmrcate_seq_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1) # this only culls like 20 dmrs
+```
+
+
+
+##########
+
+# ok I need to be saving these results better
+
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)))
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), group_size = 100)
+```
+
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)))
+```
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), plot.bias = FALSE)
+mm_cheat_plot(me_gst)
+```
+
+```{r}
+mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), plot.bias = FALSE)
+```
+
+
+```{r}
+test_list <- goregion(as_granges(filter(dmrcate_array_dmr, no.cpgs > 3, abs(meandiff) > 0.1)), dmrcate_array_anno$cg_id, "GO", "EPIC", plot.bias = TRUE)
+```
+
+* object is not a list damn
+
+* use the mm cheat because it's faster
+```{r}
+dmrcate_seq_dmr %>% filter(min_smoothed_fdr < 0.05) %>% nrow()
+tail(dmrcate_seq_dmr)
+```
+
+```{r}
+dmrcate_seq_dmr %>% filter(min_smoothed_fdr < 0.05) %>% nrow()
+dmrcate_seq_dmr %>% filter(Stouffer < 0.05) %>% nrow()
+dmrcate_seq_dmr %>% filter(HMFDR < 0.05) %>% nrow()
+dmrcate_seq_dmr %>% filter(Fisher < 0.05) %>% nrow()
+```
+```{r}
+me_gst_dmrcate_seq_out_5k <- run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes))
+```
+
+```{r}
+mm_cheat_gst_5k <- mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), plot.bias = FALSE)
+mm_cheat_gst_5k_null <- mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), plot.bias = FALSE, prior.prob = FALSE)
+```
+
+```{r}
+mm_cheat_gst_1k <- mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), plot.bias = FALSE)
+mm_cheat_gst_1k_null <- mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), plot.bias = FALSE, prior.prob = FALSE)
+```
+
+
+
+```{r}
+compare_filt <- list(
+  dmr_all = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes)), plot.bias = FALSE) %>% filter(FDR < 0.05),
+  dmr_5k = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), plot.bias = FALSE) %>% filter(FDR < 0.05),
+  dmr_1k = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), plot.bias = FALSE) %>% filter(FDR < 0.05),
+  dmr_3n_0.1b = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, filter(dmrcate_seq_dmr), "biomart", biomart_genes)), plot.bias = FALSE) %>% filter(FDR < 0.05)
+)
+```
+
+
+```{r}
+compare_filt_hyper <- list(
+  dmr_all = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes)), plot.bias = FALSE, prior.prob=FALSE) %>% filter(FDR < 0.05),
+  dmr_5k = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), plot.bias = FALSE, prior.prob = FALSE) %>% filter(FDR < 0.05),
+  dmr_1k = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), plot.bias = FALSE, prior.prob = FALSE) %>% filter(FDR < 0.05),
+  dmr_3n_0.1b = mm_cheat(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, filter(dmrcate_seq_dmr), "biomart", biomart_genes)), plot.bias = FALSE, prior.prob = FALSE) %>% filter(FDR < 0.05)
+)
+```
+
+```{r}
+mm_cheat_plot(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)))
+mm_cheat_plot(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), group_size = 100)
+```
+
+```{r}
+mm_cheat_plot(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)))
+mm_cheat_plot(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), group_size = 100)
+```
+
+```{r}
+mm_cheat_plot()
+```
+
+
+```{r}
+data.frame(group=rep(1:100,each=200)[1:length(order(as.vector(me_gst_dmrcate_array_out$freq)))]) %>% group_by(group) %>% summarise(n())
+```
+```{r}
+data.frame(group_me = rep(1:ceiling(length(order(as.vector(me_gst_dmrcate_array_out$freq)))/100), each = 100)[1:length(order(as.vector(me_gst_dmrcate_array_out$freq)))])
+```
+
+```{r}
+.plotBias <- function(D,bias, group_size = c(200,100)) {
+  # Plotting function to show gene level CpG density bias
+  # Belinda Phipson
+  # 5 March 2015
+
+  o <- order(bias)
+  group_size <- group_size[1]
+  if(group_size == 200) {
+  splitf <- rep(1:100,each=200)[1:length(bias)]
+  } else {
+    splitf <- rep(1:ceiling(length(bias)/100), each = 100)[1:length(bias)]
+  }
+  avgbias <- tapply(bias[o],factor(splitf),mean)
+  sumDM <- tapply(D[o],factor(splitf),sum)
+  propDM <- sumDM/table(splitf)
+  graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Number of CpGs per gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+}
+```
+
+```{r}
+me_gst_dmrcate_array_out$freq %>% data.frame()
+```
+
+```{r}
+.plotBias(me_gst_dmrcate_array_out$de, as.vector(me_gst_dmrcate_array_out$freq), group_size = 100)
+```
+
+
+```{r}
+.plotBias(me_gst_dmrcate_array_out$de, as.vector(me_gst_dmrcate_array_out$freq))
+```
+
+
+
+
+
