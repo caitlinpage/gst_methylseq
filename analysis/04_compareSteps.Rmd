@@ -59,11 +59,52 @@ bsseq_res_filt <- bsseq_res_filt %>% .[order(abs(.$tstat.corrected), decreasing 
 nrow(bsseq_res)
 nrow(array_dmps)
 ```
+```{r}
+compare_pos_res <- pair_nearest(as_granges(bsseq_res), as_granges(array_dmps)) %>% data.frame() %>% 
+  mutate(signif_seq = ifelse(tstat.corrected <= quantile(bsseq_res$tstat.corrected, probs = c(0.025, 0.975))[[1]] | 
+                       tstat.corrected >= quantile(bsseq_res$tstat.corrected, probs = c(0.025, 0.975))[[2]], TRUE, FALSE)) %>%
+  mutate(signif_either = case_when(signif == TRUE & signif_seq == TRUE ~ "Both",
+                                   signif == TRUE & signif_seq == FALSE ~ "Array",
+                                   signif == FALSE & signif_seq == TRUE ~ "Seq",
+                                   TRUE ~ "None"),
+         gap_seq_minus_array = granges.x.start - granges.y.start)
+```
+
 
 ```{r}
-actual_overlap_pos <- find_overlaps(as_granges(bsseq_res), as_granges(array_dmps)) %>% data.frame()
+compare_pos_res %>%
+  ggplot(aes(x = signif_either, y = gap_seq_minus_array, colour = signif_either)) +
+  geom_boxplot()
+```
+
+
+```{r}
+compare_pos_res %>%
+  ggplot(aes(x = gap_seq_minus_array, colour = signif_either)) +
+  geom_density()
+```
+
+```{r}
+pair_nearest(as_granges(bsseq_res_filt), as_granges(array_dmps_filt)) %>% data.frame() %>% 
+  mutate(gap_seq_minus_array = granges.x.start - granges.y.start) %>%
+  ggplot(aes(x = gap_seq_minus_array)) +
+  geom_density()
+
+pair_nearest(as_granges(bsseq_res), as_granges(array_dmps)) %>% data.frame() %>% 
+  mutate(gap_seq_minus_array = granges.x.start - granges.y.start) %>%
+  ggplot(aes(x = gap_seq_minus_array)) +
+  geom_density()
+```
+
+```{r}
+actual_overlap_pos <- find_overlaps(as_granges(bsseq_res), as_granges(array_dmps), maxgap = 2) %>% data.frame()
 ggVennDiagram(list(array_rank = array_dmps$rank, overlap = unique(actual_overlap_pos$rank)))
 ggVennDiagram(list(seq_rank = bsseq_res$position, overlap = unique(actual_overlap_pos$position)))
+```
+* hold up - try overlap of signif just starting with the overlapping positions:
+```{r}
+ggVennDiagram(list(array_rank = array_dmps_filt$rank, overlap = unique(actual_overlap_pos$rank)))
+ggVennDiagram(list(seq_rank = bsseq_res_filt$position, overlap = unique(actual_overlap_pos$position)))
 ```
 
 
