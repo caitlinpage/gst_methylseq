@@ -710,6 +710,12 @@ sig_terms_array[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE,
   geom_point() +
   geom_vline(xintercept = 0.05, type = "dotted") 
 ```
+```{r}
+compare_filt$dmr_1k[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE, FALSE)) %>% .[order(.$FDR, decreasing = TRUE),] %>%
+  ggplot(aes(x = -log10(FDR), y = factor(.data$TERM, levels = .data$TERM), colour = in_imm, size = N)) +
+  geom_point() +
+  geom_vline(xintercept = 0.05, type = "dotted") 
+```
 
 ```{r}
 mm_dmrcate_array2
@@ -907,4 +913,134 @@ go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, dmr
   labs(y = "Average number of CpGs per ontology category")
 ```
 
+```{r}
+DMPs %>% filter(adj.P.Val < 0.05)
+dmrcate_seq_anno %>% filter(ind.fdr < 0.05)
+seq_edge_res %>% filter(FDR < 0.05)
+bsseq_res_filt
+<- <- 
+```
+
+```{r}
+cg_genome <- wgbs_counts[,1:4]
+```
+```{r}
+cg_genome %>% group_by(seqnames) %>% mutate(dist_next = lead(start) - end) %>% replace(is.na(.), 0) %>% ungroup() %>% sample_n(., 10000) %>%
+  ggplot(aes(x = dist_next)) +
+  geom_density()
+```
+
+```{r}
+dmrcate_seq_dmr
+```
+
+
+```{r}
+plotBiasGenomeBins <- function(counts, dmr, plot_style = c("bin", "indiv"), genome = "hg19", bin_size=2000) {
+  genome_bins <- GenerateBins(genome, binSize = bin_size)
+  colnames(genome_bins) <- c("seqnames", "start", "end")
+  genome_bins <- genome_bins %>% mutate(bin_pos = paste0(seqnames, "-", start), num = 1:n())
+
+  counts_per_bin <- find_overlaps(as_granges(genome_bins), as_granges(counts)) %>% data.frame()
+
+  cg_per_bin <- counts_per_bin[,6:7] %>% group_by(num, bin_pos) %>% summarise(n_region = n())
+  cg_per_bin <- cg_per_bin %>% ungroup() %>% data.frame()
+
+  genome_bins <- genome_bins %>% mutate(num_cg = cg_per_bin[match(.$num, cg_per_bin$num), "n_region"])
+  genome_bins[is.na(genome_bins)] <- 0
+  genome_bins <- genome_bins %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
+```
+
+
+```{r}
+?plot
+```
+```{r}
+
+```
+# presentation
+
+
+```{r}
+plot(runif(n=100, min = 3, max = 550), rep(0.15, times = 100))
+```
+
+```{r}
+graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Number of CpGs per gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+```
+
+```{r}
+truth_gst_100 %>% filter(method %in% c("Wall_1k", "Hyper_1k")) %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+```{r}
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate_seq, rank_1k <= 20)$go),
+                   hyper = unique(filter(go_entrez_dmrcate_seq, rank_1k_null <= 20)$go),
+                   fishers = unique(filter(go_entrez_dmrcate_seq, rank_1k_fishers <= 20)$go)))
+```
+
+
+```{r}
+go_entrez_dmrcate_seq
+ggVennDiagram(list(wall = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k == TRUE)$go),
+                   hyper = unique(filter(go_entrez_dmrcate_seq, dmrcate_1k_null == TRUE)$go)))
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% 
+  filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = case_when(dmrcate_1k == FALSE & dmrcate_1k_null == TRUE ~ "Biased",
+                            dmrcate_1k == TRUE & dmrcate_1k_null == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_cg), y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% 
+  filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = case_when(dmrcate_1k == FALSE & dmrcate_1k_null == TRUE ~ "Biased",
+                            dmrcate_1k == TRUE & dmrcate_1k_null == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  #ggplot(aes(x = reorder(Method, mean_cg), y = mean_cg, fill = Method)) +
+  ggpubr::ggboxplot(., x = reorder("Method", "mean_cg"), y = "mean_cg", fill = "Method") +
+  stat_compare_means()
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+```{r}
+ggbox
+```
+
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>%
+  filter(dmrcate_1k_null != TRUE | dmrcate_1k != TRUE) %>% filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = ifelse(dmrcate_1k == FALSE, "Biased (Hypergeometric)", "Bias corrected (Wallenius)")) %>%
+  ggplot(aes(x = Method, y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+```{r}
+install.packages("RSNNS")
+library(RSNNS)
+```
+#trying this crashed the R session
+#why? good question for another day
+```{r}
+readPatFile("../../1_methods/data/blood/blood_wgbs/b_cells/GSM5652299_Blood-NK-Z000000TM.pat.gz")
+```
 
