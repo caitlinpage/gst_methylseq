@@ -1,0 +1,19 @@
+---
+title: "02_cpgAvailVsTested"
+author: "Caitlin Page"
+date: "2025-03-04"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+
+* problem is I have been getting my number of CpG per gene from the counts overlap for sequencing
+* which does not necessarily reflect tested CpGs
+
+```{r}
+
+```
+
