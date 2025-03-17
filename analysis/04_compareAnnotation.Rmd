@@ -30,3 +30,7 @@ find_overlaps(as_granges(array_dmps), as_granges(dmrcate_array_anno)) %>% data.f
   geom_point(alpha = 0.3)
 ```
 * so that's nice
+
+
+## compare Gene Annotation
+
