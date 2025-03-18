@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Caitlin Page" />
+
+<meta name="date" content="2024-10-25" />
+
+<title>00_differentialMethylationArray</title>
+
+<script src="site_libs/header-attrs-2.29/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">2_ontology_bias</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/caitlinpage/gst_methylseq">
+    <span class="fab fa-github"></span>
+     
+    Source code
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">00_differentialMethylationArray</h1>
+<h4 class="author">Caitlin Page</h4>
+<h4 class="date">2024-10-25</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
+</a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2025-03-18
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 0
+</p>
+<p>
+<strong>Knit directory:</strong> <code>2_ontology_bias/analysis/</code>
+<span class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.1). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date
+</a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguptodate"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great! Since the R Markdown file has been committed to the Git
+repository, you know the exact version of the code that produced these
+results.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20240905code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20240905)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20240905code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20240905)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr
+project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree5ca86811d35071f3846245e6c93f95f1077cbb51targetblank5ca8681a">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong>
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/5ca86811d35071f3846245e6c93f95f1077cbb51" target="_blank">5ca8681</a>
+</a>
+</p>
+</div>
+<div
+id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree5ca86811d35071f3846245e6c93f95f1077cbb51targetblank5ca8681a"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/5ca86811d35071f3846245e6c93f95f1077cbb51" target="_blank">5ca8681</a>.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/.DS_Store
+    Ignored:    data/gene_sets/
+    Ignored:    data/long_read/
+    Ignored:    data/microarray/
+    Ignored:    data/wgbs/
+    Ignored:    output/figures/
+    Ignored:    renv/library/
+    Ignored:    renv/staging/
+
+Untracked files:
+    Untracked:  analysis/myEnvironment.RData
+    Untracked:  code/ChatGPT_translate.html
+    Untracked:  code/ChatGPT_translate_files/
+
+Unstaged changes:
+    Modified:   2_ontology_bias.Rproj
+    Modified:   _workflowr.yml
+    Modified:   renv/.gitignore
+    Modified:   renv/activate.R
+    Modified:   renv/settings.json
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+These are the previous versions of the repository in which changes were
+made to the R Markdown
+(<code>analysis/00_differentialMethylationArray.Rmd</code>) and HTML
+(<code>docs/00_differentialMethylationArray.html</code>) files. If
+you’ve configured a remote Git repository (see
+<code>?wflow_git_remote</code>), click on the hyperlinks in the table
+below to view the files as they were in that past version.
+</p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/5ca86811d35071f3846245e6c93f95f1077cbb51/analysis/00_differentialMethylationArray.Rmd" target="_blank">5ca8681</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-03-18
+</td>
+<td>
+wflow_publish(c("index.Rmd", "00_differentialMethylationArray.Rmd"))
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/94e412e3758d9f521b18c0ef75ceb9ff952bb46a/analysis/00_differentialMethylationArray.Rmd" target="_blank">94e412e</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-02-21
+</td>
+<td>
+array dm analysis - mix of minfi and dmrcate methods
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/59852853edc6bebfb396fbb0a8e8a4d40d2e0aee/analysis/00_differentialMethylationArray.Rmd" target="_blank">5985285</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-11-12
+</td>
+<td>
+init commit
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div id="packages-used" class="section level2">
+<h2>Packages used</h2>
+<pre class="r"><code>library(DMRcate)</code></pre>
+<pre><code>Setting options(&#39;download.file.method.GEOquery&#39;=&#39;auto&#39;)</code></pre>
+<pre><code>Setting options(&#39;GEOquery.inmemory.gpl&#39;=FALSE)</code></pre>
+<pre><code></code></pre>
+<pre class="r"><code>library(limma)
+library(edgeR)
+library(minfi)</code></pre>
+<pre><code>Loading required package: BiocGenerics</code></pre>
+<pre><code>
+Attaching package: &#39;BiocGenerics&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:limma&#39;:
+
+    plotMA</code></pre>
+<pre><code>The following objects are masked from &#39;package:stats&#39;:
+
+    IQR, mad, sd, var, xtabs</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    anyDuplicated, aperm, append, as.data.frame, basename, cbind,
+    colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
+    get, grep, grepl, intersect, is.unsorted, lapply, Map, mapply,
+    match, mget, order, paste, pmax, pmax.int, pmin, pmin.int,
+    Position, rank, rbind, Reduce, rownames, sapply, setdiff, table,
+    tapply, union, unique, unsplit, which.max, which.min</code></pre>
+<pre><code>Loading required package: GenomicRanges</code></pre>
+<pre><code>Loading required package: stats4</code></pre>
+<pre><code>Loading required package: S4Vectors</code></pre>
+<pre><code>
+Attaching package: &#39;S4Vectors&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:utils&#39;:
+
+    findMatches</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    expand.grid, I, unname</code></pre>
+<pre><code>Loading required package: IRanges</code></pre>
+<pre><code>Loading required package: GenomeInfoDb</code></pre>
+<pre><code>Loading required package: SummarizedExperiment</code></pre>
+<pre><code>Loading required package: MatrixGenerics</code></pre>
+<pre><code>Loading required package: matrixStats</code></pre>
+<pre><code>
+Attaching package: &#39;MatrixGenerics&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:matrixStats&#39;:
+
+    colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse,
+    colCounts, colCummaxs, colCummins, colCumprods, colCumsums,
+    colDiffs, colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs,
+    colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats,
+    colProds, colQuantiles, colRanges, colRanks, colSdDiffs, colSds,
+    colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
+    colWeightedMeans, colWeightedMedians, colWeightedSds,
+    colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet,
+    rowCollapse, rowCounts, rowCummaxs, rowCummins, rowCumprods,
+    rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps,
+    rowMadDiffs, rowMads, rowMaxs, rowMeans2, rowMedians, rowMins,
+    rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks,
+    rowSdDiffs, rowSds, rowSums2, rowTabulates, rowVarDiffs, rowVars,
+    rowWeightedMads, rowWeightedMeans, rowWeightedMedians,
+    rowWeightedSds, rowWeightedVars</code></pre>
+<pre><code>Loading required package: Biobase</code></pre>
+<pre><code>Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    &#39;browseVignettes()&#39;. To cite Bioconductor, see
+    &#39;citation(&quot;Biobase&quot;)&#39;, and for packages &#39;citation(&quot;pkgname&quot;)&#39;.</code></pre>
+<pre><code>
+Attaching package: &#39;Biobase&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:MatrixGenerics&#39;:
+
+    rowMedians</code></pre>
+<pre><code>The following objects are masked from &#39;package:matrixStats&#39;:
+
+    anyMissing, rowMedians</code></pre>
+<pre><code>Loading required package: Biostrings</code></pre>
+<pre><code>Loading required package: XVector</code></pre>
+<pre><code>
+Attaching package: &#39;Biostrings&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:base&#39;:
+
+    strsplit</code></pre>
+<pre><code>Loading required package: bumphunter</code></pre>
+<pre><code>Loading required package: foreach</code></pre>
+<pre><code>Loading required package: iterators</code></pre>
+<pre><code>Loading required package: parallel</code></pre>
+<pre><code>Loading required package: locfit</code></pre>
+<pre><code>locfit 1.5-9.11      2025-01-27</code></pre>
+<pre class="r"><code>library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylationEPICmanifest)
+library(RColorBrewer)
+
+library(plyranges)</code></pre>
+<pre><code>
+Attaching package: &#39;plyranges&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:XVector&#39;:
+
+    slice</code></pre>
+<pre><code>The following object is masked from &#39;package:IRanges&#39;:
+
+    slice</code></pre>
+<pre><code>The following object is masked from &#39;package:stats&#39;:
+
+    filter</code></pre>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>
+Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:plyranges&#39;:
+
+    between, n, n_distinct</code></pre>
+<pre><code>The following object is masked from &#39;package:minfi&#39;:
+
+    combine</code></pre>
+<pre><code>The following objects are masked from &#39;package:Biostrings&#39;:
+
+    collapse, intersect, setdiff, setequal, union</code></pre>
+<pre><code>The following object is masked from &#39;package:XVector&#39;:
+
+    slice</code></pre>
+<pre><code>The following object is masked from &#39;package:Biobase&#39;:
+
+    combine</code></pre>
+<pre><code>The following object is masked from &#39;package:matrixStats&#39;:
+
+    count</code></pre>
+<pre><code>The following objects are masked from &#39;package:GenomicRanges&#39;:
+
+    intersect, setdiff, union</code></pre>
+<pre><code>The following object is masked from &#39;package:GenomeInfoDb&#39;:
+
+    intersect</code></pre>
+<pre><code>The following objects are masked from &#39;package:IRanges&#39;:
+
+    collapse, desc, intersect, setdiff, slice, union</code></pre>
+<pre><code>The following objects are masked from &#39;package:S4Vectors&#39;:
+
+    first, intersect, rename, setdiff, setequal, union</code></pre>
+<pre><code>The following objects are masked from &#39;package:BiocGenerics&#39;:
+
+    combine, intersect, setdiff, union</code></pre>
+<pre><code>The following objects are masked from &#39;package:stats&#39;:
+
+    filter, lag</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(stringr)
+library(ggplot2)
+library(ggVennDiagram)</code></pre>
+</div>
+<div id="reading-in-data" class="section level1">
+<h1>Reading in data</h1>
+<pre class="r"><code>file_source &lt;- c(&quot;natural_killer&quot;, &quot;b_cell&quot;)
+files_new &lt;- character()
+for(i in 1:2) {
+  files &lt;- list.files(paste0(&quot;../data/microarray/&quot;, file_source[i])) %&gt;% gsub(&quot;.idat.gz&quot;, &quot;&quot;, .)
+  files &lt;- files[!grepl(&quot;Red&quot;, files)]
+  files &lt;- files %&gt;% gsub(&quot;_Grn&quot;, &quot;&quot;, .)
+  files &lt;- paste0(&quot;../data/microarray/&quot;, file_source[i], &quot;/&quot;, files)
+  files_new &lt;- c(files_new, files)
+}
+files_new</code></pre>
+<pre><code> [1] &quot;../data/microarray/natural_killer/GSM2998022_201868500150_R03C01&quot;
+ [2] &quot;../data/microarray/natural_killer/GSM2998025_201868500150_R08C01&quot;
+ [3] &quot;../data/microarray/natural_killer/GSM2998027_201868590193_R02C01&quot;
+ [4] &quot;../data/microarray/natural_killer/GSM2998126_201870610056_R07C01&quot;
+ [5] &quot;../data/microarray/natural_killer/GSM2998131_201870610111_R01C01&quot;
+ [6] &quot;../data/microarray/natural_killer/GSM2998149_201870610111_R07C01&quot;
+ [7] &quot;../data/microarray/b_cell/GSM2998024_201868500150_R07C01&quot;        
+ [8] &quot;../data/microarray/b_cell/GSM2998029_201868590193_R06C01&quot;        
+ [9] &quot;../data/microarray/b_cell/GSM2998087_201869680009_R06C01&quot;        
+[10] &quot;../data/microarray/b_cell/GSM2998100_201869680030_R02C01&quot;        
+[11] &quot;../data/microarray/b_cell/GSM2998122_201870610056_R04C01&quot;        
+[12] &quot;../data/microarray/b_cell/GSM2998134_201870610111_R02C01&quot;        </code></pre>
+<pre class="r"><code>blood_samples &lt;- cbind(sample_num = 1:12) %&gt;% data.frame()
+blood_samples &lt;- blood_samples %&gt;% mutate(sample_group = rep(file_source, times = 6) %&gt;% .[order(., decreasing = TRUE)])
+blood_samples &lt;- blood_samples %&gt;% mutate(sample_id = substring(files_new, first = stringr::str_locate(files_new, &quot;G&quot;)[,1])
+)
+blood_samples &lt;- blood_samples %&gt;% mutate(short_group = ifelse(sample_group == &quot;natural_killer&quot;, &quot;NK&quot;, &quot;B&quot;))
+blood_samples &lt;- blood_samples %&gt;% mutate(id_group = paste0(short_group, &quot;_&quot;, substring(sample_id, first = 1, last = stringr::str_locate(sample_id, &quot;_&quot;)[,1] - 1)))
+blood_samples</code></pre>
+<pre><code>   sample_num   sample_group                      sample_id short_group
+1           1 natural_killer GSM2998022_201868500150_R03C01          NK
+2           2 natural_killer GSM2998025_201868500150_R08C01          NK
+3           3 natural_killer GSM2998027_201868590193_R02C01          NK
+4           4 natural_killer GSM2998126_201870610056_R07C01          NK
+5           5 natural_killer GSM2998131_201870610111_R01C01          NK
+6           6 natural_killer GSM2998149_201870610111_R07C01          NK
+7           7         b_cell GSM2998024_201868500150_R07C01           B
+8           8         b_cell GSM2998029_201868590193_R06C01           B
+9           9         b_cell GSM2998087_201869680009_R06C01           B
+10         10         b_cell GSM2998100_201869680030_R02C01           B
+11         11         b_cell GSM2998122_201870610056_R04C01           B
+12         12         b_cell GSM2998134_201870610111_R02C01           B
+        id_group
+1  NK_GSM2998022
+2  NK_GSM2998025
+3  NK_GSM2998027
+4  NK_GSM2998126
+5  NK_GSM2998131
+6  NK_GSM2998149
+7   B_GSM2998024
+8   B_GSM2998029
+9   B_GSM2998087
+10  B_GSM2998100
+11  B_GSM2998122
+12  B_GSM2998134</code></pre>
+<pre class="r"><code>rgSet &lt;- read.metharray(files_new)
+rgSet</code></pre>
+<pre><code>class: RGChannelSet 
+dim: 1051815 12 
+metadata(0):
+assays(2): Green Red
+rownames(1051815): 1600101 1600111 ... 99810990 99810992
+rowData names(0):
+colnames(12): GSM2998022_201868500150_R03C01
+  GSM2998025_201868500150_R08C01 ... GSM2998122_201870610056_R04C01
+  GSM2998134_201870610111_R02C01
+colData names(0):
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19</code></pre>
+</div>
+<div id="pre-processing" class="section level1">
+<h1>Pre-processing</h1>
+<pre class="r"><code>sampleNames(rgSet) &lt;- blood_samples$id_group
+head(rgSet)</code></pre>
+<pre><code>class: RGChannelSet 
+dim: 6 12 
+metadata(0):
+assays(2): Green Red
+rownames(6): 1600101 1600111 ... 1600131 1600135
+rowData names(0):
+colnames(12): NK_GSM2998022 NK_GSM2998025 ... B_GSM2998122 B_GSM2998134
+colData names(0):
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19</code></pre>
+<pre class="r"><code># calculate the detection p-values
+detP &lt;- detectionP(rgSet)
+head(detP)</code></pre>
+<pre><code>           NK_GSM2998022 NK_GSM2998025 NK_GSM2998027 NK_GSM2998126
+cg18478105             0             0             0             0
+cg09835024             0             0             0             0
+cg14361672             0             0             0             0
+cg01763666             0             0             0             0
+cg12950382             0             0             0             0
+cg02115394             0             0             0             0
+           NK_GSM2998131 NK_GSM2998149 B_GSM2998024 B_GSM2998029 B_GSM2998087
+cg18478105             0             0            0            0            0
+cg09835024             0             0            0            0            0
+cg14361672             0             0            0            0            0
+cg01763666             0             0            0            0            0
+cg12950382             0             0            0            0            0
+cg02115394             0             0            0            0            0
+           B_GSM2998100 B_GSM2998122 B_GSM2998134
+cg18478105            0            0            0
+cg09835024            0            0            0
+cg14361672            0            0            0
+cg01763666            0            0            0
+cg12950382            0            0            0
+cg02115394            0            0            0</code></pre>
+<pre class="r"><code># examine mean detection p-values across all samples to identify any failed samples
+pal &lt;- brewer.pal(8,&quot;Dark2&quot;)
+par(mfrow=c(1,2))
+barplot(colMeans(detP), col=pal[factor(blood_samples$short_group)], las=2,
+         cex.names=0.8,ylab=&quot;Mean detection p-values&quot;)
+abline(h=0.01,col=&quot;red&quot;)
+legend(&quot;topleft&quot;, legend=levels(factor(blood_samples$short_group)), fill=pal,
+        bg=&quot;white&quot;)
+
+barplot(colMeans(detP), col=pal[factor(blood_samples$short_group)], las=2,
+         cex.names=0.8, ylim = c(0,0.002), ylab=&quot;Mean detection p-values&quot;)
+legend(&quot;topleft&quot;, legend=levels(factor(blood_samples$short_group)), fill=pal,
+        bg=&quot;white&quot;)</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># remove poor quality samples
+keep &lt;- colMeans(detP) &lt; 0.05
+keep</code></pre>
+<pre><code>NK_GSM2998022 NK_GSM2998025 NK_GSM2998027 NK_GSM2998126 NK_GSM2998131 
+         TRUE          TRUE          TRUE          TRUE          TRUE 
+NK_GSM2998149  B_GSM2998024  B_GSM2998029  B_GSM2998087  B_GSM2998100 
+         TRUE          TRUE          TRUE          TRUE          TRUE 
+ B_GSM2998122  B_GSM2998134 
+         TRUE          TRUE </code></pre>
+<pre class="r"><code>rgSet &lt;- rgSet[,keep]
+rgSet</code></pre>
+<pre><code>class: RGChannelSet 
+dim: 1051815 12 
+metadata(0):
+assays(2): Green Red
+rownames(1051815): 1600101 1600111 ... 99810990 99810992
+rowData names(0):
+colnames(12): NK_GSM2998022 NK_GSM2998025 ... B_GSM2998122 B_GSM2998134
+colData names(0):
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19</code></pre>
+<pre class="r"><code># normalize the data; this results in a GenomicRatioSet object
+mSetSq &lt;- preprocessQuantile(rgSet)</code></pre>
+<pre><code>[preprocessQuantile] Mapping to genome.</code></pre>
+<pre><code>[preprocessQuantile] Fixing outliers.</code></pre>
+<pre><code>[preprocessQuantile] Quantile normalizing.</code></pre>
+<pre class="r"><code>mSetSq</code></pre>
+<pre><code>class: GenomicRatioSet 
+dim: 865859 12 
+metadata(0):
+assays(2): M CN
+rownames(865859): cg14817997 cg26928153 ... cg07587934 cg16855331
+rowData names(0):
+colnames(12): NK_GSM2998022 NK_GSM2998025 ... B_GSM2998122 B_GSM2998134
+colData names(3): xMed yMed predictedSex
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19
+Preprocessing
+  Method: Raw (no normalization or bg correction)
+  minfi version: 1.50.0
+  Manifest version: 0.3.0</code></pre>
+<pre class="r"><code># create a MethylSet object from the raw data for plotting
+mSetRaw &lt;- preprocessRaw(rgSet)
+mSetRaw</code></pre>
+<pre><code>class: MethylSet 
+dim: 866091 12 
+metadata(0):
+assays(2): Meth Unmeth
+rownames(866091): cg18478105 cg09835024 ... cg10633746 cg12623625
+rowData names(0):
+colnames(12): NK_GSM2998022 NK_GSM2998025 ... B_GSM2998122 B_GSM2998134
+colData names(0):
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19
+Preprocessing
+  Method: Raw (no normalization or bg correction)
+  minfi version: 1.50.0
+  Manifest version: 0.3.0</code></pre>
+<pre class="r"><code># visualise what the data looks like before and after normalisation
+par(mfrow=c(1,2))
+densityPlot(rgSet, sampGroups=blood_samples$short_group,main=&quot;Raw&quot;, legend=FALSE)
+legend(&quot;top&quot;, legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,&quot;Dark2&quot;))
+densityPlot(getBeta(mSetSq), sampGroups=blood_samples$short_group,
+              main=&quot;Normalized&quot;, legend=FALSE)
+legend(&quot;top&quot;, legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,&quot;Dark2&quot;))</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-8-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># MDS plots to look at largest sources of variation
+par(mfrow=c(1,2))
+plotMDS(getM(mSetSq), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)])
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$sample_num)])
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$sample_num)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>par(mfrow=c(1,3))
+plotMDS(getM(mSetSq), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)], dim = c(1,3))
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)], dim = c(2,3))
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)
+
+plotMDS(getM(mSetSq), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)], dim = c(3,4))
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># ensure probes are in the same order in the mSetSq and detP objects
+detP &lt;- detP[match(featureNames(mSetSq),rownames(detP)),]
+
+# remove any probes that have failed in one or more samples
+keep &lt;- rowSums(detP &lt; 0.01) == ncol(mSetSq)
+table(keep)</code></pre>
+<pre><code>keep
+ FALSE   TRUE 
+  1354 864505 </code></pre>
+<pre class="r"><code>mSetSqFlt &lt;- mSetSq[keep,]
+mSetSqFlt</code></pre>
+<pre><code>class: GenomicRatioSet 
+dim: 864505 12 
+metadata(0):
+assays(2): M CN
+rownames(864505): cg14817997 cg26928153 ... cg07587934 cg16855331
+rowData names(0):
+colnames(12): NK_GSM2998022 NK_GSM2998025 ... B_GSM2998122 B_GSM2998134
+colData names(3): xMed yMed predictedSex
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19
+Preprocessing
+  Method: Raw (no normalization or bg correction)
+  minfi version: 1.50.0
+  Manifest version: 0.3.0</code></pre>
+<pre class="r"><code>anno_array &lt;- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+anno_array &lt;- anno_array %&gt;% data.frame() %&gt;% mutate(seqnames = chr, start = pos, width = 1) %&gt;% relocate(c(seqnames, start, width))
+nrow(anno_array)</code></pre>
+<pre><code>[1] 865859</code></pre>
+<pre class="r"><code>head(anno_array)</code></pre>
+<pre><code>           seqnames     start width   chr       pos strand       Name AddressA
+cg18478105    chr20  61847650     1 chr20  61847650      - cg18478105 46761277
+cg09835024     chrX  24072640     1  chrX  24072640      - cg09835024 16745152
+cg14361672     chr9 131463936     1  chr9 131463936      + cg14361672 51800947
+cg01763666    chr17  80159506     1 chr17  80159506      + cg01763666 37768834
+cg12950382    chr14 105176736     1 chr14 105176736      + cg12950382  8726444
+cg02115394    chr13 115000168     1 chr13 115000168      + cg02115394 68602543
+           AddressB                                          ProbeSeqA
+cg18478105 86644198 AAATAAATTTCACTCTCAAATCCCAATCTCATACAACAAAACAAAAACCA
+cg09835024 81631976 AATAAACACCAACCCCAAACCAATCTCACTTTATTAAATTACAAAAATCA
+cg14361672  7743487 ATCACTACCTAATCTATAACAAACCATTCAACCCATCCTAACATCCTACA
+cg01763666 23754592 AAACAAAAATAAACAAACTCAAAATAAAAACAACTAAACTAAAACAAACA
+cg12950382 76660327 ATACCAAAAAATAACAATATACTTATATATATACACATACCCAAATAACA
+cg02115394 59659581 AAAATCACTACAACACCTCTAAACATTAACAAAAAAATCAAAAAAACTCA
+                                                    ProbeSeqB Type NextBase
+cg18478105 AAATAAATTTCGCTCTCAAATCCCAATCTCGTACGACGAAACGAAAACCG    I        C
+cg09835024 AATAAACGCCGACCCCGAACCGATCTCGCTTTATTAAATTACAAAAATCG    I        A
+cg14361672 ATCACTACCTAATCTATAACGAACCATTCAACCCGTCCTAACATCCTACG    I        T
+cg01763666 GAACAAAAATAAACGAACTCAAAATAAAAACAACTAAACTAAAACAAACG    I        C
+cg12950382 GTACCGAAAAATAACAATATACTTATATATATACACGTACCCGAATAACG    I        A
+cg02115394 AAAATCGCTACGACGCCTCTAAACATTAACGAAAAAATCAAAAAAACTCG    I        A
+           Color   Probe_rs Probe_maf CpG_rs CpG_maf SBE_rs SBE_maf
+cg18478105   Grn       &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA
+cg09835024   Red       &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA
+cg14361672   Red       &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA
+cg01763666   Grn       &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA
+cg12950382   Red rs12882277  0.378464   &lt;NA&gt;      NA   &lt;NA&gt;      NA
+cg02115394   Red       &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA
+                        Islands_Name Relation_to_Island
+cg18478105   chr20:61846843-61848103             Island
+cg09835024    chrX:24072558-24073135             Island
+cg14361672  chr9:131464843-131465830            N_Shore
+cg01763666                                      OpenSea
+cg12950382                                      OpenSea
+cg02115394 chr13:115000148-115000874             Island
+                                                                                                                       Forward_Sequence
+cg18478105 TCCCGTCTTACGGGATGGATTTCGCTCTCAGGTCCCAGTCTCGTGCGGCGGGGCGGGGAC[CG]CAGCCGGCTGGGCGGGGAAGCCCTGAGCCGGGGAAGTCACGTGGGGCGTGTCCGGAGGCG
+cg09835024 AGCCCCGTCATAGGTGGGCGCCGACCCCGAGCCGATCTCGCTTTATTAAATTACAGAAAT[CG]GTATTCAAAAAAAAAAAAAAAAAAGGGCGGGGAGGACACTCCCTCTTCTCTGTTCCCACA
+cg14361672 TCACCTTCCCACCTCCTGGAGGACGCTCCTCCACGAAGTGCTGACACAACCTCCTGTAAA[CG]CAGGATGCCAGGACGGGCTGAATGGCCCGCCATAGACTAGGCAGTGACCAGCACACCTCC
+cg01763666 CTGGAATGCCAGCTGCTGCTGCTGCTGCAGCTCCTCCACCTTCCTGGCCTCTCTGGCTAG[CG]CCTGCCTCAGCTTAGCTGCCTCTATCTTGAGCTCGCTCACCTCTGCCCGCCTGGCCTCTT
+cg12950382 CCCTGCTGCCACCACCTCGGTGCACACACCTACTGGACGCACAGACACACGCATGCCCAC[CG]CCACTCGGGCACGTGCACACACACAAGCACACTGCCACTCTCCGGCACGCGCACACACAA
+cg02115394 TTCTGGGGAAAGAAGGCTCAGCAGCCACCTGCTTTTTTGCCCGGGTGGGTGGTCCGGCCC[CG]AGCCCTCCTGACTCTCTCGCCAATGCCCAGAGGCGCCGCAGCGATTCCAGGGAGGCCGCG
+                                                    SourceSeq UCSC_RefGene_Name
+cg18478105 CGGTCCCCGCCCCGCCGCACGAGACTGGGACCTGAGAGCGAAATCCATCC            YTHDF1
+cg09835024 GGTGGGCGCCGACCCCGAGCCGATCTCGCTTTATTAAATTACAGAAATCG            EIF2S3
+cg14361672 CGCAGGATGCCAGGACGGGCTGAATGGCCCGCCATAGACTAGGCAGTGAC              PKN3
+cg01763666 CGCCTGCCTCAGCTTAGCTGCCTCTATCTTGAGCTCGCTCACCTCTGCCC            CCDC57
+cg12950382 CGCCACTCGGGCACGTGCACACACACAAGCACACTGCCACTCTCCGGCAC         INF2;INF2
+cg02115394 GGAATCGCTGCGGCGCCTCTGGGCATTGGCGAGAGAGTCAGGAGGGCTCG       CDC16;CDC16
+           UCSC_RefGene_Accession UCSC_RefGene_Group Phantom4_Enhancers
+cg18478105              NM_017798             TSS200                   
+cg09835024              NM_001415            TSS1500                   
+cg14361672              NM_013355            TSS1500                   
+cg01763666              NM_198082               Body                   
+cg12950382 NM_022489;NM_001031714          Body;Body                   
+cg02115394 NM_003903;NM_001078645      TSS200;TSS200                   
+           Phantom5_Enhancers DMR X450k_Enhancer             HMM_Island
+cg18478105                                         20:61317142-61318498
+cg09835024                                                             
+cg14361672                                                             
+cg01763666                                         17:77752688-77752973
+cg12950382                                       14:104247518-104247873
+cg02115394                                       13:114018251-114018976
+           Regulatory_Feature_Name Regulatory_Feature_Group
+cg18478105    20:61846284-61847956      Promoter_Associated
+cg09835024     X:24071907-24073667      Promoter_Associated
+cg14361672                                                 
+cg01763666                                                 
+cg12950382                                                 
+cg02115394  13:115000009-115001429      Promoter_Associated
+                    GencodeBasicV12_NAME
+cg18478105                 YTHDF1;YTHDF1
+cg09835024                        EIF2S3
+cg14361672                          PKN3
+cg01763666                              
+cg12950382                              
+cg02115394 CDC16;CDC16;CDC16;CDC16;CDC16
+                                                                           GencodeBasicV12_Accession
+cg18478105                                                       ENST00000370334.4;ENST00000370339.3
+cg09835024                                                                         ENST00000253039.4
+cg14361672                                                                         ENST00000291906.4
+cg01763666                                                                                          
+cg12950382                                                                                          
+cg02115394 ENST00000375312.3;ENST00000356221.3;ENST00000375310.1;ENST00000252457.5;ENST00000252458.6
+                            GencodeBasicV12_Group
+cg18478105                          TSS200;TSS200
+cg09835024                                 TSS200
+cg14361672                                TSS1500
+cg01763666                                       
+cg12950382                                       
+cg02115394 TSS200;TSS1500;TSS1500;TSS1500;TSS1500
+                           GencodeCompV12_NAME
+cg18478105                       YTHDF1;YTHDF1
+cg09835024                EIF2S3;EIF2S3;EIF2S3
+cg14361672                                PKN3
+cg01763666                                    
+cg12950382                           INF2;INF2
+cg02115394 CDC16;CDC16;CDC16;CDC16;CDC16;CDC16
+                                                                                              GencodeCompV12_Accession
+cg18478105                                                                         ENST00000370334.4;ENST00000370339.3
+cg09835024                                                       ENST00000487075.1;ENST00000423068.1;ENST00000253039.4
+cg14361672                                                                                           ENST00000291906.4
+cg01763666                                                                                                            
+cg12950382                                                                         ENST00000474229.1;ENST00000480763.1
+cg02115394 ENST00000360383.3;ENST00000356221.3;ENST00000375310.1;ENST00000494766.1;ENST00000375308.1;ENST00000252458.6
+                                     GencodeCompV12_Group
+cg18478105                                  TSS200;TSS200
+cg09835024                         TSS1500;TSS1500;TSS200
+cg14361672                                        TSS1500
+cg01763666                                               
+cg12950382                                  5&#39;UTR;TSS1500
+cg02115394 TSS200;TSS1500;TSS1500;TSS1500;TSS1500;TSS1500
+           DNase_Hypersensitivity_NAME DNase_Hypersensitivity_Evidence_Count
+cg18478105     chr20:61847520-61847755                                     3
+cg09835024      chrX:24072600-24073395                                     3
+cg14361672                                                                  
+cg01763666     chr17:80159145-80159790                                     3
+cg12950382                                                                  
+cg02115394                                                                  
+                  OpenChromatin_NAME OpenChromatin_Evidence_Count TFBS_NAME
+cg18478105                                                                 
+cg09835024                                                                 
+cg14361672  chr9:131463740-131463970                            3          
+cg01763666                                                                 
+cg12950382 chr14:105171651-105183138                            6          
+cg02115394 chr13:114999804-115001809                            6          
+           TFBS_Evidence_Count Methyl27_Loci Methyl450_Loci Random_Loci
+cg18478105                                             TRUE            
+cg09835024                                             TRUE            
+cg14361672                                             TRUE            
+cg01763666                                             TRUE            
+cg12950382                                             TRUE            
+cg02115394                                             TRUE            </code></pre>
+<pre class="r"><code>keep &lt;- featureNames(mSetSqFlt) %in% anno_array$Name
+table(keep)</code></pre>
+<pre><code>keep
+  TRUE 
+864505 </code></pre>
+<pre class="r"><code>mSetSqFlt &lt;- mSetSqFlt[keep,]</code></pre>
+<pre class="r"><code># if your data includes males and females, remove probes on the sex chromosomes
+keep &lt;- !(featureNames(mSetSqFlt) %in% anno_array$Name[anno_array$seqnames %in%
+                                                               c(&quot;chrX&quot;,&quot;chrY&quot;)])
+table(keep)</code></pre>
+<pre><code>keep
+ FALSE   TRUE 
+ 19234 845271 </code></pre>
+<pre class="r"><code>mSetSqFlt &lt;- mSetSqFlt[keep,]</code></pre>
+<pre class="r"><code># remove probes with SNPs at CpG site
+mSetSqFlt &lt;- dropLociWithSnps(mSetSqFlt)
+mSetSqFlt</code></pre>
+<pre><code>class: GenomicRatioSet 
+dim: 815590 12 
+metadata(0):
+assays(2): M CN
+rownames(815590): cg14817997 cg26928153 ... cg07660283 cg09226288
+rowData names(0):
+colnames(12): NK_GSM2998022 NK_GSM2998025 ... B_GSM2998122 B_GSM2998134
+colData names(3): xMed yMed predictedSex
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19
+Preprocessing
+  Method: Raw (no normalization or bg correction)
+  minfi version: 1.50.0
+  Manifest version: 0.3.0</code></pre>
+<pre class="r"><code>cross_reactive_probes &lt;- read.table(&quot;../data/microarray/cross_reactive_probes_supp2.txt&quot;)
+nrow(cross_reactive_probes)</code></pre>
+<pre><code>[1] 42558</code></pre>
+<pre class="r"><code>head(cross_reactive_probes)</code></pre>
+<pre><code>          V1
+1 cg00001510
+2 cg00002590
+3 cg00003969
+4 cg00004121
+5 cg00004192
+6 cg00004209</code></pre>
+<pre class="r"><code>keep &lt;- !(featureNames(mSetSqFlt) %in% cross_reactive_probes$V1)
+table(keep)</code></pre>
+<pre><code>keep
+ FALSE   TRUE 
+ 38925 776665 </code></pre>
+<pre class="r"><code>mSetSqFlt &lt;- mSetSqFlt[keep,]
+mSetSqFlt</code></pre>
+<pre><code>class: GenomicRatioSet 
+dim: 776665 12 
+metadata(0):
+assays(2): M CN
+rownames(776665): cg26928153 cg16269199 ... cg19565306 cg09226288
+rowData names(0):
+colnames(12): NK_GSM2998022 NK_GSM2998025 ... B_GSM2998122 B_GSM2998134
+colData names(3): xMed yMed predictedSex
+Annotation
+  array: IlluminaHumanMethylationEPIC
+  annotation: ilm10b4.hg19
+Preprocessing
+  Method: Raw (no normalization or bg correction)
+  minfi version: 1.50.0
+  Manifest version: 0.3.0</code></pre>
+<pre class="r"><code>par(mfrow=c(1,2))
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)], cex=0.8)
+legend(&quot;right&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        cex=0.65, bg=&quot;white&quot;)
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$sample_num)])
+legend(&quot;right&quot;, legend=levels(factor(blood_samples$sample_num)), text.col=pal,
+        cex=0.7, bg=&quot;white&quot;)</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-19-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>par(mfrow=c(1,3))
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)], dim = c(1,3))
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)], dim = c(2,3))
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)
+
+plotMDS(getM(mSetSqFlt), top=1000, gene.selection=&quot;common&quot;,
+         col=pal[factor(blood_samples$short_group)], dim = c(3,4))
+legend(&quot;top&quot;, legend=levels(factor(blood_samples$short_group)), text.col=pal,
+        bg=&quot;white&quot;, cex=0.7)</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>mVals &lt;- getM(mSetSqFlt)
+head(mVals[,1:5])</code></pre>
+<pre><code>           NK_GSM2998022 NK_GSM2998025 NK_GSM2998027 NK_GSM2998126
+cg26928153      2.376519     2.3212529     2.5833127     2.4733269
+cg16269199      1.195006     1.0723985     1.4521405     1.4945754
+cg13869341      2.002663     1.8157279     1.8925120     2.4929067
+cg24669183      1.785647     1.7564415     1.9988501     1.6793392
+cg26679879     -1.128457    -1.0423952    -0.5383319    -0.5321080
+cg22519184     -1.170990    -0.9967624    -0.5123484    -0.6901056
+           NK_GSM2998131
+cg26928153     2.1177105
+cg16269199     1.4078598
+cg13869341     1.8608433
+cg24669183     1.9148562
+cg26679879    -0.7715623
+cg22519184    -0.7880798</code></pre>
+<pre class="r"><code>bVals &lt;- getBeta(mSetSqFlt)
+head(bVals[,1:5])</code></pre>
+<pre><code>           NK_GSM2998022 NK_GSM2998025 NK_GSM2998027 NK_GSM2998126
+cg26928153     0.8385227     0.8332683     0.8570028     0.8474035
+cg16269199     0.6959985     0.6777236     0.7323439     0.7380699
+cg13869341     0.8002951     0.7787793     0.7878124     0.8491502
+cg24669183     0.7751663     0.7716184     0.7998724     0.7620641
+cg26679879     0.3138488     0.3268354     0.4077817     0.4088240
+cg22519184     0.3075350     0.3338322     0.4121383     0.3826431
+           NK_GSM2998131
+cg26928153     0.8127357
+cg16269199     0.7262848
+cg13869341     0.7841198
+cg24669183     0.7903899
+cg26679879     0.3693966
+cg22519184     0.3667336</code></pre>
+<pre class="r"><code>par(mfrow=c(1,2))
+densityPlot(bVals, sampGroups=blood_samples$short_group, main=&quot;Beta values&quot;,
+             legend=FALSE, xlab=&quot;Beta values&quot;)
+legend(&quot;top&quot;, legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,&quot;Dark2&quot;))
+densityPlot(mVals, sampGroups=blood_samples$short_group, main=&quot;M-values&quot;,
+             legend=FALSE, xlab=&quot;M values&quot;)
+legend(&quot;topleft&quot;, legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,&quot;Dark2&quot;))</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-23-1.png" width="672" style="display: block; margin: auto;" /></p>
+<div id="differential-methylation-methods" class="section level2">
+<h2>Differential methylation methods</h2>
+</div>
+</div>
+<div id="minfi" class="section level1">
+<h1>Minfi</h1>
+<pre class="r"><code># this is the factor of interest
+cellType &lt;- factor(blood_samples$short_group)
+# this is the individual effect that we need to account for
+individual &lt;- factor(blood_samples$id_group)
+
+# use the above to create a design matrix
+#design &lt;- model.matrix(~0+cellType+individual, data=blood_samples)
+#colnames(design) &lt;- c(levels(cellType),levels(individual)[-1])
+design &lt;- model.matrix(~0+cellType, data=blood_samples)
+colnames(design) &lt;- c(levels(cellType))
+design</code></pre>
+<pre><code>   B NK
+1  0  1
+2  0  1
+3  0  1
+4  0  1
+5  0  1
+6  0  1
+7  1  0
+8  1  0
+9  1  0
+10 1  0
+11 1  0
+12 1  0
+attr(,&quot;assign&quot;)
+[1] 1 1
+attr(,&quot;contrasts&quot;)
+attr(,&quot;contrasts&quot;)$cellType
+[1] &quot;contr.treatment&quot;</code></pre>
+<pre class="r"><code># fit the linear model
+fit &lt;- lmFit(mVals, design)
+
+# create a contrast matrix for specific comparisons
+contMatrix &lt;- makeContrasts(NK-B,
+                  levels=design)
+contMatrix</code></pre>
+<pre><code>      Contrasts
+Levels NK - B
+    B      -1
+    NK      1</code></pre>
+<pre class="r"><code># fit the contrasts
+fit2 &lt;- contrasts.fit(fit, contMatrix)
+fit2 &lt;- eBayes(fit2)
+
+# look at the numbers of DM CpGs at FDR &lt; 0.05
+summary(decideTests(fit2))</code></pre>
+<pre><code>       NK - B
+Down   107283
+NotSig 564569
+Up     104813</code></pre>
+<pre class="r"><code># get the table of results for the first contrast
+# do for 2nd contrast - nk - b
+annoSub &lt;- anno_array[match(rownames(mVals),anno_array$Name),
+                         c(1:3,9)]
+DMPs &lt;- topTable(fit2,  num=Inf, coef=1, genelist=annoSub)
+nrow(DMPs)</code></pre>
+<pre><code>[1] 776665</code></pre>
+<pre class="r"><code>head(DMPs)</code></pre>
+<pre><code>           seqnames     start width AddressB     logFC    AveExpr         t
+cg15949485     chr2  99273454     1          -5.737982 -0.4955390 -72.04207
+cg17092391     chr7  73515902     1           5.898663 -0.5920786  70.76621
+cg11661493    chr17  74423978     1           6.428390 -0.5212259  70.70861
+cg07021509     chr8  61892203     1           6.790302 -0.6455871  70.40347
+cg01165928     chr7 102082517     1           6.220094 -0.2474618  70.02329
+cg18664915     chr7   1043861     1           5.903508 -0.1854076  69.91840
+                P.Value    adj.P.Val        B
+cg15949485 2.400819e-19 3.298931e-14 33.52771
+cg17092391 3.078692e-19 3.298931e-14 33.34358
+cg11661493 3.113780e-19 3.298931e-14 33.33514
+cg07021509 3.306948e-19 3.298931e-14 33.29026
+cg01165928 3.565771e-19 3.298931e-14 33.23389
+cg18664915 3.640940e-19 3.298931e-14 33.21826</code></pre>
+<pre class="r"><code>DMPs %&gt;% filter(adj.P.Val &lt; 0.05) %&gt;% nrow(.)</code></pre>
+<pre><code>[1] 212096</code></pre>
+<pre class="r"><code># plot the top 4 most significantly differentially methylated CpGs
+par(mfrow=c(2,2))
+sapply(rownames(DMPs)[1:4], function(cpg){
+  plotCpg(bVals, cpg=cpg, pheno=blood_samples$short_group, ylab = &quot;Beta values&quot;)
+})</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-28-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre><code>$cg15949485
+NULL
+
+$cg17092391
+NULL
+
+$cg11661493
+NULL
+
+$cg07021509
+NULL</code></pre>
+</div>
+<div id="dmrcate" class="section level1">
+<h1>DMRcate</h1>
+<pre class="r"><code>nrow(mVals)</code></pre>
+<pre><code>[1] 776665</code></pre>
+<pre class="r"><code>ALLMs.noSNPs &lt;- rmSNPandCH(mVals, rmcrosshyb = FALSE)</code></pre>
+<pre><code>Probe IDs from EPICv1 or earlier detected. Proceeding...</code></pre>
+<pre><code>see ?DMRcatedata and browseVignettes(&#39;DMRcatedata&#39;) for documentation</code></pre>
+<pre><code>loading from cache</code></pre>
+<pre class="r"><code>nrow(ALLMs.noSNPs)</code></pre>
+<pre><code>[1] 772927</code></pre>
+<pre class="r"><code>ALLMs.noSNPs %&gt;% data.frame() %&gt;% head()</code></pre>
+<pre><code>           NK_GSM2998022 NK_GSM2998025 NK_GSM2998027 NK_GSM2998126
+cg26928153      2.376519     2.3212529     2.5833127     2.4733269
+cg16269199      1.195006     1.0723985     1.4521405     1.4945754
+cg13869341      2.002663     1.8157279     1.8925120     2.4929067
+cg24669183      1.785647     1.7564415     1.9988501     1.6793392
+cg26679879     -1.128457    -1.0423952    -0.5383319    -0.5321080
+cg22519184     -1.170990    -0.9967624    -0.5123484    -0.6901056
+           NK_GSM2998131 NK_GSM2998149 B_GSM2998024 B_GSM2998029 B_GSM2998087
+cg26928153     2.1177105     2.4930439    2.4627237    2.2908430    2.1174863
+cg16269199     1.4078598     1.3890467    1.1758524    1.2514773    1.1630183
+cg13869341     1.8608433     1.8955422    1.8396427    1.8457617    1.9508710
+cg24669183     1.9148562     1.6015930    1.8338851    1.8691560    2.0808133
+cg26679879    -0.7715623    -1.1276719   -1.0042223   -0.6192842   -0.7790826
+cg22519184    -0.7880798    -0.9884659   -0.9757157   -0.8658221   -0.8096853
+           B_GSM2998100 B_GSM2998122 B_GSM2998134
+cg26928153    2.0807858     2.084757    2.1926477
+cg16269199    1.2742493     1.192080    1.3983498
+cg13869341    1.5789544     1.965692    2.5177627
+cg24669183    1.7130067     1.992926    1.7064747
+cg26679879   -0.3681687    -1.087983   -0.7976474
+cg22519184   -0.5155199    -1.086221   -0.8005237</code></pre>
+<pre class="r"><code>cellType &lt;- factor(blood_samples$short_group)
+
+design &lt;- model.matrix(~cellType)
+design</code></pre>
+<pre><code>   (Intercept) cellTypeNK
+1            1          1
+2            1          1
+3            1          1
+4            1          1
+5            1          1
+6            1          1
+7            1          0
+8            1          0
+9            1          0
+10           1          0
+11           1          0
+12           1          0
+attr(,&quot;assign&quot;)
+[1] 0 1
+attr(,&quot;contrasts&quot;)
+attr(,&quot;contrasts&quot;)$cellType
+[1] &quot;contr.treatment&quot;</code></pre>
+<pre class="r"><code>myannotation &lt;- cpg.annotate(&quot;array&quot;, ALLMs.noSNPs, arraytype = &quot;EPICv1&quot;,
+analysis.type=&quot;differential&quot;, design=design, coef=2, what = &quot;M&quot;)</code></pre>
+<pre><code>Your contrast returned 211508 individually significant probes. We recommend the default setting of pcutoff in dmrcate().</code></pre>
+<pre class="r"><code>dmrcate_array_anno &lt;- myannotation@ranges %&gt;% data.frame()
+head(dmrcate_array_anno)</code></pre>
+<pre><code>  seqnames  start    end width strand       stat         diff    rawpval
+1     chr1  10848  10848     1      *  1.9502987  0.018342788 0.07148299
+2     chr1  10850  10850     1      *  1.0534995  0.012897409 0.30998038
+3     chr1  15865  15865     1      *  0.2893456  0.005521236 0.77656348
+4     chr1 534242 534242     1      * -0.8153243 -0.009086828 0.42855896
+5     chr1 564501 564501     1      * -0.5550500 -0.012696647 0.58763201
+6     chr1 564504 564504     1      * -0.1274281 -0.002198261 0.90041629
+    ind.fdr is.sig
+1 0.1789794  FALSE
+2 0.4974908  FALSE
+3 0.8731868  FALSE
+4 0.6114140  FALSE
+5 0.7428771  FALSE
+6 0.9468056  FALSE</code></pre>
+<pre class="r"><code>dmrcate_array_anno %&gt;% filter(is.sig == TRUE) %&gt;% nrow(.)</code></pre>
+<pre><code>[1] 211508</code></pre>
+<pre class="r"><code>dmrcoutput &lt;- dmrcate(myannotation, lambda=1000, C=2)</code></pre>
+<pre><code>Fitting chr1...</code></pre>
+<pre><code>Fitting chr2...</code></pre>
+<pre><code>Fitting chr3...</code></pre>
+<pre><code>Fitting chr4...</code></pre>
+<pre><code>Fitting chr5...</code></pre>
+<pre><code>Fitting chr6...</code></pre>
+<pre><code>Fitting chr7...</code></pre>
+<pre><code>Fitting chr8...</code></pre>
+<pre><code>Fitting chr9...</code></pre>
+<pre><code>Fitting chr10...</code></pre>
+<pre><code>Fitting chr11...</code></pre>
+<pre><code>Fitting chr12...</code></pre>
+<pre><code>Fitting chr13...</code></pre>
+<pre><code>Fitting chr14...</code></pre>
+<pre><code>Fitting chr15...</code></pre>
+<pre><code>Fitting chr16...</code></pre>
+<pre><code>Fitting chr17...</code></pre>
+<pre><code>Fitting chr18...</code></pre>
+<pre><code>Fitting chr19...</code></pre>
+<pre><code>Fitting chr20...</code></pre>
+<pre><code>Fitting chr21...</code></pre>
+<pre><code>Fitting chr22...</code></pre>
+<pre><code>Demarcating regions...</code></pre>
+<pre><code>Done!</code></pre>
+<pre class="r"><code>dmrcoutput</code></pre>
+<pre><code>DMResults object with 34263 DMRs.
+Use extractRanges() to produce a GRanges object of these.</code></pre>
+<pre class="r"><code>#saveRDS(myannotation, &quot;../output/dmrcate_array_anno.rds&quot;)
+#saveRDS(dmrcoutput, &quot;../output/dmrcate_array_out.rds&quot;)</code></pre>
+<pre class="r"><code>dmrcate_array_dmr &lt;- extractRanges(dmrcoutput, genome = &quot;hg19&quot;)</code></pre>
+<pre><code>see ?DMRcatedata and browseVignettes(&#39;DMRcatedata&#39;) for documentation</code></pre>
+<pre><code>loading from cache</code></pre>
+<pre class="r"><code>dmrcate_array_dmr %&gt;% data.frame() %&gt;% nrow(.)</code></pre>
+<pre><code>[1] 34263</code></pre>
+<pre class="r"><code>dmrcate_array_dmr %&gt;% data.frame() %&gt;% head()</code></pre>
+<pre><code>  seqnames    start      end width strand no.cpgs min_smoothed_fdr
+1     chr7 27194614 27214915 20302      *     122                0
+2     chr6 33263120 33268842  5723      *      93                0
+3     chr6 30652202 30659513  7312      *      92                0
+4     chr6 31695027 31701808  6782      *      77                0
+5    chr10  8091753  8103673 11921      *      76                0
+6     chr6 31862674 31869553  6880      *      71                0
+       Stouffer        HMFDR        Fisher    maxdiff     meandiff
+1 1.368969e-252 1.004780e-10 8.358899e-300  0.4867324  0.049689927
+2  5.171285e-16 7.509885e-11  1.570294e-41  0.3729442  0.013052812
+3 4.963010e-114 4.143546e-13 1.165282e-199  0.7071281  0.094208223
+4  8.315485e-14 5.048319e-12  7.991628e-28  0.5149155  0.006641734
+5 4.221798e-136 6.789293e-11 5.165912e-154 -0.6646075 -0.063021330
+6  5.905523e-30 1.637112e-11  1.316075e-65 -0.6704265 -0.026350362
+                                                                 overlapping.genes
+1 HOXA-AS3, RP1-170O19.21, HOXA10-AS, HOXA7, HOXA9, RP1-170O19.20, MIR196B, HOXA10
+2                                                               PFDN6, RGL2, TAPBP
+3                                                                     PPP1R18, NRM
+4                                                                     DDAH2, CLIC1
+5                                   RP11-379F12.4, GATA3, GATA3-AS1, RP11-379F12.3
+6                                                                C2, EHMT2, ZBTB12</code></pre>
+<pre class="r"><code>dmrcate_array_dmr %&gt;% data.frame() %&gt;% filter(min_smoothed_fdr &lt; 0.05) %&gt;% nrow(.) # all dmrs are significant</code></pre>
+<pre><code>[1] 34263</code></pre>
+<pre class="r"><code>#saveRDS(dmrcate_array_dmr, &quot;../output/dmrcate_array_dmr.rds&quot;)</code></pre>
+<div id="compare-methods" class="section level2">
+<h2>Compare Methods</h2>
+<pre class="r"><code>dmrcate_array_anno &lt;- dmrcate_array_anno %&gt;% .[order(.$ind.fdr),] %&gt;% mutate(rank = 1:nrow(.))
+
+DMPs &lt;- DMPs %&gt;% mutate(signif = ifelse(adj.P.Val &lt; 0.05, TRUE, FALSE), rank = 1:nrow(.))</code></pre>
+<pre class="r"><code>anno_array$position &lt;- paste0(anno_array$seqnames, &quot;-&quot;, anno_array$start)
+
+DMPs$cg_id &lt;- rownames(DMPs)
+DMPs$pos &lt;- paste0(DMPs$seqnames, &quot;-&quot;, DMPs$start)
+
+dmrcate_array_anno$pos &lt;- paste0(dmrcate_array_anno$seqnames, &quot;-&quot;, dmrcate_array_anno$start)
+dmrcate_array_anno &lt;- dmrcate_array_anno %&gt;% mutate(cg_id = anno_array[match(.$pos, anno_array$position), &quot;Name&quot;])</code></pre>
+<pre class="r"><code>overlap_tested &lt;- find_overlaps(as_granges(DMPs), 
+                                as_granges(dmrcate_array_anno)) %&gt;% data.frame()
+nrow(overlap_tested)</code></pre>
+<pre><code>[1] 772927</code></pre>
+<pre class="r"><code>head(overlap_tested)</code></pre>
+<pre><code>  seqnames     start       end width strand AddressB     logFC    AveExpr
+1     chr2  99273454  99273454     1      *          -5.737982 -0.4955390
+2     chr7  73515902  73515902     1      *           5.898663 -0.5920786
+3    chr17  74423978  74423978     1      *           6.428390 -0.5212259
+4     chr8  61892203  61892203     1      *           6.790302 -0.6455871
+5     chr7 102082517 102082517     1      *           6.220094 -0.2474618
+6     chr7   1043861   1043861     1      *           5.903508 -0.1854076
+          t      P.Value    adj.P.Val        B signif rank.x    cg_id.x
+1 -72.04207 2.400819e-19 3.298931e-14 33.52771   TRUE      1 cg15949485
+2  70.76621 3.078692e-19 3.298931e-14 33.34358   TRUE      2 cg17092391
+3  70.70861 3.113780e-19 3.298931e-14 33.33514   TRUE      3 cg11661493
+4  70.40347 3.306948e-19 3.298931e-14 33.29026   TRUE      4 cg07021509
+5  70.02329 3.565771e-19 3.298931e-14 33.23389   TRUE      5 cg01165928
+6  69.91840 3.640940e-19 3.298931e-14 33.21826   TRUE      6 cg18664915
+           pos.x      stat       diff      rawpval      ind.fdr is.sig rank.y
+1  chr2-99273454 -71.99472 -0.7493808 2.267299e-19 3.093108e-14   TRUE      2
+2  chr7-73515902  70.72959  0.7572015 2.903180e-19 3.093108e-14   TRUE      4
+3 chr17-74423978  70.68855  0.7956987 2.926767e-19 3.093108e-14   TRUE     20
+4  chr8-61892203  70.39319  0.8125228 3.102729e-19 3.093108e-14   TRUE      9
+5 chr7-102082517  69.99932  0.7897311 3.355216e-19 3.093108e-14   TRUE      6
+6   chr7-1043861  69.88482  0.7693460 3.432683e-19 3.093108e-14   TRUE      3
+           pos.y    cg_id.y
+1  chr2-99273454 cg15949485
+2  chr7-73515902 cg17092391
+3 chr17-74423978 cg11661493
+4  chr8-61892203 cg07021509
+5 chr7-102082517 cg01165928
+6   chr7-1043861 cg18664915</code></pre>
+<pre class="r"><code>ggVennDiagram(list(minfi = DMPs$cg_id, dmrcate = dmrcate_array_anno$cg_id))</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-42-1.png" width="672" style="display: block; margin: auto;" />
+* All of DMRcate’s tested sites are also tested by minfi * minfi tests
+more sites than DMRcate - filtering is less strict</p>
+</div>
+</div>
+<div id="compare-significant-sites" class="section level1">
+<h1>Compare significant sites</h1>
+<pre class="r"><code>overlap_signif &lt;- find_overlaps(as_granges(filter(DMPs, adj.P.Val &lt; 0.05)), 
+                                as_granges(filter(dmrcate_array_anno, ind.fdr &lt; 0.05))) %&gt;% data.frame()
+nrow(overlap_signif)</code></pre>
+<pre><code>[1] 211306</code></pre>
+<pre class="r"><code>head(overlap_signif)</code></pre>
+<pre><code>  seqnames     start       end width strand AddressB     logFC    AveExpr
+1     chr2  99273454  99273454     1      *          -5.737982 -0.4955390
+2     chr7  73515902  73515902     1      *           5.898663 -0.5920786
+3    chr17  74423978  74423978     1      *           6.428390 -0.5212259
+4     chr8  61892203  61892203     1      *           6.790302 -0.6455871
+5     chr7 102082517 102082517     1      *           6.220094 -0.2474618
+6     chr7   1043861   1043861     1      *           5.903508 -0.1854076
+          t      P.Value    adj.P.Val        B signif rank.x    cg_id.x
+1 -72.04207 2.400819e-19 3.298931e-14 33.52771   TRUE      1 cg15949485
+2  70.76621 3.078692e-19 3.298931e-14 33.34358   TRUE      2 cg17092391
+3  70.70861 3.113780e-19 3.298931e-14 33.33514   TRUE      3 cg11661493
+4  70.40347 3.306948e-19 3.298931e-14 33.29026   TRUE      4 cg07021509
+5  70.02329 3.565771e-19 3.298931e-14 33.23389   TRUE      5 cg01165928
+6  69.91840 3.640940e-19 3.298931e-14 33.21826   TRUE      6 cg18664915
+           pos.x      stat       diff      rawpval      ind.fdr is.sig rank.y
+1  chr2-99273454 -71.99472 -0.7493808 2.267299e-19 3.093108e-14   TRUE      2
+2  chr7-73515902  70.72959  0.7572015 2.903180e-19 3.093108e-14   TRUE      4
+3 chr17-74423978  70.68855  0.7956987 2.926767e-19 3.093108e-14   TRUE     20
+4  chr8-61892203  70.39319  0.8125228 3.102729e-19 3.093108e-14   TRUE      9
+5 chr7-102082517  69.99932  0.7897311 3.355216e-19 3.093108e-14   TRUE      6
+6   chr7-1043861  69.88482  0.7693460 3.432683e-19 3.093108e-14   TRUE      3
+           pos.y    cg_id.y
+1  chr2-99273454 cg15949485
+2  chr7-73515902 cg17092391
+3 chr17-74423978 cg11661493
+4  chr8-61892203 cg07021509
+5 chr7-102082517 cg01165928
+6   chr7-1043861 cg18664915</code></pre>
+<pre class="r"><code>ggVennDiagram(list(minfi = filter(DMPs, adj.P.Val &lt; 0.05)$cg_id, 
+                   dmrcate = filter(dmrcate_array_anno, ind.fdr &lt; 0.05)$cg_id))</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-44-1.png" width="672" style="display: block; margin: auto;" />
+* the majority of significant sites overlap * demonstrates the
+robustness of the methods, and their similarity</p>
+</div>
+<div id="compare-rank" class="section level1">
+<h1>compare rank</h1>
+<pre class="r"><code>overlap_signif %&gt;%
+  ggplot(aes(x = rank.x, y = rank.y)) +
+  geom_point(alpha = 0.3) +
+  labs(x = &quot;minfi_rank&quot;, y = &quot;dmrcate_rank&quot;, title = &quot;Compare rank of overlapping CpG sites&quot;)</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-45-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>#compare fdr</p>
+<pre class="r"><code>overlap_signif %&gt;%
+  ggplot(aes(x = adj.P.Val, y = ind.fdr)) +
+  geom_point(alpha = 0.3) +
+  labs(x = &quot;minfi_fdr&quot;, y = &quot;dmrcate_fdr&quot;, title = &quot;Compare FDR of overlapping CpG sites&quot;)</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-46-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>cor.test(overlap_signif$adj.P.Val, overlap_signif$ind.fdr)</code></pre>
+<pre><code>
+    Pearson&#39;s product-moment correlation
+
+data:  overlap_signif$adj.P.Val and overlap_signif$ind.fdr
+t = 170944, df = 211304, p-value &lt; 2.2e-16
+alternative hypothesis: true correlation is not equal to 0
+95 percent confidence interval:
+ 0.9999964 0.9999964
+sample estimates:
+      cor 
+0.9999964 </code></pre>
+</div>
+<div id="compare-significant-sites-and-regions" class="section level1">
+<h1>Compare significant sites and regions</h1>
+<pre class="r"><code>dmrcate_array_dmr &lt;- dmrcate_array_dmr %&gt;% data.frame() %&gt;% mutate(rank_dmr = 1:nrow(.))</code></pre>
+<pre class="r"><code>overlap_dmr_dmrcate &lt;- find_overlaps(as_granges(dmrcate_array_dmr), as_granges(dmrcate_array_anno)) %&gt;% data.frame() 
+nrow(overlap_dmr_dmrcate)</code></pre>
+<pre><code>[1] 177623</code></pre>
+<pre class="r"><code>head(overlap_dmr_dmrcate)</code></pre>
+<pre><code>  seqnames    start      end width strand no.cpgs min_smoothed_fdr
+1     chr7 27194614 27214915 20302      *     122                0
+2     chr7 27194614 27214915 20302      *     122                0
+3     chr7 27194614 27214915 20302      *     122                0
+4     chr7 27194614 27214915 20302      *     122                0
+5     chr7 27194614 27214915 20302      *     122                0
+6     chr7 27194614 27214915 20302      *     122                0
+       Stouffer       HMFDR        Fisher   maxdiff   meandiff
+1 1.368969e-252 1.00478e-10 8.358899e-300 0.4867324 0.04968993
+2 1.368969e-252 1.00478e-10 8.358899e-300 0.4867324 0.04968993
+3 1.368969e-252 1.00478e-10 8.358899e-300 0.4867324 0.04968993
+4 1.368969e-252 1.00478e-10 8.358899e-300 0.4867324 0.04968993
+5 1.368969e-252 1.00478e-10 8.358899e-300 0.4867324 0.04968993
+6 1.368969e-252 1.00478e-10 8.358899e-300 0.4867324 0.04968993
+                                                                 overlapping.genes
+1 HOXA-AS3, RP1-170O19.21, HOXA10-AS, HOXA7, HOXA9, RP1-170O19.20, MIR196B, HOXA10
+2 HOXA-AS3, RP1-170O19.21, HOXA10-AS, HOXA7, HOXA9, RP1-170O19.20, MIR196B, HOXA10
+3 HOXA-AS3, RP1-170O19.21, HOXA10-AS, HOXA7, HOXA9, RP1-170O19.20, MIR196B, HOXA10
+4 HOXA-AS3, RP1-170O19.21, HOXA10-AS, HOXA7, HOXA9, RP1-170O19.20, MIR196B, HOXA10
+5 HOXA-AS3, RP1-170O19.21, HOXA10-AS, HOXA7, HOXA9, RP1-170O19.20, MIR196B, HOXA10
+6 HOXA-AS3, RP1-170O19.21, HOXA10-AS, HOXA7, HOXA9, RP1-170O19.20, MIR196B, HOXA10
+  rank_dmr     stat      diff      rawpval      ind.fdr is.sig rank
+1        1 26.23070 0.3225760 2.729876e-13 4.438588e-11   TRUE 4752
+2        1 25.61069 0.3381528 3.789685e-13 5.651456e-11   TRUE 5183
+3        1 25.41212 0.4867324 4.216282e-13 6.114218e-11   TRUE 5330
+4        1 23.27253 0.2054934 1.403985e-12 1.554028e-10   TRUE 6983
+5        1 23.09359 0.3358522 1.559948e-12 1.690113e-10   TRUE 7134
+6        1 21.35349 0.4544445 4.533665e-12 3.931993e-10   TRUE 8911
+            pos      cg_id
+1 chr7-27202344 cg01891966
+2 chr7-27208590 cg23854860
+3 chr7-27210168 cg15293367
+4 chr7-27201728 cg08971667
+5 chr7-27202797 cg09342060
+6 chr7-27199726 cg25975690</code></pre>
+<pre class="r"><code>ggVennDiagram(list(dmr = overlap_dmr_dmrcate$cg_id, tested = dmrcate_array_anno$cg_id))</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-50-1.png" width="672" style="display: block; margin: auto;" />
+* DMRs represent only 23% of the tested CpGs</p>
+<pre class="r"><code>ggVennDiagram(list(dmr = overlap_dmr_dmrcate$cg_id, signif_cg = filter(dmrcate_array_anno, ind.fdr &lt; 0.05)$cg_id))</code></pre>
+<p><img src="figure/00_differentialMethylationArray.Rmd/unnamed-chunk-51-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>95430/(95430+116078)</code></pre>
+<pre><code>[1] 0.4511886</code></pre>
+<ul>
+<li>not all sites in a DMR are individually significant</li>
+</ul>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.4.2 (2024-10-31)
+Platform: aarch64-apple-darwin20
+Running under: macOS Sequoia 15.2
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.0
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+time zone: Australia/Melbourne
+tzcode source: internal
+
+attached base packages:
+[1] parallel  stats4    stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] DMRcatedata_2.22.0                                 
+ [2] ExperimentHub_2.12.0                               
+ [3] AnnotationHub_3.12.0                               
+ [4] BiocFileCache_2.12.0                               
+ [5] dbplyr_2.5.0                                       
+ [6] ggVennDiagram_1.5.2                                
+ [7] ggplot2_3.5.1                                      
+ [8] stringr_1.5.1                                      
+ [9] dplyr_1.1.4                                        
+[10] plyranges_1.24.0                                   
+[11] RColorBrewer_1.1-3                                 
+[12] IlluminaHumanMethylationEPICmanifest_0.3.0         
+[13] IlluminaHumanMethylationEPICanno.ilm10b4.hg19_0.6.0
+[14] minfi_1.50.0                                       
+[15] bumphunter_1.46.0                                  
+[16] locfit_1.5-9.11                                    
+[17] iterators_1.0.14                                   
+[18] foreach_1.5.2                                      
+[19] Biostrings_2.72.1                                  
+[20] XVector_0.44.0                                     
+[21] SummarizedExperiment_1.34.0                        
+[22] Biobase_2.64.0                                     
+[23] MatrixGenerics_1.16.0                              
+[24] matrixStats_1.5.0                                  
+[25] GenomicRanges_1.56.2                               
+[26] GenomeInfoDb_1.40.1                                
+[27] IRanges_2.38.1                                     
+[28] S4Vectors_0.42.1                                   
+[29] BiocGenerics_0.50.0                                
+[30] edgeR_4.2.2                                        
+[31] limma_3.60.6                                       
+[32] DMRcate_3.0.10                                     
+
+loaded via a namespace (and not attached):
+  [1] fs_1.6.5                                          
+  [2] ProtGenerics_1.36.0                               
+  [3] bitops_1.0-9                                      
+  [4] httr_1.4.7                                        
+  [5] tools_4.4.2                                       
+  [6] doRNG_1.8.6.1                                     
+  [7] backports_1.5.0                                   
+  [8] R6_2.5.1                                          
+  [9] HDF5Array_1.32.1                                  
+ [10] lazyeval_0.2.2                                    
+ [11] Gviz_1.48.0                                       
+ [12] rhdf5filters_1.16.0                               
+ [13] permute_0.9-7                                     
+ [14] withr_3.0.2                                       
+ [15] prettyunits_1.2.0                                 
+ [16] gridExtra_2.3                                     
+ [17] base64_2.0.2                                      
+ [18] preprocessCore_1.66.0                             
+ [19] cli_3.6.3                                         
+ [20] labeling_0.4.3                                    
+ [21] sass_0.4.9                                        
+ [22] readr_2.1.5                                       
+ [23] genefilter_1.86.0                                 
+ [24] askpass_1.2.1                                     
+ [25] Rsamtools_2.20.0                                  
+ [26] foreign_0.8-87                                    
+ [27] siggenes_1.78.0                                   
+ [28] illuminaio_0.46.0                                 
+ [29] R.utils_2.12.3                                    
+ [30] dichromat_2.0-0.1                                 
+ [31] scrime_1.3.5                                      
+ [32] BSgenome_1.72.0                                   
+ [33] readxl_1.4.3                                      
+ [34] rstudioapi_0.17.1                                 
+ [35] RSQLite_2.3.9                                     
+ [36] generics_0.1.3                                    
+ [37] BiocIO_1.14.0                                     
+ [38] gtools_3.9.5                                      
+ [39] Matrix_1.7-1                                      
+ [40] interp_1.1-6                                      
+ [41] abind_1.4-8                                       
+ [42] R.methodsS3_1.8.2                                 
+ [43] lifecycle_1.0.4                                   
+ [44] whisker_0.4.1                                     
+ [45] yaml_2.3.10                                       
+ [46] rhdf5_2.48.0                                      
+ [47] SparseArray_1.4.8                                 
+ [48] grid_4.4.2                                        
+ [49] blob_1.2.4                                        
+ [50] promises_1.3.2                                    
+ [51] crayon_1.5.3                                      
+ [52] lattice_0.22-6                                    
+ [53] GenomicFeatures_1.56.0                            
+ [54] annotate_1.82.0                                   
+ [55] KEGGREST_1.44.1                                   
+ [56] pillar_1.10.1                                     
+ [57] knitr_1.49                                        
+ [58] beanplot_1.3.1                                    
+ [59] rjson_0.2.23                                      
+ [60] codetools_0.2-20                                  
+ [61] glue_1.8.0                                        
+ [62] data.table_1.16.4                                 
+ [63] vctrs_0.6.5                                       
+ [64] png_0.1-8                                         
+ [65] cellranger_1.1.0                                  
+ [66] gtable_0.3.6                                      
+ [67] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1
+ [68] cachem_1.1.0                                      
+ [69] xfun_0.50                                         
+ [70] mime_0.12                                         
+ [71] S4Arrays_1.4.1                                    
+ [72] survival_3.7-0                                    
+ [73] statmod_1.5.0                                     
+ [74] nlme_3.1-166                                      
+ [75] bit64_4.6.0-1                                     
+ [76] bsseq_1.40.0                                      
+ [77] progress_1.2.3                                    
+ [78] filelock_1.0.3                                    
+ [79] rprojroot_2.0.4                                   
+ [80] bslib_0.9.0                                       
+ [81] nor1mix_1.3-3                                     
+ [82] rpart_4.1.23                                      
+ [83] colorspace_2.1-1                                  
+ [84] DBI_1.2.3                                         
+ [85] Hmisc_5.2-2                                       
+ [86] nnet_7.3-19                                       
+ [87] tidyselect_1.2.1                                  
+ [88] bit_4.5.0.1                                       
+ [89] compiler_4.4.2                                    
+ [90] curl_6.2.0                                        
+ [91] git2r_0.35.0                                      
+ [92] httr2_1.1.0                                       
+ [93] htmlTable_2.4.3                                   
+ [94] xml2_1.3.6                                        
+ [95] DelayedArray_0.30.1                               
+ [96] rtracklayer_1.64.0                                
+ [97] checkmate_2.3.2                                   
+ [98] scales_1.3.0                                      
+ [99] quadprog_1.5-8                                    
+[100] rappdirs_0.3.3                                    
+[101] digest_0.6.37                                     
+[102] rmarkdown_2.29                                    
+[103] GEOquery_2.72.0                                   
+[104] htmltools_0.5.8.1                                 
+[105] pkgconfig_2.0.3                                   
+[106] jpeg_0.1-10                                       
+[107] base64enc_0.1-3                                   
+[108] sparseMatrixStats_1.16.0                          
+[109] fastmap_1.2.0                                     
+[110] ensembldb_2.28.1                                  
+[111] rlang_1.1.5                                       
+[112] htmlwidgets_1.6.4                                 
+[113] UCSC.utils_1.0.0                                  
+[114] DelayedMatrixStats_1.26.0                         
+[115] farver_2.1.2                                      
+[116] jquerylib_0.1.4                                   
+[117] jsonlite_1.8.9                                    
+[118] BiocParallel_1.38.0                               
+[119] mclust_6.1.1                                      
+[120] R.oo_1.27.0                                       
+[121] VariantAnnotation_1.50.0                          
+[122] RCurl_1.98-1.16                                   
+[123] magrittr_2.0.3                                    
+[124] Formula_1.2-5                                     
+[125] GenomeInfoDbData_1.2.12                           
+[126] Rhdf5lib_1.26.0                                   
+[127] munsell_0.5.1                                     
+[128] Rcpp_1.0.14                                       
+[129] stringi_1.8.4                                     
+[130] zlibbioc_1.50.0                                   
+[131] MASS_7.3-61                                       
+[132] plyr_1.8.9                                        
+[133] org.Hs.eg.db_3.19.1                               
+[134] deldir_2.0-4                                      
+[135] splines_4.4.2                                     
+[136] multtest_2.60.0                                   
+[137] hms_1.1.3                                         
+[138] rngtools_1.5.2                                    
+[139] biomaRt_2.60.1                                    
+[140] BiocVersion_3.19.1                                
+[141] missMethyl_1.38.0                                 
+[142] XML_3.99-0.18                                     
+[143] evaluate_1.0.3                                    
+[144] latticeExtra_0.6-30                               
+[145] biovizBase_1.52.0                                 
+[146] BiocManager_1.30.25                               
+[147] tzdb_0.4.0                                        
+[148] httpuv_1.6.15                                     
+[149] tidyr_1.3.1                                       
+[150] openssl_2.3.2                                     
+[151] purrr_1.0.4                                       
+[152] reshape_0.8.9                                     
+[153] xtable_1.8-4                                      
+[154] restfulr_0.0.15                                   
+[155] AnnotationFilter_1.28.0                           
+[156] later_1.4.1                                       
+[157] tibble_3.2.1                                      
+[158] memoise_2.0.1                                     
+[159] AnnotationDbi_1.66.0                              
+[160] GenomicAlignments_1.40.0                          
+[161] cluster_2.1.6                                     
+[162] workflowr_1.7.1                                   </code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
