@@ -10,19 +10,24 @@ editor_options:
 
 Welcome to my research website.
 
-* list of important objects and their contents
-* and important analysis files
+Analysis:
+
+1. Differential methylation methods and comparison
+  a.[Microarray](00_differentialMethylationArray.html)
+
+
+
 ```{r}
 	
-save.image(file='myEnvironment.RData')
+#save.image(file='myEnvironment.RData')
 ```
 
 https://www.techcoil.com/blog/how-to-save-and-load-environment-objects-in-r/#google_vignette
 ```{r}
-load('myEnvironment.RData')
+#load('myEnvironment.RData')
 ```
 
-```{r}
+
 library(plyranges)
 library(dplyr)
 
@@ -33,7 +38,7 @@ library(goseq)
 library(GO.db)
 library(missMethyl)
 library(BiasedUrn)
-```
+
 
 
 [analysis/00_exploreCpGDistribution]

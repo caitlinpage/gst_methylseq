@@ -7,23 +7,25 @@ editor_options:
   chunk_output_type: inline
 ---
 
-* dun dun dun i did it wrong - so it is epicv1 - which is 850k, v2 is more like 935k and is hg38
-## Introduction
+## Packages used
 
 ```{r}
 library(DMRcate)
-
 library(limma)
+library(edgeR)
 library(minfi)
 library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 library(IlluminaHumanMethylationEPICmanifest)
 library(RColorBrewer)
+
+library(plyranges)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(ggVennDiagram)
 ```
 
-* DMRcate can do array and sequencing
-
-* DMRcate wants the beta values
-* so do sample stuff following minfi (1_methods/analysis/1_limma_array)
+# Reading in data
 ```{r}
 file_source <- c("natural_killer", "b_cell")
 files_new <- character()
@@ -47,10 +49,11 @@ blood_samples
 rgSet <- read.metharray(files_new)
 rgSet
 ```
+# Pre-processing
 
 ```{r}
 sampleNames(rgSet) <- blood_samples$id_group
-rgSet
+head(rgSet)
 
 # calculate the detection p-values
 detP <- detectionP(rgSet)
@@ -154,13 +157,9 @@ mSetSqFlt
 
 ```{r}
 anno_array <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
-anno_array
 anno_array <- anno_array %>% data.frame() %>% mutate(seqnames = chr, start = pos, width = 1) %>% relocate(c(seqnames, start, width))
-anno_array 
-```
-
-```{r}
-anno_array
+nrow(anno_array)
+head(anno_array)
 ```
 
 
@@ -187,7 +186,8 @@ mSetSqFlt
 
 ```{r}
 cross_reactive_probes <- read.table("../data/microarray/cross_reactive_probes_supp2.txt")
-cross_reactive_probes
+nrow(cross_reactive_probes)
+head(cross_reactive_probes)
 
 keep <- !(featureNames(mSetSqFlt) %in% cross_reactive_probes$V1)
 table(keep)
@@ -210,7 +210,7 @@ plotMDS(getM(mSetSqFlt), top=1000, gene.selection="common",
 legend("right", legend=levels(factor(blood_samples$sample_num)), text.col=pal,
         cex=0.7, bg="white")
 ```
-- the 1st component is even stronger now - not sure if that's supposed to happen
+
 
 ```{r}
 par(mfrow=c(1,3))
@@ -240,18 +240,85 @@ bVals <- getBeta(mSetSqFlt)
 head(bVals[,1:5])
 ```
 
+```{r}
+par(mfrow=c(1,2))
+densityPlot(bVals, sampGroups=blood_samples$short_group, main="Beta values",
+             legend=FALSE, xlab="Beta values")
+legend("top", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+densityPlot(mVals, sampGroups=blood_samples$short_group, main="M-values",
+             legend=FALSE, xlab="M values")
+legend("topleft", legend = levels(factor(blood_samples$short_group)),
+        text.col=brewer.pal(8,"Dark2"))
+```
 
-# now DMRcate
-* they convert beta to M - but I have beta and M from minfi
 
-* do their filtering
+## Differential methylation methods
+
+# Minfi
+```{r}
+# this is the factor of interest
+cellType <- factor(blood_samples$short_group)
+# this is the individual effect that we need to account for
+individual <- factor(blood_samples$id_group)
+
+# use the above to create a design matrix
+#design <- model.matrix(~0+cellType+individual, data=blood_samples)
+#colnames(design) <- c(levels(cellType),levels(individual)[-1])
+design <- model.matrix(~0+cellType, data=blood_samples)
+colnames(design) <- c(levels(cellType))
+design
+
+# fit the linear model
+fit <- lmFit(mVals, design)
+
+# create a contrast matrix for specific comparisons
+contMatrix <- makeContrasts(NK-B,
+			      levels=design)
+contMatrix
+```
+
+
+```{r}
+# fit the contrasts
+fit2 <- contrasts.fit(fit, contMatrix)
+fit2 <- eBayes(fit2)
+
+# look at the numbers of DM CpGs at FDR < 0.05
+summary(decideTests(fit2))
+```
+
+```{r}
+# get the table of results for the first contrast
+# do for 2nd contrast - nk - b
+annoSub <- anno_array[match(rownames(mVals),anno_array$Name),
+                         c(1:3,9)]
+DMPs <- topTable(fit2,  num=Inf, coef=1, genelist=annoSub)
+nrow(DMPs)
+head(DMPs)
+```
+
+```{r}
+DMPs %>% filter(adj.P.Val < 0.05) %>% nrow(.)
+```
+
+
+```{r}
+# plot the top 4 most significantly differentially methylated CpGs
+par(mfrow=c(2,2))
+sapply(rownames(DMPs)[1:4], function(cpg){
+  plotCpg(bVals, cpg=cpg, pheno=blood_samples$short_group, ylab = "Beta values")
+})
+```
+
+# DMRcate
 ```{r}
 nrow(mVals)
 ALLMs.noSNPs <- rmSNPandCH(mVals, rmcrosshyb = FALSE)
 nrow(ALLMs.noSNPs)
 ```
 ```{r}
-ALLMs.noSNPs %>% data.frame()
+ALLMs.noSNPs %>% data.frame() %>% head()
 ```
 
 ```{r}
@@ -262,36 +329,137 @@ design
 myannotation <- cpg.annotate("array", ALLMs.noSNPs, arraytype = "EPICv1",
 analysis.type="differential", design=design, coef=2, what = "M")
 ```
-```{r}
-design
-```
+
 
 ```{r}
 dmrcate_array_anno <- myannotation@ranges %>% data.frame()
+head(dmrcate_array_anno)
 ```
 
 ```{r}
-?dmrcate
+dmrcate_array_anno %>% filter(is.sig == TRUE) %>% nrow(.)
 ```
+
 
 ```{r}
 dmrcoutput <- dmrcate(myannotation, lambda=1000, C=2)
+dmrcoutput
 ```
 
 ```{r}
-saveRDS(myannotation, "../output/dmrcate_array_anno.rds")
-saveRDS(dmrcoutput, "../output/dmrcate_array_out.rds")
+#saveRDS(myannotation, "../output/dmrcate_array_anno.rds")
+#saveRDS(dmrcoutput, "../output/dmrcate_array_out.rds")
 ```
 
 
 ```{r}
 dmrcate_array_dmr <- extractRanges(dmrcoutput, genome = "hg19")
+dmrcate_array_dmr %>% data.frame() %>% nrow(.)
+dmrcate_array_dmr %>% data.frame() %>% head()
+```
+
+```{r}
+dmrcate_array_dmr %>% data.frame() %>% filter(min_smoothed_fdr < 0.05) %>% nrow(.) # all dmrs are significant
 ```
 
 
 ```{r}
-saveRDS(dmrcate_array_dmr, "../output/dmrcate_array_dmr.rds")
+#saveRDS(dmrcate_array_dmr, "../output/dmrcate_array_dmr.rds")
 ```
 
+
+## Compare Methods
+
+```{r}
+dmrcate_array_anno <- dmrcate_array_anno %>% .[order(.$ind.fdr),] %>% mutate(rank = 1:nrow(.))
+
+DMPs <- DMPs %>% mutate(signif = ifelse(adj.P.Val < 0.05, TRUE, FALSE), rank = 1:nrow(.))
+```
+
+```{r}
+anno_array$position <- paste0(anno_array$seqnames, "-", anno_array$start)
+
+DMPs$cg_id <- rownames(DMPs)
+DMPs$pos <- paste0(DMPs$seqnames, "-", DMPs$start)
+
+dmrcate_array_anno$pos <- paste0(dmrcate_array_anno$seqnames, "-", dmrcate_array_anno$start)
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(cg_id = anno_array[match(.$pos, anno_array$position), "Name"])
+```
+
+
+```{r}
+overlap_tested <- find_overlaps(as_granges(DMPs), 
+                                as_granges(dmrcate_array_anno)) %>% data.frame()
+nrow(overlap_tested)
+head(overlap_tested)
+```
+
+
+```{r}
+ggVennDiagram(list(minfi = DMPs$cg_id, dmrcate = dmrcate_array_anno$cg_id))
+```
+* All of DMRcate's tested sites are also tested by minfi
+* minfi tests more sites than DMRcate - filtering is less strict
+
+# Compare significant sites
+```{r}
+overlap_signif <- find_overlaps(as_granges(filter(DMPs, adj.P.Val < 0.05)), 
+                                as_granges(filter(dmrcate_array_anno, ind.fdr < 0.05))) %>% data.frame()
+nrow(overlap_signif)
+head(overlap_signif)
+```
+
+```{r}
+ggVennDiagram(list(minfi = filter(DMPs, adj.P.Val < 0.05)$cg_id, 
+                   dmrcate = filter(dmrcate_array_anno, ind.fdr < 0.05)$cg_id))
+```
+* the majority of significant sites overlap
+* demonstrates the robustness of the methods, and their similarity
+
+# compare rank
+```{r}
+overlap_signif %>%
+  ggplot(aes(x = rank.x, y = rank.y)) +
+  geom_point(alpha = 0.3) +
+  labs(x = "minfi_rank", y = "dmrcate_rank", title = "Compare rank of overlapping CpG sites")
+```
+
+
+#compare fdr
+```{r}
+overlap_signif %>%
+  ggplot(aes(x = adj.P.Val, y = ind.fdr)) +
+  geom_point(alpha = 0.3) +
+  labs(x = "minfi_fdr", y = "dmrcate_fdr", title = "Compare FDR of overlapping CpG sites")
+```
+
+```{r}
+cor.test(overlap_signif$adj.P.Val, overlap_signif$ind.fdr)
+```
+
+# Compare significant sites and regions
+```{r}
+dmrcate_array_dmr <- dmrcate_array_dmr %>% data.frame() %>% mutate(rank_dmr = 1:nrow(.))
+```
+
+```{r}
+overlap_dmr_dmrcate <- find_overlaps(as_granges(dmrcate_array_dmr), as_granges(dmrcate_array_anno)) %>% data.frame() 
+nrow(overlap_dmr_dmrcate)
+head(overlap_dmr_dmrcate)
+```
+
+```{r}
+ggVennDiagram(list(dmr = overlap_dmr_dmrcate$cg_id, tested = dmrcate_array_anno$cg_id))
+```
+* DMRs represent only 23% of the tested CpGs
+
+```{r}
+ggVennDiagram(list(dmr = overlap_dmr_dmrcate$cg_id, signif_cg = filter(dmrcate_array_anno, ind.fdr < 0.05)$cg_id))
+```
+```{r}
+95430/(95430+116078)
+```
+
+* not all sites in a DMR are individually significant
 
 
