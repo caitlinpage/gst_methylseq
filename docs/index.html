@@ -441,15 +441,15 @@ project makes it easier to run your code on other machines.</p>
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree9d2770f8c15c8daea34cd59ad9e0c51874c1ac77targetblank9d2770fa">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeb1ab34f850ff217d1aaeec363c99c63a7c7a383btargetblankb1ab34fa">
 <span class="glyphicon glyphicon-ok text-success"
 aria-hidden="true"></span> <strong>Repository version:</strong>
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/9d2770f8c15c8daea34cd59ad9e0c51874c1ac77" target="_blank">9d2770f</a>
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/b1ab34f850ff217d1aaeec363c99c63a7c7a383b" target="_blank">b1ab34f</a>
 </a>
 </p>
 </div>
 <div
-id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree9d2770f8c15c8daea34cd59ad9e0c51874c1ac77targetblank9d2770fa"
+id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeb1ab34f850ff217d1aaeec363c99c63a7c7a383btargetblankb1ab34fa"
 class="panel-collapse collapse">
 <div class="panel-body">
 <p>
@@ -459,7 +459,7 @@ reproducibility.
 </p>
 <p>
 The results in this page were generated with repository version
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/9d2770f8c15c8daea34cd59ad9e0c51874c1ac77" target="_blank">9d2770f</a>.
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/b1ab34f850ff217d1aaeec363c99c63a7c7a383b" target="_blank">b1ab34f</a>.
 See the <em>Past versions</em> tab to see a history of the changes made
 to the R Markdown and HTML files.
 </p>
@@ -503,6 +503,7 @@ Unstaged changes:
     Modified:   analysis/00_differentialMethylationArray.Rmd
     Modified:   analysis/00_differentialMethylationSequencing.Rmd
     Modified:   analysis/00_exploreCpGDistrib.Rmd
+    Modified:   analysis/02_exploreBiasGenes.Rmd
     Modified:   analysis/04_compareDM.Rmd
     Modified:   code/runSeqDmMethods.R
     Modified:   renv/.gitignore
@@ -551,6 +552,40 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/b1ab34f850ff217d1aaeec363c99c63a7c7a383b/analysis/index.Rmd" target="_blank">b1ab34f</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-03-28
+</td>
+<td>
+wflow_publish(c("index.Rmd", "01_exploreBiasByBins.Rmd"))
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/caitlinpage/gst_methylseq/d7cdb2f1ad8c0e6297027f90a5b38600e8cc6ffe/docs/index.html" target="_blank">d7cdb2f</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-03-28
+</td>
+<td>
+Build site.
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -712,8 +747,23 @@ href="00_differentialMethylationArray.html">Microarray</a></p></li>
 <li><p>Compare microarray and sequencing DMRcate results</p></li>
 </ol>
 <ol start="2" style="list-style-type: decimal">
-<li><a href="00_microarrayOntologyAnalysis.Rmd">Methylation microarray
-gene set testing analysis</a></li>
+<li><p><a href="00_microarrayOntologyAnalysis.Rmd">Methylation
+microarray gene set testing analysis</a></p></li>
+<li><p>Identify bias for correction in gene set testing</p></li>
+</ol>
+<ol style="list-style-type: lower-alpha">
+<li><a href="01_exploreBiasByBins.Rmd">Explore CpG distribution across
+genome bins</a></li>
+</ol>
+<ol start="4" style="list-style-type: decimal">
+<li><p>Develop gene set testing method for methylation
+sequencing</p></li>
+<li><p>Validate gene set testing method for methylation
+sequencing</p></li>
+<li><p>Applying gene set testing method to different data sets</p></li>
+</ol>
+<ol style="list-style-type: lower-alpha">
+<li>Long read Analysis 00_longRead</li>
 </ol>
 <pre class="r"><code>#save.image(file=&#39;myEnvironment.RData&#39;)</code></pre>
 <p><a
