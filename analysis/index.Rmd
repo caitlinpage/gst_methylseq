@@ -27,6 +27,18 @@ Analysis:
 
 2. [Methylation microarray gene set testing analysis](00_microarrayOntologyAnalysis.Rmd)
 
+3. Identify bias for correction in gene set testing
+
+  a) [Explore CpG distribution across genome bins](01_exploreBiasByBins.Rmd)
+  
+4. Develop gene set testing method for methylation sequencing
+
+5. Validate gene set testing method for methylation sequencing
+
+6. Applying gene set testing method to different data sets
+
+  a) Long read Analysis 00_longRead
+
 ```{r}
 	
 #save.image(file='myEnvironment.RData')
