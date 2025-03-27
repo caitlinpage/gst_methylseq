@@ -10,12 +10,22 @@ editor_options:
 
 Welcome to my research website.
 
+The main analyses conducted uses B cell type and NK cell type samples, 
+under the hg19 genome annotation.
+* Microarray: EPICv1 platform. [GSE110554](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE110554)
+* WGBS [GSE186458](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186458)
+
 Analysis:
 
 1. Differential methylation methods and comparison
-  a.[Microarray](00_differentialMethylationArray.html)
 
+  a) [Microarray](00_differentialMethylationArray.html)
+  
+  b) Sequencing *tbd 00_differentialMethylationSequencing
+  
+  c) Compare microarray and sequencing DMRcate results 
 
+2. [Methylation microarray gene set testing analysis](00_microarrayOntologyAnalysis.Rmd)
 
 ```{r}
 	
@@ -28,16 +38,6 @@ https://www.techcoil.com/blog/how-to-save-and-load-environment-objects-in-r/#goo
 ```
 
 
-library(plyranges)
-library(dplyr)
-
-library(ggplot2)
-library(ggVennDiagram)
-library(BSgenome.Hsapiens.UCSC.hg19)
-library(goseq)
-library(GO.db)
-library(missMethyl)
-library(BiasedUrn)
 
 
 

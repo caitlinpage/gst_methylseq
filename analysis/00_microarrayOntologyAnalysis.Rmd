@@ -7,55 +7,61 @@ editor_options:
   chunk_output_type: inline
 ---
 
-## Introduction
+Conducting gene set testing of Microarray EPICv1 data using missMethyl.
 https://www.bioconductor.org/packages/release/bioc/vignettes/missMethyl/inst/doc/missMethyl.html
+
+
+## Packages used
 ```{r}
 library(missMethyl)
 library(limma)
 library(minfi)
 library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 
+library(plyranges)
 library(dplyr)
 library(ggplot2)
 
 library(ggVennDiagram)
 ```
 
+## Pre-processing
+* this the minfi results - not dmrcate
 
-```{r}
-#top <- topRUV(rfit4, number = Inf, p.BH = 1)
-#table(top$p.BH_X1.1 < 0.01)
-```
+dmrcate_array_anno <- readRDS("../output/dmrcate_array_anno.rds")
+nrow(dmrcate_array_anno)
+head(dmrcate_array_anno)
+
+dmrcate_array_anno <- readRDS("../output/dmrcate_array_dmr.rds")
+nrow(dmrcate_array_anno)
+head(dmrcate_array_anno)
+
+
+
+dmrcate_array_anno$pos <- paste0(dmrcate_array_anno$seqnames, "-", dmrcate_array_anno$start)
+dmrcate_overlap <- find_overlaps(as_granges(dmrcate_array_dmr), as_granges(dmrcate_array_anno)) %>% data.frame()
+
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(in_dmr = ifelse(pos %in% dmrcate_overlap$pos, TRUE, FALSE))
+
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(rank_dmr = dmrcate_overlap[match(.$pos.x, dmrcate_overlap$pos), "rank"], rank_dmr = ifelse(is.na(rank_dmr), max(rank_dmr, na.rm = TRUE) + 1, rank_dmr))
+
+dmrcate_array_anno <- find_overlaps(as_granges(dmrcate_array_anno), as_granges(mutate(anno_array, cg_id = rownames(anno_array)))) %>% data.frame()
+
+
 ```{r}
 DMPs <- readRDS("../output/array_dmps.rds")
-DMPs
+head(DMPs)
+nrow(DMPs)
 ```
 ```{r}
-top <- DMPs %>% filter(adj.P.Val < 0.05)
-top
-```
-```{r}
-head(bVals)
-```
-- this code is just an option to filter the CpGs by just picking the ones with a big beta value.
-```{r}
-#beta <- getBeta(mSet)
-beta <- bVals
-# make sure that order of beta values matches orer after analysis
-beta <- beta[match(rownames(top),rownames(beta)),]
-beta_norm <- rowMeans(beta[,7:12])
-beta_can <- rowMeans(beta[,1:6])
-Delta_beta <- beta_can - beta_norm
-sigDM <- top$adj.P.Val < 0.01 & abs(Delta_beta) > 0.25
-table(sigDM)
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
 ```
 
 ```{r}
-#topCpGs<-topRUV(rfit4,number=10000)
 topCpGs <- DMPs[1:10000,]
 sigCpGs <- rownames(topCpGs)
 sigCpGs[1:10]
-
 ```
 
 ```{r}
@@ -67,59 +73,71 @@ check <- getMappedEntrezIDs(sig.cpg = sigCpGs)
 length(check$sig.eg)
 ```
 
+## Bias corrected GST
+
 ```{r}
-gst <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(top), collection="GO",
-              plot.bias=TRUE)
-```
-- this all.cpg thing - the vignette uses top - damn I did a filtering thing on that, the vignette uses just all the tested - which would be all of the DMPs table
-```{r}
-gst2 <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
+gst <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
               plot.bias=TRUE)
 ```
 ```{r}
 system.time(gometh(rownames(DMPs[1:10000,]), all.cpg = rownames(DMPs), collection = "GO", plot.bias = TRUE))
 ```
-```{r}
-?gometh
-```
 
 ```{r}
-topGSA(gst, n=20)
-topGSA(gst2, n=20)
-```
-```{r}
-sig_terms_array <- topGSA(gst2, n = 1000) %>% filter(FDR < 0.05)
-sig_terms_array
-saveRDS(sig_terms_array, "../output/mm_array_res.rds")
+sig_terms_array <- topGSA(gst, n = 1000) %>% filter(FDR < 0.05) %>% .[order(.$FDR),]
+sig_terms_array$GOID <- rownames(sig_terms_array)
+sig_terms_array$rank <- 1:nrow(sig_terms_array)
+nrow(sig_terms_array)
+head(sig_terms_array)
+#saveRDS(sig_terms_array, "../output/mm_array_res.rds")
 ```
 
-## no bias
+
+```{r}
+sig_terms_array[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE, FALSE)) %>% .[order(.$FDR, decreasing = TRUE),] %>%
+  ggplot(aes(x = -log10(FDR), y = factor(.data$TERM, levels = .data$TERM), colour = in_imm, size = N)) +
+  geom_point() +
+  geom_vline(xintercept = 0.05, type = "dotted") 
+```
+
+
+## Biased GST
 
 ```{r}
 gst.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
               prior.prob=FALSE)
 
-sig_terms_array_biased <- topGSA(gst.biased, n=10000) %>% filter(FDR < 0.05)
-sig_terms_array_biased
-saveRDS(sig_terms_array_biased, "../output/mm_array_null.rds")
+sig_terms_array_biased <- topGSA(gst.biased, n=10000) %>% filter(FDR < 0.05) %>% .[order(.$FDR),]
+sig_terms_array_biased$GOID <- rownames(sig_terms_array_biased)
+sig_terms_array_biased$rank <- 1:nrow(sig_terms_array_biased)
+nrow(sig_terms_array_biased)
+head(sig_terms_array_biased)
+#saveRDS(sig_terms_array_biased, "../output/mm_array_null.rds")
 ```
+
 ## compare bias and corrected
+
 ```{r}
 list_venn <- list(correct = sig_terms_array$TERM, bias = sig_terms_array_biased$TERM)
 ggVennDiagram(list_venn)
 ```
 
-
-## 
-# with kegg
 ```{r}
-gst.kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="KEGG")
-## All input CpGs are used for testing.
-topGSA(gst.kegg, n=10)
+truth_gst_100_array <- rbind(
+  sig_terms_array[1:100,] %>% mutate(in_imm = cumsum(rownames(.) %in% immuneGO$GOID), 
+                                     method = "Bias corrected") %>% 
+    .[,colnames(.) %in% c("GOID", "rank", "in_imm", "method")],
+  sig_terms_array_biased[1:100,] %>% mutate(in_imm = cumsum(rownames(.) %in% immuneGO$GOID), method = "Biased") %>% 
+    .[,colnames(.) %in% c("GOID", "rank", "in_imm", "method")])
 
+truth_gst_100_array %>%
+  ggplot(aes(x = rank, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets")
 ```
 
-#promoters
+
+# promoters
 
 ```{r}
 gst_promoter <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
@@ -128,7 +146,8 @@ gst_promoter <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="GO",
 ```{r}
 gst_promoter
 sig_terms_array_promoter <- gst_promoter %>% .[order(.$FDR),] %>% filter(FDR < 0.05)
-sig_terms_array_promoter
+nrow(sig_terms_array_promoter)
+head(sig_terms_array_promoter)
 ```
 
 ```{r}
@@ -137,88 +156,39 @@ gst_promoter.biased <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collectio
 ```
 ```{r}
 sig_terms_array_promoter_biased <- gst_promoter.biased %>% .[order(.$FDR),] %>% filter(FDR < 0.05)
-sig_terms_array_promoter_biased
-```
-
-#####
-# ok we've seen the results
-now i want to know what's happening under the hood
-gometh 
-- this function gets the collection data - GO, KEGG etc
-
-everything else happens under gsameth
--entrez ids 
-- takes names of signif cpgs
-```{r}
-mapped_genes <- getMappedEntrezIDs(rownames(top), array.type = "EPIC")
-mapped_genes
-```
-```{r}
-mapped_genes <- getMappedEntrezIDs(rownames(DMPs), array.type = "EPIC")
-mapped_genes
-```
-- probs want this version
-```{r}
-mapped_genes <- getMappedEntrezIDs(sigCpGs, array.type = "EPIC") 
-mapped_genes
-```
-```{r}
-mapped_genes <- getMappedEntrezIDs(rownames(DMPs), array.type = "EPIC")
-mapped_genes
+nrow(sig_terms_array_promoter_biased)
+head(sig_terms_array_promoter_biased)
 ```
 
 ```{r}
-mapped_genes$fract.counts # if cpg multiple genes
-length(mapped_genes$sig.eg) # this is just entrez gene ids for signif cpgs
-length(mapped_genes$universe) # entrez gene ids for all - either from array or provided set
-data.frame(mapped_genes$freq) # entrez gene id - all of them - and number of cpgs (Freq)
-data.frame(mapped_genes$equiv) # multigene bias into account
-length(mapped_genes$de) # is each gene from universe de or not - 1 or 0
+list_venn <- list(correct = sig_terms_array_promoter$TERM, bias = sig_terms_array_promoter_biased$TERM)
+ggVennDiagram(list_venn)
 ```
 
-- for consistency with missmethyl
-- i probably want a function like this then - just for sequencing
-- or even just add sequencing to it?
-- again though all belinda's code is in base
-- i reckon maybe a function and then maybe the thing could just have a wrapper? - and add sequencing as what data type?
-- but i'll still need to do all the code because it's not like array where it's set which probes match to which genes and it's easy
 
--they check that the genes are all in the go/kegg category
-- remove genes from go that aren't in list
 
-- then it's the nullp - bias plots and stuff
+## Compare gene and promoter
+
+* Bias corrected
 ```{r}
-pwf <- .estimatePWF(D=test.de,bias=as.vector(equiv))
+list_venn <- list(gene = sig_terms_array$TERM, prom = sig_terms_array_promoter$TERM)
+ggVennDiagram(list_venn)
 ```
 
-pwf <- .estimatePWF(D=test.de,bias=as.vector(equiv))
-- so it takes vector of if gene de or not - 1 or 0, and bias with multigene mapping into account
+* Biased
 ```{r}
-.estimatePWF <- function(D,bias)
-  # An alternative to goseq function nullp, which is transformation invariant
-  # Belinda Phipson and Gordon Smyth
-  # 6 March 2015
-{
-  prior.prob <- bias
-  o <- order(bias)
-  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
-  prior.prob
-}
+list_venn <- list(gene = sig_terms_array_biased$TERM, prom = sig_terms_array_promoter_biased$TERM)
+ggVennDiagram(list_venn)
 ```
 
+
+
+## with kegg
 ```{r}
-?tricubeMovingAverage # moving average smoother
-```
-- similar to least squares loess curve of degree 0
-- this step is sim to goseq nullp
-- that uses monotonic spline with 6 knots
-- they did it with mgcv::pcls()
-- I assume those 2 functions are similar?
-```{r}
-?goseq::nullp
+gst.kegg <- gometh(sig.cpg=sigCpGs, all.cpg=rownames(DMPs), collection="KEGG")
+## All input CpGs are used for testing.
+topGSA(gst.kegg, n=10)
+
 ```
 
-- then there's some compiling stuff (??)
 
-- and then hypergeometric test
-- and yes they do use BiasedUrn
