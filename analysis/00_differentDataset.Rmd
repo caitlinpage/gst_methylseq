@@ -1,0 +1,173 @@
+---
+title: "00_differentDataset"
+author: "Caitlin Page"
+date: "2025-03-20"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# want to look at the filtering more
+
+## breast cancer cell lines
+er pos or er neg
+RRBS data (not whole genome)
+https://www.degruyter.com/document/doi/10.1515/sagmb-2015-0078/html
+* they used chromosome 1
+* data available: raw fastq, or this summarised table thing which is at the island level - not helpful
+
+## Introduction
+
+```{r}
+read.table("../data/cell_line_wgbs/GSM665135_BT20_CpGislands_stats.txt.gz", header = TRUE)
+```
+
+* trying Galaxy to do the mapping
+* because cluster is confusing
+
+
+# other method
+2 human cell lines
+i. DMRcaller paper: https://academic.oup.com/nar/article/46/19/e114/5050634?login=false#123816690
+also has bioconductor package for data: ListerEtAlBSSeq
+ii. review methods: https://www.mdpi.com/1660-4601/18/15/7975#B58-ijerph-18-07975 (also uses the data) - has processed files available
+
+# i.
+```{r}
+library(ListerEtAlBSseq)
+```
+
+```{r}
+library(BSgenome.Hsapiens.UCSC.hg18)
+```
+
+H1
+```{r}
+h1data <- system.file('extdata', 'mc_h1_tabix.txt.gz', package='ListerEtAlBSseq')
+h1uncov <- system.file('extdata', 'uncov_GR_h1.Rdata', package='ListerEtAlBSseq')
+load(h1uncov)
+H1.WGBS <- BSdata(file=h1data, uncov=uncov_GR_h1, org=Hsapiens)
+```
+
+IMR90
+```{r}
+imr90data <- system.file('extdata', 'mc_i90_tabix.txt.gz', package='ListerEtAlBSseq')
+imr90uncov <- system.file('extdata', 'uncov_GR_imr90.Rdata', package='ListerEtAlBSseq')
+load(imr90uncov)
+IMR90.WGBS <- BSdata(file=imr90data, uncov=uncov_GR_imr90, org=Hsapiens)
+```
+
+
+```{r}
+H1.WGBS@uncov %>% data.frame()
+H1.WGBS@org@multiple_sequences
+H1.WGBS
+```
+* follow MethylPipe analysis
+https://bioconductor.org/packages/release/bioc/vignettes/methylPipe/inst/doc/methylPipe.pdf
+```{r}
+library(methylPipe)
+```
+
+```{r}
+H1.IMR90.set <- BSdataSet(org=Hsapiens, group=c("C","E"), IMR90=IMR90.WGBS, H1=H1.WGBS)
+```
+
+```{r}
+gr <- GRanges("chr20",IRanges(1,5e5))
+sres <- mCsmoothing(H1.WGBS, gr, Scorefun='sum', Nbins=50, plot=TRUE)
+```
+
+
+```{r}
+methpipe_DMRs <- findDMR(object= H1.IMR90.set, Nproc=5, MCClass='mCG', dmrSize=5, dmrBp=1000) #default param - 5 cpgs, max length 1kb
+head(DMRs)
+```
+
+```{r}
+methpipe_DMRs_consol <- readRDS("../output/methpipe_DMRs_consol.rds") %>% data.frame()
+cg_hg18 <- get_cg_sites(BSgenome.Hsapiens.UCSC.hg18::BSgenome.Hsapiens.UCSC.hg18, 1, 25)
+```
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(cg_hg18, methpipe_DMRs_consol, "biomart", biomart_genes)), "Wallenius")
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(cg_hg18, methpipe_DMRs_consol[1:1000,], "biomart", biomart_genes)), "Wallenius")
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(cg_hg18, methpipe_DMRs_consol[1:500,], "biomart", biomart_genes)), "Wallenius")
+```
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(cg_hg18, methpipe_DMRs_consol, "biomart", biomart_genes)), "None")
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(cg_hg18, methpipe_DMRs_consol[1:1000,], "biomart", biomart_genes)), "None")
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(cg_hg18, methpipe_DMRs_consol[1:500,], "biomart", biomart_genes)), "None")
+```
+
+
+- need the tested sites
+- it's not loaded into the memory with the fn
+```{r}
+mCsmoothing(H1.WGBS, gr, Scorefun='sum', Nbins=50, plot=TRUE)
+```
+```{r}
+cg_hg18 <- get_cg_sites(BSgenome.Hsapiens.UCSC.hg18::BSgenome.Hsapiens.UCSC.hg18, 1, 25)
+```
+
+```{r}
+mapBSdata2GRanges(as_granges(cg_hg18), H1.WGBS, context = "CG")
+```
+
+```{r}
+mapBSdata2GRanges(as_granges(cg_hg18), IMR90.WGBS, context = "CG")
+```
+
+# ii.
+
+```{r}
+rtracklayer::import("../data/cell_line_wgbs/cell_line/mc_h1.tar.gz")
+```
+```{r}
+untar("../data/cell_line_wgbs/cell_line/mc_h1.tar.gz")
+?untar
+```
+
+
+```{r}
+read.table("../data/cell_line_wgbs/cell_line/DMR.txt.gz", header = TRUE)
+```
+
+
+#######
+
+# breast cancer cell lines (er pos and er neg)
+
+```{r}
+read.table("../data/cell_line_wgbs/breast_cancer/processed/BT20_Galaxy5-[Bismark-Meth.Extractor-on-data-3_Mbias-Report].txt")
+```
+
+```{r}
+read.table("../data/cell_line_wgbs/breast_cancer/processed/er_neg_BT20_Galaxy6-[Bismark Meth.Extractor-on-data-3_Genome-wide-methylation-report.].txt")
+```
+- taking too long to run
+
+```{r}
+read.table("../data/cell_line_wgbs/breast_cancer/processed/dm_res/Galaxy54-[metilene on data 52, data 50, and others].tabular")
+breast_cancer_dmr <- read.table("../data/cell_line_wgbs/breast_cancer/processed/dm_res/Galaxy68-[metilene on data 52, data 50, and others].tabular")
+```
+
+```{r}
+names(breast_cancer_dmr)[1:3] <- c("seqnames", "start", "end")
+names(breast_cancer_dmr)[6:8] <- c("n_cg", "p_val", "FDR")
+```
+* guessing about these things
+```{r}
+library(org.Hs.eg.db)
+```
+
+```{r}
+source("../code/mmGST.R")
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, breast_cancer_dmr, "biomart", biomart_genes)), "Wallenius")
+```
+
+```{r}
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, breast_cancer_dmr, "biomart", biomart_genes)), "None")
+```
+
+
