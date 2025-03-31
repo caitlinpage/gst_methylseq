@@ -1,0 +1,165 @@
+---
+title: "00_datasets"
+author: "Caitlin Page"
+date: "2025-03-28"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Packages
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+
+library(BSgenome.Hsapiens.UCSC.hg19)
+```
+
+
+## Datasets
+
+# Main Datasets: Blood cell types
+
+# 1. Microarray
+[GSE110554](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE110554)
+* Tech: EPICv1 platform, ~850k array, hg19
+* WHAT: Blood cell types
+* SELECTED: NK and B
+* REPLICATES: 3
+* FILE TYPE: idat
+  * 2 files per sample: green and red for the different intensities
+  * read in as rgSet object
+* WHY: Part of this dataset was used by my supervisors in their gene set testing paper for [missMethyl](https://link.springer.com/article/10.1186/s13059-021-02388-x#Abs1)
+* USED FOR: all my microarray analysis
+
+# 2. WGBS sequencing
+[GSE186458](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186458)
+* Tech: WGBS, ~28m sites, hg19
+* WHAT: [Atlas of cell types](https://www.nature.com/articles/s41586-022-05580-6)
+* SELECTED: NK and B cell types
+* REPLICATES: 2
+* FILE TYPE: beta, bigWig
+* WHY:
+* USED FOR: comparing DM methods, developing GST, comparing to microarray
+* Preprocessing (also in "../code/runBsseqDMR.R)
+
+* need positions of CpGs
+```{r}
+# get the positions of cg sites
+seq_names <- seqnames(BSgenome.Hsapiens.UCSC.hg19)[1:25]
+anno_seq <- lapply(seq_names, function(x) {
+  cbind(data.frame(matchPattern("CG", BSgenome.Hsapiens.UCSC.hg19[[x]])),
+        seqnames = x
+  )
+}) %>%
+  dplyr::bind_rows()
+anno_seq <- anno_seq %>% mutate(pos = paste0(seqnames, "-", start)) %>%
+  relocate(pos, seqnames)
+# make this a function for later - and so can do other species and genomes
+get_cg_sites <- function(genome, x, y) {
+  seq_names <- seqnames(genome)[x:y]
+  anno_seq <- lapply(seq_names, function(x) {
+    cbind(data.frame(matchPattern("CG", genome[[x]])),
+          seqnames = x
+    )
+  }) %>%
+    dplyr::bind_rows()
+  anno_seq <- anno_seq %>% mutate(pos = paste0(seqnames, "-", start)) %>%
+    relocate(pos, seqnames)
+  anno_seq
+}
+```
+
+Processing beta files to get for each CpG site:
+* Number methylated reads (M)
+* Number unmethylated reads (C)
+* Calculate number of unmethylated reads (C - M)
+
+* I knew the data had the methylated and coverage because if I used that to calculate the beta score:
+M/C - It was the same as the score on the bigWig files
+* but the bigWig files didn't have every site (can't have a score if no coverage on the site 0/0 = Inf)
+* so needed the beta file: information for every site
+* and the positions from anno-seq match the positions on the bigWigs
+```{r}
+# NK counts
+fname <- "../data/wgbs/GSM5652299_Blood-NK-Z000000TM.beta"
+N <- file.info(fname)$size
+beta_nk <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- "../data/wgbs/GSM5652300_Blood-NK-Z000000U1.beta"
+N <- file.info(fname)$size
+beta_nk <- cbind(beta_nk, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- "../data/wgbs/GSM5652301_Blood-NK-Z000000UF.beta"
+N <- file.info(fname)$size
+beta_nk <- cbind(beta_nk, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_nk) <- c("M_TM", "C_TM", "M_U1", "C_U1", "M_UF", "C_UF")
+beta_nk <- cbind(anno_seq[,1:4], beta_nk)
+
+# B counts
+fname <- "../data/wgbs/GSM5652316_Blood-B-Z000000TX.beta"
+N <- file.info(fname)$size
+beta_b <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- "../data/wgbs/GSM5652317_Blood-B-Z000000UB.beta"
+N <- file.info(fname)$size
+beta_b <- cbind(beta_b, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- "../data/wgbs/GSM5652318_Blood-B-Z000000UR.beta"
+N <- file.info(fname)$size
+beta_b <- cbind(beta_b, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_b) <- c("M_TX", "C_TX", "M_UB", "C_UB", "M_UR", "C_UR")
+beta_b <- cbind(anno_seq[,1:4], beta_b)
+
+# add unmeth counts
+beta_nk <- beta_nk %>% mutate(Un_TM = C_TM - M_TM, Un_U1 = C_U1 - M_U1, Un_UF = C_UF - M_UF)
+beta_b <- beta_b %>% mutate(Un_TX = C_TX - M_TX, Un_UB = C_UB - M_UB, Un_UR = C_UR - M_UR)
+
+# combine
+colnames(beta_b)[5:13] <- paste0("b_", colnames(beta_b)[5:13])
+colnames(beta_nk)[5:13] <- paste0("nk_", colnames(beta_nk)[5:13])
+
+beta_all <- cbind(beta_nk, beta_b[,5:13])
+
+saveRDS(beta_all, "../output/wgbs_counts.rds")
+```
+
+
+
+
+## Extra Datasets
+
+# EPIC QC Study - NOT IN FINAL ANALYSIS
+* Tech: 
+* WHAT: 
+* SELECTED:
+* REPLICATES: 
+* FILE TYPE:
+* WHY: lots of different data types - and new data types like EM-seq that we wanted to work on.
+So we thought it would be cool to do DM on it and compare - and be able to compare different sequencing approaches
+* USED FOR: initiall attempt at DM analysis. Unsuited for anything as very little methylation.
+
+# Long read
+* Tech: Oxford Nanopore, mm10
+* WHAT: genomic imprinting, X inactivation
+* SELECTED:
+* REPLICATES: 
+* FILE TYPE:
+* WHY:
+* USED FOR: test
+
+# 2 cell lines
+* Tech: WGBS, hg18
+* WHAT: H1 and IMR90
+* SELECTED:
+* REPLICATES: 
+* FILE TYPE:
+* WHY:
+* USED FOR:
+
+# Breast cancer cell lines
+* Tech: RRBS
+* WHAT: 
+* SELECTED:
+* REPLICATES: 4
+* FILE TYPE:
+* WHY:
+* USED FOR:
