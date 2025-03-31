@@ -310,7 +310,7 @@ class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2025-03-28
+<strong>Last updated:</strong> 2025-03-31
 </p>
 <p>
 <strong>Checks:</strong> <span
@@ -441,15 +441,15 @@ project makes it easier to run your code on other machines.</p>
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeb1ab34f850ff217d1aaeec363c99c63a7c7a383btargetblankb1ab34fa">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree067790ef804cd5640ee7d7b8692f037f7dd7f9a6targetblank067790ea">
 <span class="glyphicon glyphicon-ok text-success"
 aria-hidden="true"></span> <strong>Repository version:</strong>
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/b1ab34f850ff217d1aaeec363c99c63a7c7a383b" target="_blank">b1ab34f</a>
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/067790ef804cd5640ee7d7b8692f037f7dd7f9a6" target="_blank">067790e</a>
 </a>
 </p>
 </div>
 <div
-id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeb1ab34f850ff217d1aaeec363c99c63a7c7a383btargetblankb1ab34fa"
+id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree067790ef804cd5640ee7d7b8692f037f7dd7f9a6targetblank067790ea"
 class="panel-collapse collapse">
 <div class="panel-body">
 <p>
@@ -459,7 +459,7 @@ reproducibility.
 </p>
 <p>
 The results in this page were generated with repository version
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/b1ab34f850ff217d1aaeec363c99c63a7c7a383b" target="_blank">b1ab34f</a>.
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/067790ef804cd5640ee7d7b8692f037f7dd7f9a6" target="_blank">067790e</a>.
 See the <em>Past versions</em> tab to see a history of the changes made
 to the R Markdown and HTML files.
 </p>
@@ -478,7 +478,6 @@ Ignored files:
     Ignored:    .Rhistory
     Ignored:    .Rproj.user/
     Ignored:    analysis/.DS_Store
-    Ignored:    analysis/figure/
     Ignored:    analysis/myEnvironment.RData
     Ignored:    data/cell_line_wgbs/
     Ignored:    data/gene_sets/
@@ -490,7 +489,6 @@ Ignored files:
     Ignored:    renv/staging/
 
 Untracked files:
-    Untracked:  analysis/00_differentDataset.Rmd
     Untracked:  analysis/clusterlog.txt
     Untracked:  analysis/mc_h1/
     Untracked:  code/ChatGPT_translate.html
@@ -500,11 +498,6 @@ Unstaged changes:
     Modified:   .gitignore
     Modified:   2_ontology_bias.Rproj
     Modified:   _workflowr.yml
-    Modified:   analysis/00_differentialMethylationArray.Rmd
-    Modified:   analysis/00_differentialMethylationSequencing.Rmd
-    Modified:   analysis/00_exploreCpGDistrib.Rmd
-    Modified:   analysis/02_exploreBiasGenes.Rmd
-    Modified:   analysis/04_compareDM.Rmd
     Modified:   code/runSeqDmMethods.R
     Modified:   renv/.gitignore
     Modified:   renv/activate.R
@@ -552,6 +545,40 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/067790ef804cd5640ee7d7b8692f037f7dd7f9a6/analysis/index.Rmd" target="_blank">067790e</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-03-31
+</td>
+<td>
+wflow_publish(c("index.Rmd", "00_datasets.Rmd"))
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/caitlinpage/gst_methylseq/8fe9f540fa543e1368e17565df63e97d63fc7396/docs/index.html" target="_blank">8fe9f54</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-03-28
+</td>
+<td>
+Build site.
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -736,15 +763,40 @@ platform. <a
 href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE110554">GSE110554</a>
 * WGBS <a
 href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186458">GSE186458</a></p>
+<ul>
+<li>Initial analysis and development of GST methods was done on results
+from bsseq.</li>
+<li>This was the method that ran and worked well.</li>
+<li>When revisiting analysis - retried DMRcate and it ran (didn’t
+initially).</li>
+<li>It was attractive as it had a method for array and seq, and found
+less DMRs (bsseq was very noisy)</li>
+<li>original microarray analysis was done with minfi - and then repeated
+with DMRcate</li>
+<li>results from both methods will be included in the various steps - as
+the original development, and as the subsequent analysis.</li>
+</ul>
 <p>Analysis:</p>
-<ol style="list-style-type: decimal">
-<li>Differential methylation methods and comparison</li>
+<ol start="0" style="list-style-type: decimal">
+<li><p><a href="00_datasets.Rmd">Datasets used in the
+analyses</a></p></li>
+<li><p><a href="00_exploreCpGDistrib">Exploration of CpG
+sites</a></p></li>
+<li><p>Differential methylation methods and comparison</p></li>
 </ol>
 <ol style="list-style-type: lower-alpha">
 <li><p><a
 href="00_differentialMethylationArray.html">Microarray</a></p></li>
 <li><p>Sequencing *tbd 00_differentialMethylationSequencing</p></li>
+<li><p>Compare CpG level and DMR results</p></li>
 <li><p>Compare microarray and sequencing DMRcate results</p></li>
+</ol>
+<ol start="2" style="list-style-type: decimal">
+<li>Annotating DMRs to genes</li>
+</ol>
+<ol style="list-style-type: lower-alpha">
+<li><p>Comparing significant genes</p></li>
+<li><p>Comparing microarray and sequencing genes</p></li>
 </ol>
 <ol start="2" style="list-style-type: decimal">
 <li><p><a href="00_microarrayOntologyAnalysis.Rmd">Methylation
@@ -752,18 +804,18 @@ microarray gene set testing analysis</a></p></li>
 <li><p>Identify bias for correction in gene set testing</p></li>
 </ol>
 <ol style="list-style-type: lower-alpha">
-<li><a href="01_exploreBiasByBins.Rmd">Explore CpG distribution across
-genome bins</a></li>
+<li><p><a href="01_exploreBiasByBins.Rmd">Explore CpG distribution
+across genome bins</a></p></li>
+<li><p><a href="02_exploreBiasGenes.Rmd">Explore gene based biases</a>
+*tba</p></li>
 </ol>
 <ol start="4" style="list-style-type: decimal">
-<li><p>Develop gene set testing method for methylation
-sequencing</p></li>
-<li><p>Validate gene set testing method for methylation
-sequencing</p></li>
+<li><p><a href="03_runGST.Rmd">Develop and evaludate gene set testing
+method for methylation sequencing</a></p></li>
 <li><p>Applying gene set testing method to different data sets</p></li>
 </ol>
 <ol style="list-style-type: lower-alpha">
-<li>Long read Analysis 00_longRead</li>
+<li><a href="00_longReadAnalysis">Long read Analysis</a></li>
 </ol>
 <pre class="r"><code>#save.image(file=&#39;myEnvironment.RData&#39;)</code></pre>
 <p><a
