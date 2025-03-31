@@ -15,7 +15,20 @@ under the hg19 genome annotation.
 * Microarray: EPICv1 platform. [GSE110554](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE110554)
 * WGBS [GSE186458](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186458)
 
+
+* Initial analysis and development of GST methods was done on results from bsseq.
+* This was the method that ran and worked well.
+* When revisiting analysis - retried DMRcate and it ran (didn't initially).
+* It was attractive as it had a method for array and seq, and found less DMRs (bsseq was very noisy)
+* original microarray analysis was done with minfi - and then repeated with DMRcate
+* results from both methods will be included in the various steps - as the original development, and as the subsequent analysis.
+
+
 Analysis:
+
+0. [Datasets used in the analyses](00_datasets.Rmd) 
+
+1. [Exploration of CpG sites](00_exploreCpGDistrib)
 
 1. Differential methylation methods and comparison
 
@@ -23,7 +36,15 @@ Analysis:
   
   b) Sequencing *tbd 00_differentialMethylationSequencing
   
+  c) Compare CpG level and DMR results
+  
   c) Compare microarray and sequencing DMRcate results 
+
+2. Annotating DMRs to genes
+
+  a) Comparing significant genes
+
+  a) Comparing microarray and sequencing genes
 
 2. [Methylation microarray gene set testing analysis](00_microarrayOntologyAnalysis.Rmd)
 
@@ -31,13 +52,14 @@ Analysis:
 
   a) [Explore CpG distribution across genome bins](01_exploreBiasByBins.Rmd)
   
-4. Develop gene set testing method for methylation sequencing
-
-5. Validate gene set testing method for methylation sequencing
+  b) [Explore gene based biases](02_exploreBiasGenes.Rmd) *tba
+  
+4. [Develop and evaludate gene set testing method for methylation sequencing](03_runGST.Rmd)
 
 6. Applying gene set testing method to different data sets
 
-  a) Long read Analysis 00_longRead
+  a) [Long read Analysis](00_longReadAnalysis)
+  
 
 ```{r}
 	

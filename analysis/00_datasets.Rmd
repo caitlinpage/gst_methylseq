@@ -12,9 +12,25 @@ editor_options:
 ```{r}
 library(plyranges)
 library(dplyr)
+library(stringr)
 library(ggplot2)
 
+# get WGBS cg sites
 library(BSgenome.Hsapiens.UCSC.hg19)
+
+# microarray analysis
+library(minfi)
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylationEPICmanifest)
+
+# long read data
+library(NanoMethViz)
+library(org.Mm.eg.db)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+
+# h1 and imr90 cell lines
+library(ListerEtAlBSseq)
+library(methylPipe)
 ```
 
 
@@ -32,7 +48,28 @@ library(BSgenome.Hsapiens.UCSC.hg19)
   * 2 files per sample: green and red for the different intensities
   * read in as rgSet object
 * WHY: Part of this dataset was used by my supervisors in their gene set testing paper for [missMethyl](https://link.springer.com/article/10.1186/s13059-021-02388-x#Abs1)
+Immune cell types also have large differences in methylation
 * USED FOR: all my microarray analysis
+```{r}
+# 2 folders: 1 for natural killer samples, 1 for b cell samples
+file_source <- c("natural_killer", "b_cell")
+files_new <- character()
+for(i in 1:2) {
+  files <- list.files(paste0("../data/microarray/", file_source[i])) %>% gsub(".idat.gz", "", .)
+  files <- files[!grepl("Red", files)]
+  files <- files %>% gsub("_Grn", "", .)
+  files <- paste0("../data/microarray/", file_source[i], "/", files)
+  files_new <- c(files_new, files)
+}
+files_new
+```
+
+```{r}
+# minfi is used to organise the data
+rgSet <- read.metharray(files_new)
+rgSet
+```
+
 
 # 2. WGBS sequencing
 [GSE186458](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186458)
@@ -41,7 +78,8 @@ library(BSgenome.Hsapiens.UCSC.hg19)
 * SELECTED: NK and B cell types
 * REPLICATES: 2
 * FILE TYPE: beta, bigWig
-* WHY:
+* WHY: Cell types match those available in the microarray data
+Immune cell types are known to have large methylation differences
 * USED FOR: comparing DM methods, developing GST, comparing to microarray
 * Preprocessing (also in "../code/runBsseqDMR.R)
 
@@ -128,38 +166,93 @@ saveRDS(beta_all, "../output/wgbs_counts.rds")
 ## Extra Datasets
 
 # EPIC QC Study - NOT IN FINAL ANALYSIS
-* Tech: 
-* WHAT: 
-* SELECTED:
-* REPLICATES: 
-* FILE TYPE:
+* Tech: Whole genome: EM-Seq, Methyl Seq, Nanopore, SPLAT, TrueMethyl (Oxid and BS), Truseq
+Targeted: EPIC
+* WHAT: [Quality control of technologies](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02529-2)
+[Nanopore](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE173688)
+[All other samples](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA200694)
+* SELECTED: 2 family trios (mum, dad, child). Chinese Han ancestry, Ashkenazi Jewish ancestry
+* REPLICATES: NA
+* FILE TYPE: Bedgraphs for seq, idat for array
 * WHY: lots of different data types - and new data types like EM-seq that we wanted to work on.
 So we thought it would be cool to do DM on it and compare - and be able to compare different sequencing approaches
-* USED FOR: initiall attempt at DM analysis. Unsuited for anything as very little methylation.
+* USED FOR: initial attempt at DM analysis. Unsuited for anything as very little methylation.
 
 # Long read
 * Tech: Oxford Nanopore, mm10
-* WHAT: genomic imprinting, X inactivation
-* SELECTED:
-* REPLICATES: 
-* FILE TYPE:
-* WHY:
-* USED FOR: test
+* WHAT: genomic imprinting, X inactivation, from [NanoMethViz](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009524)
+[Processed data](https://zenodo.org/records/4495921)
+[Analysis workflow/raw data](https://f1000research.com/articles/13-1243)
+* SELECTED: All samples available. 3 samples, with maternal and paternal stranda
+* REPLICATES: 3 (triplicate)
+* FILE TYPE: Modified Bams, subsetted to chromosome 7
+* WHY: We wanted to do a long read analysis, but there is limited data available.
+At BioCAsia 2024, I did the NanoMethViz workshop and it used this data. As I was familar with it, it was the most accessible to try our gene set testing on.
+* USED FOR: testing the gene set testing method - proof of concept that it is suited for long read.
+It's utility was limited as there is limited methylation that occurs in this data, so the evidence of the methods effectiveness in comparison to biased was limited.
+
+```{r}
+if (!dir.exists("../data/long_read/bams")) {
+    options(timeout = 600)
+    download.file("https://zenodo.org/records/12747551/files/input.tar.gz?download=1", "input.tar.gz")
+    utils::untar("input.tar.gz")
+    file.remove("input.tar.gz")
+}
+bam_files <- dir("../data/long_read/input", pattern = "*bam$", full.names = TRUE)
+bam_files
+```
+
+```{r}
+samples <- read.table("../data/long_read/input/sample_anno.tsv", header = TRUE)
+head(samples)
+```
+
+```{r}
+exon_anno <- get_exons_mm10() 
+head(exon_anno)
+```
+
+```{r}
+mbr <- ModBamResult(
+    methy = ModBamFiles(
+        paths = bam_files,
+        samples = samples$sample
+    ),
+    samples = samples,
+    exons = exon_anno,
+    mod_code = "m"
+)
+```
 
 # 2 cell lines
 * Tech: WGBS, hg18
-* WHAT: H1 and IMR90
-* SELECTED:
-* REPLICATES: 
-* FILE TYPE:
-* WHY:
-* USED FOR:
+* WHAT: H1 (human embryonic) and IMR90 (human fibroblast lung embryo - 16 weeks) cell lines
+Used in [DMRCaller paper](https://academic.oup.com/nar/article/46/19/e114/5050634?login=false#123816627)
+Processed data is available as a [Bioconductor package](https://bioconductor.org/packages/release/data/experiment/html/ListerEtAlBSseq.html)
+The DMRCaller paper uses several other publicly available datasets; compiled Arabidopsis data, rice endosperm vs rice embryo
+* SELECTED: H1 and IMR90
+* REPLICATES: 1
+* FILE TYPE: processed
+* WHY: We wanted a dataset with less methylation differences to compare to and determine recommended filtering parameters. Looked at DM methods papers and reviews for datasets.
+* USED FOR: Running DM analysis and GST method, and to compare method when there is less DM. Processed data is suited for DM analysis with MethylPipe, and uses similar data structure to bsseq.
 
-# Breast cancer cell lines
+```{r}
+h1data <- system.file('extdata', 'mc_h1_tabix.txt.gz', package='ListerEtAlBSseq')
+h1uncov <- system.file('extdata', 'uncov_GR_h1.Rdata', package='ListerEtAlBSseq')
+load(h1uncov)
+H1.WGBS <- BSdata(file=h1data, uncov=uncov_GR_h1, org=Hsapiens)
+```
+
+
+# Breast cancer cell lines - NOT in FINAL ANALYSIS
 * Tech: RRBS
-* WHAT: 
-* SELECTED:
-* REPLICATES: 4
-* FILE TYPE:
-* WHY:
-* USED FOR:
+* WHAT: [Paper comparing 5 differential methylation methods](https://www.degruyter.com/document/doi/10.1515/sagmb-2015-0078/html)
+[The data though is from 2011](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE27003)
+Breast cancer cell lines comparing ER+ and ER-
+Has Methylation, RNA-Seq, and DNA Copy Number Alterations
+* SELECTED: Methylation 2 cell lines for each
+* REPLICATES: 4 (total), 2 selected
+* FILE TYPE: Raw fastq. Summarised CpG island statistics
+* WHY: We wanted a dataset with less methylation differences than cell types, and wanted to look at what DM papers used.
+* USED FOR: Attempted to process data using Galaxy. Bismark to map data, metiliene to identify DM regions.
+Will not be used in final analysis as we would prefer pre-processed data - not fastqs.
