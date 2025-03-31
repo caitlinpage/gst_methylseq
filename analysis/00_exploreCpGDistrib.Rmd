@@ -6,6 +6,67 @@ output: workflowr::wflow_html
 editor_options:
   chunk_output_type: inline
 ---
+
+## Packages
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(ggVennDiagram)
+
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylationEPICmanifest)
+```
+
+
+
+```{r}
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+anno_array <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+anno_array <- anno_array %>% data.frame() %>% mutate(seqnames = chr, start = pos, width = 1) %>% relocate(c(seqnames, start, width))
+```
+```{r}
+c(seq_sites = nrow(wgbs_counts), array_sites = nrow(anno_array))
+```
+
+```{r}
+overlap <- find_overlaps(as_granges(wgbs_counts), as_granges(anno_array)) %>% data.frame()
+```
+
+# Q: How do Array and Sequencing positions relate
+* H: Array would be a subset of sequencing
+A: Majority overlap
+
+```{r}
+list_venn <- list(seq = wgbs_counts$pos, 
+                  array = anno_array$position)
+ggVennDiagram(list_venn)
+```
+* is this less that overlap than used to?
+
+* look for the ones on the array that don't overlap
+
+# number of CpGs across chromosomes
+* seq
+```{r}
+wgbs_counts %>%
+  ggplot(aes(x = seqnames, fill = seqnames)) +
+  geom_bar() +
+  theme(legend.position = "none")
+```
+
+* array
+```{r}
+anno_array %>%
+  ggplot(aes(x = seqnames, fill = seqnames)) +
+  geom_bar() +
+  theme(legend.position = "none")
+```
+
+# density
+
+* see bins bias for more
+
 ```{r}
 library(plyranges)
 library(dplyr)
@@ -17,70 +78,10 @@ library(IlluminaHumanMethylationEPICmanifest)
 library(annotatr)
 ```
 
-## Introduction
-
-```{r}
-DMPs <- readRDS("../output/DMPs.rds")
-
-wgbs_counts <- readRDS("../output/wgbs_counts.rds")
-bsseq_res <- readRDS("../output/bsseq_res.rds")
-
-biomart_genes <- readRDS("../output/biomart_genes.rds")
-```
-
-```{r}
-tested_array <- DMPs[,c("cg_id", "seqnames", "start", "width")]
-tested_seq <- bsseq_res[,c("position", "seqnames", "start", "end")]
-```
-```{r}
-anno_array <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
-anno_array
-anno_array <- anno_array %>% data.frame() %>% mutate(seqnames = chr, start = pos, width = 1) %>% relocate(c(seqnames, start, width))
-anno_array 
-```
 
 
-```{r}
-tested_array <- tested_array %>% .[order(.$seqnames, .$start),]
-```
-
-## Compare distance between tested sites
-```{r}
-tested_array <- tested_array %>% group_by(seqnames) %>% mutate(dist_to_next = lead(start) - start) %>% ungroup()
-
-tested_seq <- tested_seq %>% group_by(seqnames) %>% mutate(dist_to_next = lead(start) - start) %>% ungroup()
-```
-
-# array
-
-```{r}
-tested_array %>%
-  ggplot(aes(x = log2(dist_to_next), colour = seqnames)) +
-  geom_density()
-
-tested_array %>%
-  ggplot(aes(y = log2(dist_to_next), x = seqnames, colour = seqnames)) +
-  geom_boxplot()
-```
 
 
-# WGBS
-
-```{r}
-tested_seq %>%
-  ggplot(aes(x = log2(dist_to_next), colour = seqnames)) +
-  geom_density()
-
-tested_seq %>%
-  ggplot(aes(y = log2(dist_to_next), x = seqnames, colour = seqnames)) +
-  geom_boxplot()
-```
-
-```{r}
-t.test(tested_array$dist_to_next[!is.na(tested_array$dist_to_next)], tested_seq$dist_to_next[!is.na(tested_seq$dist_to_next)])
-```
-* 2 groups are significantly different
-* sequencing has much smaller gaps between tested CpGs
 
 
 ## Distribution of tested CpGs among CpG annotations - islands etc
@@ -100,11 +101,8 @@ tested_array$cpg_feature <- anno_array[match(tested_array$cg_id, rownames(anno_a
 tested_array %>% group_by(cpg_feature) %>% summarise(n=n()) %>% ungroup() %>% mutate(total = sum(n), prop = n/sum(n))
 ```
 
-# WGBS
-* use package annotatr - has CpG annotations built in
-```{r}
-builtin_annotations()
-```
+# annotatr
+
 ```{r}
 anno_cpg <- build_annotations(genome="hg19", annotations = "hg19_cpgs")
 ```
@@ -136,7 +134,8 @@ tested_array %>%
 
 tested_array %>%
   ggplot(aes(y = log2(dist_to_next), x = annot.type, colour = annot.type)) +
-  geom_boxplot()
+  geom_boxplot() +
+  theme(legend.position = "none")
 ```
 
 ```{r}
@@ -146,7 +145,8 @@ tested_seq %>%
 
 tested_seq %>%
   ggplot(aes(y = log2(dist_to_next), x = annot.type, colour = annot.type)) +
-  geom_boxplot()
+  geom_boxplot() +
+  theme(legend.position = "none")
 ```
 * as expected, shorter distances between cpgs in the islands
 
@@ -162,22 +162,22 @@ anno_gene %>% data.frame() %>% distinct(type)
 ```
 
 ```{r}
-annotate_regions(as_granges(tested_seq), anno_gene) %>% data.frame() %>% .[,!colnames(.) %in% c("annot.id.1", "annot_tx_id.1", "annot.gene_id.1")]
+#annotate_regions(as_granges(tested_seq), anno_gene) %>% data.frame() %>% .[,!colnames(.) %in% c("annot.id.1", "annot_tx_id.1", "annot.gene_id.1")]
 ```
 ** come back to this
 
 ######
 ```{r}
-unique(bseq_all_res$seqnames)
+unique(bsseq_res$seqnames)
 annots_gene <- annots_gene %>% data.frame() %>% filter(seqnames %in% unique(bseq_all_res$seqnames)) %>% as_granges()
 ```
 
 ```{r}
-anno_cpg_by_gene <- annotate_regions(as_granges(bseq_all_res), annots_gene) %>% data.frame()
+anno_cpg_by_gene <- annotate_regions(as_granges(bsseq_res), annots_gene) %>% data.frame()
 ```
 
 ```{r}
-annotate_regions(as_granges(bseq_dmrs), annots_gene) %>% data.frame()
+annotate_regions(as_granges(bsseq_dmrs), annots_gene) %>% data.frame()
 ```
 ```{r}
 bseq_dmrs_genes <- annotate_regions(as_granges(bseq_dmrs), annots_gene) %>% data.frame()
