@@ -46,7 +46,11 @@ dmrcate_array_anno <- dmrcate_array_anno %>% mutate(in_dmr = ifelse(pos %in% dmr
 dmrcate_array_anno <- dmrcate_array_anno %>% mutate(rank_dmr = dmrcate_overlap[match(.$pos.x, dmrcate_overlap$pos), "rank"], rank_dmr = ifelse(is.na(rank_dmr), max(rank_dmr, na.rm = TRUE) + 1, rank_dmr))
 
 dmrcate_array_anno <- find_overlaps(as_granges(dmrcate_array_anno), as_granges(mutate(anno_array, cg_id = rownames(anno_array)))) %>% data.frame()
+dmrcate_array_anno <- dmrcate_array_anno %>% mutate(rank_dmr = dmrcate_overlap[match(.$pos.x, dmrcate_overlap$pos), "rank"], rank_dmr = ifelse(is.na(rank_dmr), max(rank_dmr, na.rm = TRUE) + 1, rank_dmr))
 
+dmrcate_array_bio_anno <- annoGeneDmr(anno_array, dmrcate_array_anno, gene_source = "biomart", biomart_genes)
+me_gst_dmrcate_array_out <- run_miss_methyl_a(biomart_genes, dmrcate_array_bio_anno)
+me_gst_dmrcate_array <- run_miss_methyl_b(run_miss_methyl_a(me_gst_dmrcate_array_out, method = "Wallenius"))
 
 ```{r}
 DMPs <- readRDS("../output/array_dmps.rds")
