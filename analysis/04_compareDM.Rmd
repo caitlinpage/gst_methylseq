@@ -11,6 +11,8 @@ editor_options:
 library(plyranges)
 library(dplyr)
 library(ggplot2)
+library(ggVennDiagram)
+library(ComplexUpset)
 ```
 
 
@@ -27,9 +29,6 @@ bsseq_res <- readRDS("../output/bsseq_res.rds")
 seq_edge_res <- readRDS("../output/seq_edge_res.rds")
 ```
 
-```{r}
-library(ComplexUpset)
-```
 ```{r}
 dmrcate_array_anno
 dmrcate_seq_anno$pos <- paste0(dmrcate_seq_anno$seqnames, "-", dmrcate_seq_anno$start)
