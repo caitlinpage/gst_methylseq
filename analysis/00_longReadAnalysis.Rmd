@@ -9,27 +9,17 @@ editor_options:
 
 ## Introduction
 
-install:
-org.Mm.eg.db
-TxDb.Mmusculus.UCSC.mm10.knownGene
 ```{r}
 library(NanoMethViz)
+library(plyranges)
 library(dplyr)
+library(ggplot2)
 library(stringr)
 library(bsseq)
 library(dmrseq)
-
-long_ratio <- read.csv("../data/long_read/log_methy_ratio.csv.gz")
-long_chrx <- read.table("../data/long_read/chrx_methy_data.tsv.gz", header = TRUE)
+library(org.Mm.eg.db)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 ```
-
-
-```{r}
-long_ratio
-long_chrx
-```
-* actually let's download the BAMS
-* and follow the workshop code
 
 ```{r}
 if (!dir.exists("../data/long_read/bams")) {
@@ -46,15 +36,14 @@ bam_files
 
 ```{r}
 samples <- read.table("../data/long_read/input/sample_anno.tsv", header = TRUE)
-samples
+head(samples)
 ```
 * they just used exon 7 - that only left very few significant DMRs
 * workshop data is just chr7
 
 ```{r}
 exon_anno <- get_exons_mm10() 
-  #  filter(chr %in% c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7"))
-exon_anno
+head(exon_anno)
 ```
 
 ```{r}
@@ -72,9 +61,9 @@ plot_gene(mbr, "Peg3")
 ```
 
 ```{r}
-modbam_to_tabix(mbr, "../data/long_read/methy.tsv.bgz")
+#modbam_to_tabix(mbr, "../data/long_read/methy.tsv.bgz")
 ```
-* oh this makes the file I downloaded from the paper - just with all chr instead of just X
+
 
 ```{r}
 nmr <- NanoMethResult(
@@ -82,7 +71,7 @@ nmr <- NanoMethResult(
     samples = samples,
     exons = exon_anno
 )
-nmr
+str(nmr)
 ```
 
 ```{r}
@@ -98,7 +87,7 @@ mat_cols <- str_detect(colnames(getCoverage(bss)), "mat")
 low_cov <- (rowSums(getCoverage(bss)[, pat_cols] == 0) == 3) |
            (rowSums(getCoverage(bss)[, mat_cols] == 0) == 3)
 
-table(low_cov)/sum(table(low_cov))
+head(table(low_cov)/sum(table(low_cov)))
 ```
 
 ```{r}
@@ -106,7 +95,8 @@ bss <- bss[!low_cov, ]
 ```
 ```{r}
 cgi_anno <- readRDS("../data/long_read/cgi_mm10.rds")
-cgi_anno
+nrow(cgi_anno)
+head(cgi_anno)
 ```
 * wrong package version so this is being annoying - just download the rds file and read it 
 
@@ -128,7 +118,8 @@ gene_anno <- exons_to_genes(exons(nmr))
 plot_agg_regions(nmr, regions = slice_sample(gene_anno, n = 100), group_col = "group")
 ```
 ```{r}
-gene_anno
+nrow(gene_anno)
+head(gene_anno)
 ```
 
 ```{r}
@@ -138,16 +129,14 @@ plot_agg_regions(nmr, cgi_anno, group_col = "group")
 ```{r}
 pData(bss)$condition <- NanoMethViz::samples(nmr)$group
 ```
-```{r}
-bss@rowRanges
-```
-* hold on I tried to use all chromosomes - how did I end up with just 7 again?
+
 ```{r}
 long_regions <- dmrseq(bss, testCovariate = "condition", minNumRegion = 20)
 ```
 
 ```{r}
-long_regions
+nrow(long_regions)
+head(long_regions)
 ```
 
 ```{r}
@@ -159,7 +148,8 @@ gene_anno_gr_tss <- gene_anno_gr %>%
     stretch(10000)
 
 gene_dmr_overlaps <- join_overlap_intersect(long_regions, gene_anno_gr_tss)
-gene_dmr_overlaps
+nrow(gene_dmr_overlaps)
+head(gene_dmr_overlaps)
 ```
 
 ```{r}
@@ -173,10 +163,6 @@ long_regions_sig <- dmr_regions %>%
 
 long_regions_sig %>% as.data.frame() 
 ```
-```{r}
-long_regions %>% data.frame() %>% filter(qval < 0.05)
-dmr_regions
-```
 
 * well damn I've only got 8 genes significant
 * guess I just have to try it
@@ -185,7 +171,6 @@ dmr_regions
 
 ```{r}
 gene_anno$seqnames <- gene_anno$chr
-gene_anno %>% filter(seqnames == "chr7")
 ```
 
 ```{r}
@@ -199,9 +184,6 @@ long_gene_overlap %>%
 ```
 ```{r}
 gene_anno <- data.frame(gene_anno)
-```
-```{r}
-long_gene_overlap
 ```
 
 ```{r}
@@ -232,9 +214,7 @@ long_genes_tested
 cgi_anno
 gene_anno %>% filter(chr == "chr7", symbol == "Peg3")
 ```
-```{r}
-3531843 - 3531624
-```
+
 
 ## my way of getting cg annotation
 ```{r get-cg}
@@ -277,23 +257,18 @@ gene_anno_7
 ```
 
 ## Gene set testing - GOSEQ
-* ok actually I'm not convinced of this background either
 
 ```{r}
 gene.vector <- long_genes_tested$signif
 names(gene.vector) <- long_genes_tested$gene_id
 
 pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = long_genes_tested$num_cg)
-pwf
 GO.long <- goseq::goseq(pwf, "mm10", "knownGene")
-GO.long
 GO.long <- GO.long %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
-GO.long
+head(GO.long)
 ```
-* ok the FDR is 1 but the top term is genomic imprinting which is correct - so yay
-```{r}
-gene_anno_7 %>% filter(is.na(qval)) mutate(qval = ifelse(is.na(qva)))
-```
+* ok the FDR is 1 but the top term is genomic imprinting which is correct 
+
 
 ```{r}
 gene_anno_7 <- gene_anno_7 %>% mutate(qval = ifelse(is.na(qval), 1.1, qval), signif = ifelse(qval < 0.05, 1, 0))
@@ -301,11 +276,9 @@ gene.vector <- gene_anno_7$signif
 names(gene.vector) <- gene_anno_7$gene_id
 
 pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
-pwf
 GO.long <- goseq::goseq(pwf, "mm10", "knownGene")
-GO.long
 GO.long <- GO.long %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
-GO.long
+head(GO.long)
 ```
 
 ```{r}
@@ -314,11 +287,9 @@ gene.vector <- gene_anno_7$signif
 names(gene.vector) <- gene_anno_7$gene_id
 
 pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
-pwf
 GO.long.50 <- goseq::goseq(pwf, "mm10", "knownGene")
-GO.long.50
 GO.long.50 <- GO.long.50 %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
-GO.long.50
+head(GO.long.50)
 ```
 * yeah ok taking top 50 genes made it worse
 
@@ -332,10 +303,9 @@ pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = long_genes_tes
 
 GO.long_null <- goseq::goseq(pwf, "mm10", "knownGene", method = "Hypergeometric")
 GO.long_null <- GO.long_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
-GO.long_null
+head(GO.long_null)
 ```
 * also imprinting
-* idk about the rest of the terms
 
 ```{r}
 gene_anno_7 <- gene_anno_7 %>% mutate(qval = ifelse(is.na(qval), 1.1, qval), signif = ifelse(qval < 0.05, 1, 0))
@@ -343,11 +313,9 @@ gene.vector <- gene_anno_7$signif
 names(gene.vector) <- gene_anno_7$gene_id
 
 pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
-pwf
 GO.long_null <- goseq::goseq(pwf, "mm10", "knownGene", method = "Hypergeometric")
-GO.long_null
 GO.long_null <- GO.long_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
-GO.long_null
+head(GO.long_null)
 ```
 
 
@@ -357,11 +325,9 @@ gene.vector <- gene_anno_7$signif
 names(gene.vector) <- gene_anno_7$gene_id
 
 pwf <- goseq::nullp(gene.vector, "mm10", "knownGene", bias.data = gene_anno_7$num_cg)
-pwf
 GO.long.50_null <- goseq::goseq(pwf, "mm10", "knownGene", method = "Hypergeometric")
-GO.long.50_null
 GO.long.50_null <- GO.long.50_null %>% dplyr::mutate(FDR = stats::p.adjust(.data$over_represented_pvalue, method = "BH"))
-GO.long.50_null
+head(GO.long.50_null)
 ```
 
 ## fisher for lols?
