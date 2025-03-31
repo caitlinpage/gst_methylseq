@@ -7,32 +7,92 @@ editor_options:
   chunk_output_type: inline
 ---
 
-## Introduction
+## Data
+The data used in this analysis is B cell types and NK cell types from WGBS, 
+under the hg19 genome annotation. [GSE186458](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186458)
 
-```{r}
+* B cell type: 3 samples
+* NK cell type: 3 samples
 
-```
+## Packages used
 
-# do DMRcate tp match array
 ```{r}
 library(DMRcate)
-
 library(bsseq)
+library(edgeR)
+library(limma)
 library(BiocParallel)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(Biostrings)
+
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(ggVennDiagram)
+library(ComplexUpset)
 ```
 
-* they take in smoothed samples from bsseq
-```{r}
-wgbs_counts
+## Obtain counts
+```{r, eval=FALSE}
+# get the positions of cg sites
+seq_names <- seqnames(BSgenome.Hsapiens.UCSC.hg19)[1:25]
+anno_seq <- lapply(seq_names, function(x) {
+  cbind(data.frame(matchPattern("CG", BSgenome.Hsapiens.UCSC.hg19[[x]])),
+        seqnames = x)}) %>%
+  dplyr::bind_rows()
+anno_seq <- anno_seq %>% mutate(pos = paste0(seqnames, "-", start)) %>%
+  relocate(pos, seqnames)
+
+# NK counts
+fname <- "../data/wgbs/GSM5652299_Blood-NK-Z000000TM.beta"
+N <- file.info(fname)$size
+beta_nk <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- "../data/wgbs/GSM5652300_Blood-NK-Z000000U1.beta"
+N <- file.info(fname)$size
+beta_nk <- cbind(beta_nk, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- "../data/wgbs/GSM5652301_Blood-NK-Z000000UF.beta"
+N <- file.info(fname)$size
+beta_nk <- cbind(beta_nk, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_nk) <- c("M_TM", "C_TM", "M_U1", "C_U1", "M_UF", "C_UF")
+beta_nk <- cbind(anno_seq[,1:4], beta_nk)
+
+# B counts
+fname <- "../data/wgbs/GSM5652316_Blood-B-Z000000TX.beta"
+N <- file.info(fname)$size
+beta_b <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- "../data/wgbs/GSM5652317_Blood-B-Z000000UB.beta"
+N <- file.info(fname)$size
+beta_b <- cbind(beta_b, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- "../data/wgbs/GSM5652318_Blood-B-Z000000UR.beta"
+N <- file.info(fname)$size
+beta_b <- cbind(beta_b, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_b) <- c("M_TX", "C_TX", "M_UB", "C_UB", "M_UR", "C_UR")
+beta_b <- cbind(anno_seq[,1:4], beta_b)
+
+# add unmeth counts
+beta_nk <- beta_nk %>% mutate(Un_TM = C_TM - M_TM, Un_U1 = C_U1 - M_U1, Un_UF = C_UF - M_UF)
+beta_b <- beta_b %>% mutate(Un_TX = C_TX - M_TX, Un_UB = C_UB - M_UB, Un_UR = C_UR - M_UR)
+
+# combine
+colnames(beta_b)[5:13] <- paste0("b_", colnames(beta_b)[5:13])
+colnames(beta_nk)[5:13] <- paste0("nk_", colnames(beta_nk)[5:13])
+
+wgbs_counts <- cbind(beta_nk, beta_b[,5:13])
+
+saveRDS(wgbs_counts, "../output/wgbs_counts.rds")
 ```
 
-```{r}
-beta_all <- wgbs_counts
-beta_all <- beta_all %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
-m_df <- beta_all[,c(5,7,9,14,16,18)]
+
+## Differential Methylation Analysis
+
+# bsseq pre-processing: bsseq and bsmooth objects
+```{r eval=FALSE}
+## set up
+wgbs_counts <- wgbs_counts %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
+m_df <- wgbs_counts[,c(5,7,9,14,16,18)]
 colnames(m_df) <- colnames(m_df) %>% gsub("_M", "", .)
 
-coverage_df <- beta_all[,c(6,8,10,15,17,19)]
+coverage_df <- wgbs_counts[,c(6,8,10,15,17,19)]
 colnames(coverage_df) <- colnames(coverage_df) %>% gsub("_C", "", .)
 
 sample_stuff <- cbind(Type = c("nk", "nk", "nk", "b", "b", "b")) %>% data.frame()
@@ -43,142 +103,217 @@ bseq_nk_vs_b_all <- BSseq(M = as.matrix(m_df),
                           Cov = as.matrix(coverage_df), pData = sample_stuff,
                           chr = beta_all$seqnames, pos = as.numeric(beta_all$start),
                           sampleNames = colnames(m_df))
-```
 
-```{r}
-#bsmooth_obj <- BSmooth(BSseq = bseq_nk_vs_b_all, BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
-bsmooth_obj <- readRDS("../../1_methods/output/imp/bsmooth_all_obj.rds")
-```
-```{r}
+## BSmooth by sample - so it doesn't crash
+bsmooth1 <- BSmooth(BSseq = bseq_nk_vs_b_all[,1], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth2 <- BSmooth(BSseq = bseq_nk_vs_b_all[,2], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth3 <- BSmooth(BSseq = bseq_nk_vs_b_all[,3], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth4 <- BSmooth(BSseq = bseq_nk_vs_b_all[,4], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth5 <- BSmooth(BSseq = bseq_nk_vs_b_all[,5], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth6 <- BSmooth(BSseq = bseq_nk_vs_b_all[,6], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth_obj <- combine(bsmooth1, bsmooth2, bsmooth3, bsmooth4, bsmooth5, bsmooth6)
+## filter
 bseq.cov <- getCoverage(bsmooth_obj)
 keep <- which(rowSums(bseq.cov[, bsmooth_obj$Type == "nk"] >= 2) >= 2 &
                 rowSums(bseq.cov[, bsmooth_obj$Type == "b"] >= 2) >= 2)
 length(keep)
 
 bsmooth_obj <- bsmooth_obj[keep,]
-```
-
-# now dmrcate
-```{r}
-colnames(bsmooth_obj)
-```
-
-```{r}
-bsseq::pData(bsmooth_obj)
-```
-
-
-```{r}
-tissue <- factor(pData(bsmooth_obj)$Type)
-tissue
-#Regular matrix design
-design <- model.matrix(~tissue)
-design
-```
-
-```{r}
-methdesign <- edgeR::modelMatrixMeth(design)
-methdesign
-```
-```{r}
 saveRDS(bsmooth_obj, "../output/bsmooth_obj.rds")
 ```
 
-```{r}
-seq_annot <- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE,
-coef = 8, fdr=0.05)
-```
-- well damn can only get around that on cluster
-- but do i remember my cluster password? - probs not
-- let the laptop calm down and then try again
-- no that didn't work
 
-```{r}
-?sequencing.annotate
-```
+# bsseq
+```{r eval=FALSE}
+## testing
+bsseq.tstat <- BSmooth.tstat(bsmooth_obj, group1 = c("nk_TM", "nk_U1", "nk_UF"),
+                            group2 = c("b_TX", "b_UB", "b_UR"),
+                            estimate.var = "group2",
+                            local.correct = TRUE,
+                            verbose = TRUE, mc.cores = 6)
 
-```{r}
-seq_dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
-```
+bsseq_res <- bsseq.tstat@stats %>% data.frame() %>%
+  mutate(seqnames = data.frame(bsseq.tstat@gr)$seqnames,
+         start = data.frame(bsseq.tstat@gr)$start,
+         end = start, position = paste0(seqnames, "-", start)) %>%
+  relocate(position)
+saveRDS(bsseq_res, "../output/bsseq_res.rds")
 
-```{r}
-seq_ranges <- extractRanges(seq_dmrcate.res, genome = "hg19")
-```
-
-############################
-
-
-```{r}
-library(DMRcate)
-library(dplyr)
-```
-```{r}
-library(bsseq)
-library(BiocParallel)
-library(limma)
+## dmrs
+bsseq_dmrs <- dmrFinder(bseq.tstat)
+# filter the dmrs
+bsseq_dmrs <- subset(bsseq_dmrs, n >= 3 & abs(meanDiff) >= 0.1)
+colnames(bsseq_dmrs)[1] <- "seqnames"
+bsseq_dmrs <- bsseq_dmrs %>%
+  mutate(position = paste0(seqnames, "-", start)) %>% relocate(position)
+bsseq_dmrs$rank <- 1:nrow(bsseq_dmrs)
+saveRDS(bsseq_dmrs, "../output/bsseq_dmrs.rds")
 ```
 
-```{r}
-wgbs_counts <- readRDS("/researchers/caitlin.page/phd_gst/output/wgbs_counts.rds")
-```
-
-
-```{r}
-beta_all <- wgbs_counts
-beta_all <- beta_all %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
-m_df <- beta_all[,c(5,7,9,14,16,18)]
-colnames(m_df) <- colnames(m_df) %>% gsub("_M", "", .)
-
-coverage_df <- beta_all[,c(6,8,10,15,17,19)]
-colnames(coverage_df) <- colnames(coverage_df) %>% gsub("_C", "", .)
-
-sample_stuff <- cbind(Type = c("nk", "nk", "nk", "b", "b", "b")) %>% data.frame()
-rownames(sample_stuff) <- colnames(m_df)
-
-## make BSseq object
-bseq_nk_vs_b_all <- BSseq(M = as.matrix(m_df),
-                          Cov = as.matrix(coverage_df), pData = sample_stuff,
-                          chr = beta_all$seqnames, pos = as.numeric(beta_all$start),
-                          sampleNames = colnames(m_df))
+```{r include=FALSE}
+bsseq_res <- readRDS("../output/bsseq_res.rds")
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
 ```
 
 ```{r}
-bsmooth_obj <- BSmooth(BSseq = bseq_nk_vs_b_all, BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
-```
-```{r}
-bseq.cov <- getCoverage(bsmooth_obj)
-keep <- which(rowSums(bseq.cov[, bsmooth_obj$Type == "nk"] >= 2) >= 2 &
-                rowSums(bseq.cov[, bsmooth_obj$Type == "b"] >= 2) >= 2)
-length(keep)
-
-bsmooth_obj <- bsmooth_obj[keep,]
+nrow(bsseq_res)
+head(bsseq_res)
 ```
 
-# dmrcate
-
 ```{r}
-tissue <- factor(pData(bsmooth_obj)$Type)
+nrow(bsseq_dmrs)
+head(bsseq_dmrs)
+```
+
+# DMRcate
+
+* takes in smoothed samples from bsseq
+* also has the same filtering recommendations as bsseq
+```{r eval=FALSE}
+bsmooth_obj
+
+tissue <- factor(c("nk", "nk", "nk", "b", "b", "b"), levels = c("nk", "b"))
 tissue
 #Regular matrix design
 design <- model.matrix(~tissue)
 design
-```
 
-```{r}
-methdesign <- edgeR::modelMatrixMeth(design)
+methdesign <- modelMatrixMeth(design)
 methdesign
+
+seq_annot <- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE, 
+                                 coef = 8, fdr=0.05)
+#saveRDS(seq_annot, "../output/dmrcate_seq_anno.rds")
+
+seq_dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
+
+dmrcate_seq_dmr <- extractRanges(seq_dmrcate.res, genome = "hg19")
+#saveRDS(dmrcate_seq_dmr, "../output/dmrcate_seq_dmr.rds")
+```
+
+```{r include=FALSE}
+dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
 ```
 
 ```{r}
-seq_annot <- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE,
-coef = 8, fdr=0.05)
+nrow(dmrcate_seq_anno)
+head(dmrcate_seq_anno)
 ```
 
 ```{r}
-dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
+nrow(dmrcate_seq_dmr)
+head(dmrcate_seq_dmr)
 ```
 
-```{r}
-dmrcate_seq_dmr <-  extractRanges(dmrcate.res, genome="hg19")
+
+# dmrseq
+* Uses bsseq object as input
+* dmrseq failed.
+```{r eval=FALSE}
+bseq_nk_vs_b_all
+
+loci.idx <- which(DelayedMatrixStats::rowSums2(getCoverage(bseq_nk_vs_b_all, type="Cov")==0) == 0)
+sample.idx <- which(pData(bseq_nk_vs_b_all)$Type %in% c("nk", "b"))
+
+bs.filtered <- bseq_nk_vs_b_all[loci.idx, sample.idx]
+
+testCovariate <- "Type"
+regions <- dmrseq(bs=bs.filtered,
+                  cutoff = 0.05,
+                  testCovariate=testCovariate) # failed with error
 ```
+
+# DSS
+* Uses bsseq object as input
+* DMLtest failed to finish. Unclear as to why, 
+  expected to be too computationally intensive
+```{r eval=FALSE}
+bseq_nk_vs_b_all
+dss_dmlTest_all <- DMLtest(bseq_nk_vs_b_all,
+                                  group1=c("nk_TM", "nk_U1", "nk_UF"),
+                                  group2 = c("b_TX", "b_UB", "b_UR"),
+                               smoothing = TRUE, BPPARAM = BatchtoolsParam()) #failed
+dss_dmrs_pos_filt <- callDMR(dss_dmlTest_nk_vs_b_pos_filt, p.threshold=0.05)
+dss_dmrs <- callDMR(dss_dmlTest_nk_vs_b, p.threshold=0.05)
+```
+
+
+# edgeR
+
+```{r eval=FALSE}
+# pre-processing
+edge_matrix <- wgbs_counts[,c(5,11,7,12,9,13,14,20,16,21,18,22)]
+
+colnames(edge_matrix) <- c(
+  "NK1.Me", "NK1.Un", "NK2.Me", "NK2.Un", "NK3.Me", "NK3.Un",
+  "B1.Me", "B1.Un", "B2.Me", "B2.Un", "B3.Me", "B3.Un")
+rownames(edge_matrix) <- wgbs_counts$pos
+
+edge_matrix <- edge_matrix[!grepl("chrX", rownames(edge_matrix)),]
+edge_matrix <- edge_matrix[!grepl("chrY", rownames(edge_matrix)),]
+
+sample <- gl(6,2,12)
+methylation <- gl(2,1,12, labels=c("Me","Un"))
+condition <- gl(2,6,12, labels=c("NK", "B"))
+edge_sample_info <- cbind(sample, methylation, condition)
+rownames(edge_sample_info) <- colnames(edge_matrix)
+data.frame(edge_sample_info)
+
+
+edge_dge <- DGEList(as.matrix(edge_matrix), samples = data.frame(edge_sample_info),
+                    group = c(
+                      "NK", "NK", "NK", "NK", "NK", "NK",
+                      "B", "B", "B", "B", "B", "B"))
+
+edge_coverage <- edge_dge$counts[, c(1,3,5,7,9,11)] + edge_dge$counts[, c(2,4,6,8,10,12)]
+head(edge_coverage)
+keep <- rowSums(edge_coverage >= 8) == 6
+
+edge_dge <- edge_dge[keep,,keep.lib.sizes=FALSE]
+
+edge_dge$samples
+
+edge_total_lib_size <- filter(edge_dge$samples, methylation==1)$lib.size +
+  filter(edge_dge$samples, methylation==2)$lib.size
+
+edge_dge$samples$lib.size <- rep(edge_total_lib_size, each=2)
+edge_dge$samples
+
+# testing
+edge_samples <- cbind(Group = c("NK", "NK", "NK", "B", "B", "B")) %>% data.frame()
+rownames(edge_samples) <- c("NK1", "NK2", "NK3", "B1", "B2", "B3")
+edge_samples <- edge_samples %>% mutate(Group = as.factor(Group))
+
+edge_design <- model.matrix(~0 + Group, data = edge_samples)
+colnames(edge_design) <- c("B", "NK")
+
+edge_design <- modelMatrixMeth(edge_design)
+
+edge_dge <- estimateDisp(edge_dge, edge_design, trend="none")
+
+edge_fit <- glmFit(edge_dge, edge_design)
+edge_contrasts <- makeContrasts(NK - B,
+                                levels=edge_design)
+edge_lrt <- glmLRT(edge_fit, contrast=edge_contrasts)
+
+edge_res <- topTags(edge_lrt, n = Inf)
+
+edge_res <- edge_res$table %>% mutate(signif.05 = ifelse(FDR <= 0.05, TRUE, FALSE))
+
+#saveRDS(edge_res, "../output/edge_res.rds")
+```
+```{r include=FALSE}
+edge_res <- readRDS("../output/seq_edge_res.rds")
+```
+```{r}
+nrow(edge_res)
+head(edge_res)
+```
+
+
+
 
