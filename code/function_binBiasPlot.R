@@ -226,6 +226,30 @@ plotBiasGroupedMedian <- function(genes, anno_genes, regression_line=FALSE, log2
   plot
 }
 
+
+plotBiasGeneLength <- function(genes, anno, dist_dmr=0, bin_size=100) {
+  genes %>% mutate(num_cg = granges.y.width) %>%
+    mutate(has_dmr = ifelse(ensembl_gene_id %in% filter(anno, abs(min_dist) == dist_dmr)$ensembl_gene_id, TRUE, FALSE), width = end - start + 1) %>%
+    .[order(.$width),] %>%
+    mutate(bin_group = rep(1:ceiling(nrow(.)/bin_size), each = bin_size)[1:nrow(.)]) %>%
+    group_by(bin_group) %>%
+    mutate(num_cg_bin_group = mean(width)) %>%
+    group_by(num_cg_bin_group) %>%
+    mutate(num_bins_group_same_cg = dplyr::n()) %>%
+    group_by(num_cg_bin_group, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = dplyr::n()/num_bins_group_same_cg) %>%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg_bin_group) %>%
+    .[order(.$num_cg_bin_group),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = dplyr::n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg_bin_group, y = prop)) +
+    geom_point(alpha = 0.4) +
+    scale_x_continuous(limits = c(0,500000)) +
+    labs(x = "Length of gene", y = "Proportion differential methylation")
+}
+
 ######################
 plotBiasByGroup <- function(counts, dmr, bias_type=c("gene", "bin"), bin_size=2000) {
   if(length(bias_type) > 1) {
