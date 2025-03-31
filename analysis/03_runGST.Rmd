@@ -7,154 +7,199 @@ editor_options:
   chunk_output_type: inline
 ---
 
-* hold on - mm as it runs is set to all - which includes cpgs/dmrs in front of the gene - tss200, and tss1500
-* and my genes are just overlap right now
-* could restrict array to body and see if it changes anything
-
-## Introduction
-
-```{r}
-```
-
-```{r}
-find_overlaps(as_granges(biomart_genes), as_granges(filter(DMPs, adj.P.Val < 0.05))) %>% data.frame() %>% distinct(gene_name)
-```
-```{r}
-dmrcate_array_anno <- readRDS("../output/dmrcate_array_anno.rds")
-dmrcate_array_anno <- data.frame(dmrcate_array_anno@ranges)
-```
-```{r}
-dmrcate_array_anno$pos <- paste0(dmrcate_array_anno$seqnames, "-", dmrcate_array_anno$start)
-dmrcate_overlap <- find_overlaps(as_granges(dmrcate_array_dmr), as_granges(dmrcate_array_anno)) %>% data.frame()
-```
-```{r}
-dmrcate_array_anno <- dmrcate_array_anno %>% mutate(in_dmr = ifelse(pos %in% dmrcate_overlap$pos, TRUE, FALSE))
-```
-```{r}
-dmrcate_array_anno <- dmrcate_array_anno %>% mutate(rank_dmr = dmrcate_overlap[match(.$pos.x, dmrcate_overlap$pos), "rank"], rank_dmr = ifelse(is.na(rank_dmr), max(rank_dmr, na.rm = TRUE) + 1, rank_dmr))
-```
-
-```{r}
-dmrcate_array_anno <- find_overlaps(as_granges(dmrcate_array_anno), as_granges(mutate(anno_array, cg_id = rownames(anno_array)))) %>% data.frame()
-```
-```{r}
-getMapped
-```
-
-```{r}
-mm_map_dmrcate_array <- getMappedEntrezIDs(filter(dmrcate_array_anno, in_dmr == TRUE)$cg_id, dmrcate_array_anno$cg_id, "EPIC")
-```
 
 
 ```{r}
-tail(dmrcate_array_dmr)
-dmrcate_array_bio_anno <- annoGeneDmr(anno_array, dmrcate_array_anno, gene_source = "biomart", biomart_genes)
-```
-* I can run - MM
-* and just the gsa-meth bit using my input beforehand
-* and see if results change
-* big brain moment
-* and can just run the mapped entrez bit
-* and can really compare results
-* dmrcate array stuff, and also just regular array
-```{r}
-me_gst_dmrcate_array_out <- run_miss_methyl_a(biomart_genes, dmrcate_array_bio_anno)
-```
+library(plyranges)
+library(dplyr)
+library(ggplot2)
 
-```{r}
-dmrcate_array_
-```
-
-```{r}
-getMappedEntrezIDs()
+library(BiasedUrn)
+library(ggVennDiagram)
+library(org.Hs.eg.db)
 ```
 
 
-```{r}
-me_gst_dmrcate_array <- run_miss_methyl_b(run_miss_methyl_a(me_gst_dmrcate_array_out, method = "Wallenius")
-```
 
 ```{r}
-goregion()
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
+dmrcate_seq_anno <- data.frame(dmrcate_seq_anno@ranges)
+
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
 ```
 
-```{r}
-DMPs
-```
+
+
+# selected bias
+* Number of CpGs overlapping a Gene
+
+
 
 ## run sequencing
-```{r}
-dmrcate_seq_anno
-dmrcate_seq_dmr
-```
-```{r}
-run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")
-```
-
 
 ```{r}
-run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")
-```
-
-
-```{r}
-run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")
+source("../code/mmGST.R")
+gst_res_dmr1 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Wallenius")
+gst_res_dmr1$rank_fdr <- 1:nrow(gst_res_dmr1)
+gst_res_dmr1 <- gst_res_dmr1 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_dmr1)
 ```
 
 ```{r}
-run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno), dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")
+gst_res_dmr1[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE, FALSE)) %>% .[order(.$FDR, decreasing = TRUE),] %>%
+  ggplot(aes(x = -log10(FDR), y = factor(.data$TERM, levels = .data$TERM), colour = in_imm, size = N)) +
+  geom_point() +
+  geom_vline(xintercept = 0.05, type = "dotted") 
+```
+
+
+## Impact of DMR filtering parameters
+
+```{r}
+source("../code/mmGST.R")
+gst_res_all <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")
+gst_res_all$rank_fdr <- 1:nrow(gst_res_all)
+gst_res_all <- gst_res_all %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+
+gst_res_dmr5 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")
+gst_res_dmr5$rank_fdr <- 1:nrow(gst_res_dmr5)
+gst_res_dmr5 <- gst_res_dmr5 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 ```
 
 ```{r}
-dmrcate_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno), dmrcate_seq_dmr, "biomart", biomart_genes)), "Fisher")
+venn_list <- list(
+  dmr_all = gst_res_all %>% filter(FDR < 0.05) %>% .$GOID,
+  dmr_5k = gst_res_dmr5 %>% filter(FDR < 0.05) %>% .$GOID,
+  dmr_1k = gst_res_dmr1 %>% filter(FDR < 0.05) %>% .$GOID,
+)
+ggVennDiagram(venn_list)
+```
+
+
+## Wallenius vs Fisher
+```{r}
+source("../code/mmGST.R")
+gst_res_dmr1_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Fishers")
+gst_res_dmr1_fish$rank_fdr <- 1:nrow(gst_res_dmr1_fish)
+gst_res_dmr1_fish <- gst_res_dmr1_fish %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 ```
 
 
 ```{r}
-annoGeneDmr()
+source("../code/mmGST.R")
+system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "Fishers"))
+system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "Wallenius"))
 ```
 
 ```{r}
-annoGeneDmr <- function(counts, dmrs, gene_source = c("biomart", "experimenthub", "self"), genes) { #why do I have the gene source here?? why???
-  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub", "self"))
-  genes <- data.frame(genes)
-  # ensure ensembl_id name consistency
-  colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
-  # double check only 1 ensembl id per gene entry
-  genes$width <- genes$end - genes$start + 1
-  genes <- genes %>% group_by(ensembl_gene_id) %>% filter(width == max(width)) %>% ungroup()
-  # add random identifier
-  genes$gene_num <- 1:nrow(genes)
-  # add number of cpgs overlapping gene
-  gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
-  gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = n()) %>% ungroup() %>% data.frame()
+venn_list <- list(wall = filter(gst_res_dmr1, FDR < 0.05)$TERM, fish = filter(gst_res_dmr1_fish, FDR < 0.05)$TERM)
+ggVennDiagram(venn_list)
+```
 
-  genes$num_cg <- gene_cpg[match(genes$gene_num, gene_cpg$gene_num), "n_cpg"]
-  genes[is.na(genes)] <- 0
-  if(!"TSS" %in% colnames(genes)) {
-    genes$TSS <- ifelse(genes$strand == "+", genes$start, genes$end) # above I have strand for 1/-1
-  }
-  # assume dmrs are already in order of most to least signif
-  dmrs$rank <- 1:nrow(dmrs)
-  # add if gene overlaps dmr
-  overlap_dmr <- find_overlaps(as_granges(dmrs), as_granges(genes)) %>% data.frame() %>%
-    mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
-  anno_dmr <- pair_nearest(as_granges(dmrs), as_granges(genes)) %>% data.frame() %>%
-    mutate(combo = paste0(ensembl_gene_id, "-DMR", rank))
-  #dist gene to dmr
-  anno_dmr <- anno_dmr %>%
-    mutate(tss_start = TSS - granges.x.start, tss_end = TSS - granges.x.end) %>%
-    mutate(tss_rel_peak = ifelse(combo %in% overlap_dmr$combo, "Overlap", NA),
-            tss_rel_peak = case_when(is.na(tss_rel_peak) & tss_start > 0 & tss_end > 0 & tss_end < tss_start ~ "Peak_upstream",
-                                     is.na(tss_rel_peak) & tss_start < 0 & tss_end < 0 &  tss_end < tss_start ~ "Peak_downstream", TRUE ~ tss_rel_peak),
-           tss_rel_peak = case_when(tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ "Peak_downstream",
-                                   tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ "Peak_upstream", TRUE ~ tss_rel_peak),
-          min_dist = case_when(tss_rel_peak == "Overlap" ~ 0, tss_rel_peak == "Peak_downstream" & granges.y.strand == "+" ~ tss_start,
-                                tss_rel_peak == "Peak_downstream" & granges.y.strand == "-" ~ tss_end, tss_rel_peak == "Peak_upstream" & granges.y.strand == "+" ~ tss_end,
-                                tss_rel_peak == "Peak_upstream" & granges.y.strand == "-" ~ tss_start))
-  anno_dmr
+## Wallenius vs Hypergeometric (Unbiased vs Biased)
+```{r}
+source("../code/mmGST.R")
+gst_res_dmr1_hyper <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "None")
+gst_res_dmr1_hyper$rank_fdr <- 1:nrow(gst_res_dmr1_hyper)
+gst_res_dmr1_hyper <- gst_res_dmr1_hyper %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+```
 
+
+```{r}
+venn_list <- list(wall = filter(gst_res_dmr1, FDR < 0.05)$TERM, hyper = filter(gst_res_dmr1_hyper, FDR < 0.05)$TERM)
+ggVennDiagram(venn_list)
+```
+
+
+## Comparisons
+```{r}
+xx <- as.list(org.Hs.egGO2ALLEGS)
+if(length(xx) > 0){
+    # Gets the Entrez Gene identifiers for the top 2nd and 3nd GO identifiers
+    goids <- xx[2:3]
+    # Gets all the Entrez Gene identifiers for the first element of goids
+    goids[[1]]
+    # Evidence code for the mappings
+    names(goids[[1]])
 }
+out <- run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes))
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+go_entrez <- go_entrez[,1:2] %>% data.frame()
+go_entrez <- go_entrez %>%
+  mutate(num_cg = data.frame(out$freq)[match(.$entrez, data.frame(out$freq)$freq_make_table), "Freq"],
+         dmrcate_1k = ifelse(go %in% rownames(filter(gst_res_dmr1, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_1k_null = ifelse(go %in% rownames(filter(gst_res_dmr1_hyper, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_1k_fish = ifelse(go %in% rownames(filter(gst_res_dmr1_fish, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_5k = ifelse(go %in% rownames(filter(gst_res_dmr5, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_all = ifelse(go %in% rownames(filter(gst_res_all, FDR < 0.05)), TRUE, FALSE))
+go_entrez <- go_entrez %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg))
+go_entrez <- go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg)) %>% ungroup()
+
+go_entrez <- go_entrez %>%
+  mutate(rank_1k = gst_res_dmr1[match(.$go, gst_res_dmr1$GOID), "rank_fdr"],
+         rank_1k_null = gst_res_dmr1_hyper[match(.$go, gst_res_dmr1_hyper$GOID), "rank_fdr"],
+         rank_1k_fish = gst_res_dmr1_fish[match(.$go, gst_res_dmr1_fish$GOID), "rank_fdr"],
+         rank_5k = gst_res_dmr5[match(.$go, gst_res_dmr5$GOID), "rank_fdr"],
+         rank_all = gst_res_all[match(.$go, gst_res_all$GOID), "rank_fdr"])
 ```
 
+```{r}
+go_entrez %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 1000, rank_1k_null <= 1000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") +
+  scale_x_continuous(limits = c(0, 1500))
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% 
+  filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = case_when(dmrcate_1k == FALSE & dmrcate_1k_null == TRUE ~ "Biased",
+                            dmrcate_1k == TRUE & dmrcate_1k_null == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_cg), y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_res_dmr1[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1") %>% .[,8:10],
+  gst_res_dmr1_hyper$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1") %>% .[,8:10])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets")
+```
+
+
+####
+
+```{r}
+dmrcate_seq_dmr[1:500,] %>% summarise(sum(no.cpgs))
+dmrcate_seq_dmr[1:1000,] %>% summarise(sum(no.cpgs))
+dmrcate_seq_dmr[1:5000,] %>% summarise(sum(no.cpgs))
+dmrcate_seq_dmr %>% summarise(sum(no.cpgs))
+```
+
+```{r}
+annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes) %>% distinct(gene_name, num_cg) %>% mutate(sum(num_cg))
+annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes) %>% distinct(gene_name, num_cg) %>% mutate(sum(num_cg))
+annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes) %>% distinct(gene_name, num_cg) %>% mutate(sum(num_cg))
+annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes) %>% distinct(gene_name, num_cg) %>% mutate(sum(num_cg))
+```
+```{r}
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = log2(min_smoothed_fdr))) +
+  geom_density()
+```
 
