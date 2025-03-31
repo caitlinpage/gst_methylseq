@@ -7,6 +7,13 @@ editor_options:
   chunk_output_type: inline
 ---
 
+## Data
+The data used in this analysis is B cell and NK cell types from the 
+EPICv1 platform, under the hg19 genome annotation. [GSE110554](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE110554)
+
+* B cell type: 6 samples
+* NK cell type: 6 samples
+
 ## Packages used
 
 ```{r}
