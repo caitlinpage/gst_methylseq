@@ -7,7 +7,7 @@ editor_options:
   chunk_output_type: inline
 ---
 
-## Introduction
+## Packages
 
 ```{r}
 library(org.Hs.eg.db)
@@ -18,16 +18,170 @@ library(dplyr)
 library(ggplot2)
 ```
 
-```{r}
-unique(entrez_genes$go) %in% .getGO()$GOID %>% summary()
-```
-* not working but whatever they're the same
+To do the Gene Set Test, we need to obtain all the gene sets, and the genes that are in them.
+The trick is, that this can include the child terms.
+The other trick is that we don't want this to be species dependent.
+And although we have mainly been using GO, we want it to applicable for other gene set databases like KEGG.
+
+
 
 ```{r}
-go_info <- .getGO()
-go_info <- go_info$idTable
+# missMethyl
+.getGO <- function(){
+  if(!requireNamespace("org.Hs.eg.db", quietly = TRUE))
+    stop("org.Hs.eg.db package required but not installed.")
+  egGO2ALLEGS <- utils::getFromNamespace("org.Hs.egGO2ALLEGS", "org.Hs.eg.db")
+  GeneID.PathID <- AnnotationDbi::toTable(egGO2ALLEGS)[,c("gene_id", "go_id", "Ontology")]
+  d <- !duplicated(GeneID.PathID[, c("gene_id", "go_id")])
+  GeneID.PathID <- GeneID.PathID[d, ]
+  GOID.TERM <- suppressMessages(AnnotationDbi::select(GO.db::GO.db,
+                                                      keys=unique(GeneID.PathID$go_id),
+                                                      columns=c("GOID","ONTOLOGY","TERM"),
+                                                      keytype="GOID"))
+  go <- tapply(GeneID.PathID$gene_id, GeneID.PathID$go_id, list)
+
+  list(idList=go, idTable=GOID.TERM)
+}
+
+# goseq
+
+getgo=function(genes,genome,id,fetch.cats=c("GO:CC","GO:BP","GO:MF")){
+	#Check for valid input
+	if(any(!fetch.cats%in%c("GO:CC","GO:BP","GO:MF","KEGG"))){
+		stop("Invaled category specified.  Categories can only be GO:CC, GO:BP, GO:MF or KEGG")
+	}
+	#Convert from genome ID to org.__.__.db format
+	orgstring=as.character(.ORG_PACKAGES[match(gsub("[0-9]+",'',genome),names(.ORG_PACKAGES))])
+	#Multimatch or no match
+	if(length(orgstring)!=1){
+		stop("Couldn't grab GO categories automatically.  Please manually specify.")
+	}
+	#Load the library
+	library(paste(orgstring,"db",sep='.'),character.only=TRUE)
+	#What is the default ID that the organism package uses?
+	coreid=strsplit(orgstring,"\\.")[[1]][3]
+
+	#Now we need to convert it into the naming convention used by the organism packages
+	userid=as.character(.ID_MAP[match(id,names(.ID_MAP))])
+	#Multimatch or no match
+	if(is.na(userid) | (length(userid)!=1)){
+		stop("Couldn't grab GO categories automatically.  Please manually specify.")
+	}
+	#The (now loaded) organism package contains a mapping between the internal ID and whatever 
+        #the default is (usually eg), the rest of this function is about changing that mapping to 
+	#point from categories to the ID specified
+	#Fetch the mapping in its current format
+	#Because GO is a directed graph, we need to get not just the genes associated with each ID, 
+	#but also those associated with its children.  GO2ALLEGS does this.
+	core2cat=NULL
+	if(length(grep("^GO",fetch.cats))!=0){
+	        #Get the name of the function which maps gene ids to go terms
+		#usually this will be "GO2ALLEG"
+	        gomapFunction=.ORG_GOMAP_FUNCTION[orgstring]
+		if(is.na(gomapFunction)) gomapFunction=.ORG_GOMAP_FUNCTION["default"]	
+		x=toTable(get(paste(orgstring,gomapFunction,sep='')))
+		#Keep only those ones that we specified and keep only the names
+#		core2cat=x[x$Ontology%in%gsub("^GO:",'',fetch.cats),1:2]
+		x[!x$Ontology%in%gsub("^GO:",'',fetch.cats),2]<-"Other"
+		core2cat=x[,1:2]
+		colnames(core2cat)=c("gene_id","category")
+	}
+	if(length(grep("^KEGG",fetch.cats))!=0){
+		x=toTable(get(paste(orgstring,"PATH",sep='')))
+		#Either add it to existing table or create a new one
+		colnames(x)=c("gene_id","category")
+		if(!is.null(core2cat)){
+			core2cat=rbind(core2cat,x)
+		}else{
+			core2cat=x
+		}
+	}
+
+	#Now we MAY have to convert the "gene_id" column to the format we are using
+	if(coreid!=userid){
+		#The mapping between user id and core id, don't use the <USER_ID>2<CORE_ID> object as the naming is not always consistent
+		user2core=toTable(get(paste(orgstring,userid,sep='')))
+		#Throw away any user ID that doesn't appear in core2cat
+		user2core=user2core[user2core[,1]%in%core2cat[,1],]
+		#Make a list version of core2cat, we'll need it
+		list_core2cat=split(core2cat[,2],core2cat[,1])
+		#Now we need to replicate the core IDs that need replicating
+		list_core2cat=list_core2cat[match(user2core[,1],names(list_core2cat))]
+		#Now we can replace the labels on this list with the user ones from user2core, 
+		#but there will be duplicates, so we have to unlist, label, then relist
+		user2cat=split(unlist(list_core2cat,FALSE,FALSE),rep(user2core[,2],sapply(list_core2cat,length)))
+		#Now we only want each category listed once for each entry...
+		user2cat=sapply(user2cat,unique)
+		###In case you don't believe that this works as it should, here is the slow as all hell way for comparison...
+		###Make first list
+		##list_user2core=split(user2core[,1],user2core[,2])
+		###Make the second
+		##list_core2cat=split(core2cat[,2],core2cat[,1])
+		###Go through each entry in first list and expand using second...
+		##user2cat=sapply(list_user2core,function(u){unique(unlist(list_core2cat[u],FALSE,FALSE))})
+
+	}else{
+		#We don't need to convert anything (WOO!), so just make it into a list
+		user2cat=split(core2cat[,2],core2cat[,1])
+		user2cat=sapply(user2cat,unique)
+	}
+	#remove any empty strings
+	user2cat=lapply(user2cat,function(x){  
+	        if(length(x)>1) x=x[x!="Other"]  
+		x })
+
+	## we don't like case sensitivity
+	names(user2cat)<-toupper(names(user2cat))
+
+	#Now look them up
+	return(user2cat[toupper(genes)])
+}
 ```
 
+```{r}
+# For org.Hs.egGO2ALLEGS
+xx <- as.list(org.Hs.egGO2ALLEGS)
+if(length(xx) > 0){
+    # Gets the Entrez Gene identifiers for the top 2nd and 3nd GO identifiers
+    goids <- xx[2:3]
+    # Gets all the Entrez Gene identifiers for the first element of goids
+    goids[[1]]
+    # Evidence code for the mappings
+    names(goids[[1]])
+}
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+go_entrez
+go_entrez %>% distinct(go) %>% nrow()
+```
+```{r}
+mm_go <- .getGO()
+mm_go <- mm_go$idTable
+```
+
+```{r}
+unique(go_entrez$go) %in% mm_go$GOID %>% summary()
+```
+* same terms
+
+```{r}
+go_entrez <- go_entrez %>% mutate(term = mm_go[match(.$go, mm_go$GOID), "TERM"],
+                     ontology = mm_go[match(.$go, mm_go$GOID), "ONTOLOGY"])
+go_entrez <- go_entrez %>% group_by(go) %>% mutate(num_genes = n()) %>% ungroup()
+```
+
+```{r}
+go_entrez_summ <- go_entrez %>% distinct(go, ontology, term, num_genes)
+```
+
+
+```{r}
+go_entrez_summ %>%
+  ggplot(aes(x = log10(num_genes), colour = ontology)) +
+  geom_density()
+go_entrez_summ %>%
+  ggplot(aes(x = ontology, y = log10(num_genes))) +
+  geom_boxplot()
+```
 
 
 ```{r}
