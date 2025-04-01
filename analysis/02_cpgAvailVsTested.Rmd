@@ -20,6 +20,9 @@ editor_options:
 library(plyranges)
 library(dplyr)
 library(ggplot2)
+library(BSDA)
+library(ggVennDiagram)
+library(gplots)
 
 library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 library(IlluminaHumanMethylationEPICmanifest)
@@ -32,9 +35,7 @@ library(annotatr)
 wgbs_counts <- readRDS("../output/wgbs_counts.rds")
 anno_array <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 anno_array <- anno_array %>% data.frame() %>% mutate(seqnames = chr, start = pos, width = 1) %>% relocate(c(seqnames, start, width))
-```
 
-```{r}
 DMPs <- readRDS("../output/DMPs.rds") # bsseq res
 dmrcate_array_anno <- readRDS("../output/dmrcate_array_anno.rds")
 dmrcate_array_anno <- dmrcate_array_annoranges %>% data.frame() %>%
@@ -104,6 +105,21 @@ bsseq_res %>%
   theme(legend.position = "none")
 ```
 
+```{r}
+t.test(dmrcate_seq_anno$dist_to_next, bsseq_res$dist_to_next)
+```
+
+# compare all sites to tested sites
+
+```{r}
+wgbs_counts <- wgbs_counts %>% group_by(seqnames) %>% mutate(dist_to_next = lead(start) - start) %>% ungroup()
+c(mean = mean(wgbs_counts$dist_to_next, na.rm=TRUE), sd = sd(wgbs_counts$dist_to_next, na.rm=TRUE))
+```
+```{r}
+z.test(dmrcate_seq_anno$dist_to_next, mu=mean(wgbs_counts$dist_to_next, na.rm=TRUE), sigma.x = sd(wgbs_counts$dist_to_next, na.rm=TRUE))
+```
+* do not reject null
+* basically the tested sites are not a distinct group in terms of the distance between them
 
 # array
 
@@ -129,6 +145,24 @@ DMPs %>%
   theme(legend.position = "none")
 ```
 
+```{r}
+t.test(dmrcate_array_anno$dist_to_next, DMPs$dist_to_next)
+```
+* 2 groups are not distinct as expected
+
+# Compare tested and all
+```{r}
+anno_array <- anno_array %>% .[order(.$seqnames, .$start),] %>%
+  group_by(seqnames) %>% mutate(dist_to_next = lead(start) - start) %>% ungroup()
+c(mean = mean(anno_array$dist_to_next, na.rm = TRUE), sd = sd(anno_array$dist_to_next, na.rm = TRUE))
+```
+
+```{r}
+z.test(dmrcate_array_anno$dist_to_next, mu = mean(anno_array$dist_to_next, na.rm = TRUE), sigma.x = sd(anno_array$dist_to_next, na.rm = TRUE))
+```
+* in the array, tested sites are a significant separate group to overall in regards to the distance between the sites
+
+# Compare array and seq
 
 ```{r}
 t.test(dmrcate_seq_anno$dist_to_next[!is.na(dmrcate_seq_anno$dist_to_next)], dmrcate_array_anno$dist_to_next[!is.na(dmrcate_array_anno$dist_to_next)])
@@ -142,84 +176,108 @@ t.test(dmrcate_seq_anno$dist_to_next[!is.na(dmrcate_seq_anno$dist_to_next)], dmr
 # array
 * relationship to CpG annotation is included in the EPIC annotation file/package
 ```{r}
-anno_array
+anno_array <- data.frame(anno_array)
+head(anno_array)
 ```
 
 ```{r}
-tested_array <- data.frame(tested_array)
-tested_array$cpg_feature <- anno_array[match(tested_array$cg_id, rownames(anno_array)), "Relation_to_Island"]
+dmrcate_array_anno <- data.frame(dmrcate_array_anno)
+dmrcate_array_anno$cpg_feature <- anno_array[match(dmrcate_array_anno$cg_id, anno_array$Name), "Relation_to_Island"]
 ```
 
 ```{r}
-tested_array %>% group_by(cpg_feature) %>% summarise(n=n()) %>% ungroup() %>% mutate(total = sum(n), prop = n/sum(n))
-```
-
-
-## Distribution of tested CpGs among CpG annotations - islands etc
-
-# array
-* relationship to CpG annotation is included in the EPIC annotation file/package
-```{r}
-anno_array
+dmrcate_array_anno %>% group_by(cpg_feature) %>% summarise(n=n()) %>% ungroup() %>% mutate(total = sum(n), prop = n/sum(n))
 ```
 
 ```{r}
-tested_array <- data.frame(tested_array)
-tested_array$cpg_feature <- anno_array[match(tested_array$cg_id, rownames(anno_array)), "Relation_to_Island"]
+dmrcate_array_anno %>%
+  ggplot(aes(x = cpg_feature, fill = cpg_feature)) +
+  geom_bar() +
+  theme(legend.position = "none")
 ```
+* so far I've just been comparing array and seq
+* not diff between tested and non tested
+* i still think some kind of chi-square - because I want to compare how the proportions change/distributions change
+* dist to next would be a z test I think - because the tested is a subgroup of the all
 
 ```{r}
-tested_array %>% group_by(cpg_feature) %>% summarise(n=n()) %>% ungroup() %>% mutate(total = sum(n), prop = n/sum(n))
+dt <- cbind(dmrcate_array_anno %>% group_by(cpg_feature) %>% summarise(tested_n=n()), 
+      all_n = anno_array %>% group_by(Relation_to_Island) %>% summarise(all_n=n()) %>% .$all_n)
+rownames(dt) <- dt$cpg_feature
+dt <- dt[,2:3]
+dt
 ```
+```{r}
+balloonplot(t(as.table(as.matrix(dt))),
+      main = "Array CpG features", xlab = "", ylab = "", label = FALSE, show.margins = FALSE)
+```
+* frequencies appear to be very similar
 
-# annotatr
+# sequencing
 
 ```{r}
 anno_cpg <- build_annotations(genome="hg19", annotations = "hg19_cpgs")
+anno_cpg <- anno_cpg %>% data.frame()
+
+overlap_feature <- find_overlaps(as_granges(wgbs_counts), as_granges(anno_cpg)) %>% data.frame() 
+dmrcate_seq_anno <- find_overlaps(as_granges(dmrcate_seq_anno), as_granges(anno_cpg)) %>% data.frame()
+```
+
+
+```{r}
+dt <- cbind(dmrcate_seq_anno %>% group_by(type) %>% summarise(tested_n=n()), 
+      all_n = overlap_feature %>% group_by(type) %>% summarise(all_n=n()) %>% .$all_n)
+rownames(dt) <- dt$type
+dt <- dt[,2:3]
+dt
+```
+```{r}
+balloonplot(t(as.table(as.matrix(dt))),
+      main = "Seq CpG features", xlab = "", ylab = "", label = FALSE, show.margins = FALSE)
+```
+* similar frequencies
+
+# Seq and Array
+* For Array, OpenSea is Inter, and combine N and S shelves and shores
+```{r}
+dt <- cbind(dmrcate_array_anno %>% group_by(cpg_feature) %>% summarise(array_test=n()), 
+      array_all = anno_array %>% group_by(Relation_to_Island) %>% summarise(all_n=n()) %>% .$all_n)
+dt <- rbind(dt, c(cpg_feature = "shelf", array_test = dt[2,2] + dt[5,2], array_all = dt[2,3] + dt[5,3]),
+      c(cpg_feature = "shore", array_test = dt[3,2] + dt[6,2], array_all = dt[3,3] + dt[6,3])) %>% .[c(4,1,7,8),]
+rownames(dt) <- NULL
+dt <- cbind(cbind(dmrcate_seq_anno %>% group_by(type) %>% summarise(seq_test=n()), 
+      seq_all = overlap_feature %>% group_by(type) %>% summarise(all_n=n()) %>% .$all_n), dt)
+rownames(dt) <- dt$type
+dt <- dt[,c(2,3,5,6)]
+dt
 ```
 
 ```{r}
-tested_seq <- annotate_regions(regions = as_granges(tested_seq), annotations = anno_cpg) %>% data.frame()
-tested_array <- annotate_regions(regions = as_granges(tested_array), annotations = anno_cpg) %>% data.frame()
+balloonplot(t(as.table(as.matrix(dt))),
+      main = "CpG features", xlab = "", ylab = "", label = FALSE, show.margins = FALSE)
 ```
+
+
 ```{r}
-tested_seq %>% group_by(annot.type) %>% summarise(n=n()) %>% ungroup() %>% mutate(total = sum(n), prop = n/sum(n))
+dmrcate_array_anno %>%
+  ggplot(aes(x = log2(dist_to_next), colour = cpg_feature)) +
+  geom_density()
+anno_array %>%
+  ggplot(aes(x = log2(dist_to_next), colour = Relation_to_Island)) +
+  geom_density()
 ```
 
 ```{r}
-tested_array %>% group_by(cpg_feature) %>% summarise(n=n()) %>% ungroup() %>% mutate(total = sum(n), prop = n/sum(n))
-tested_array %>% group_by(annot.type) %>% summarise(n=n()) %>% ungroup() %>% mutate(total = sum(n), prop = n/sum(n))
-```
-* the 2 array anno basically match up
-* open sea is inter
-* and then if you add the 2 shelves, or the 2 shores - about the same
-
-* seq have ~ 10x num cpgs in islands than array
-* but proportion wise have more in open sea
-* look at dist stuff in this context
-
-```{r}
-tested_array %>%
-  ggplot(aes(x = log2(dist_to_next), colour = annot.type)) +
+dmrcate_seq_anno %>%
+  ggplot(aes(x = log2(dist_to_next), colour = type)) +
   geom_density()
 
-tested_array %>%
-  ggplot(aes(y = log2(dist_to_next), x = annot.type, colour = annot.type)) +
-  geom_boxplot() +
-  theme(legend.position = "none")
-```
-
-```{r}
-tested_seq %>%
-  ggplot(aes(x = log2(dist_to_next), colour = annot.type)) +
+overlap_feature %>%
+  ggplot(aes(x = log2(dist_to_next), colour = type)) +
   geom_density()
-
-tested_seq %>%
-  ggplot(aes(y = log2(dist_to_next), x = annot.type, colour = annot.type)) +
-  geom_boxplot() +
-  theme(legend.position = "none")
 ```
-* as expected, shorter distances between cpgs in the islands
+* CpGs in islands have a shorter distance between them
+
 
 ## Gene features
 ```{r}
