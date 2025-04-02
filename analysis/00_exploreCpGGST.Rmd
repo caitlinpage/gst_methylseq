@@ -23,7 +23,7 @@ The trick is, that this can include the child terms.
 The other trick is that we don't want this to be species dependent.
 And although we have mainly been using GO, we want it to applicable for other gene set databases like KEGG.
 
-
+## Previous work
 
 ```{r}
 # missMethyl
@@ -42,7 +42,12 @@ And although we have mainly been using GO, we want it to applicable for other ge
 
   list(idList=go, idTable=GOID.TERM)
 }
+```
+* Positives: doesn't require an input - just runs
+             easy to read
+* Negatives: only allows Human input - not other species
 
+```{r}
 # goseq
 
 getgo=function(genes,genome,id,fetch.cats=c("GO:CC","GO:BP","GO:MF")){
@@ -137,6 +142,102 @@ getgo=function(genes,genome,id,fetch.cats=c("GO:CC","GO:BP","GO:MF")){
 	return(user2cat[toupper(genes)])
 }
 ```
+* Positives: allows for multiple species
+             GO or KEGG in one fn
+* Negatives: code is old and not easy to follow
+
+## Developing my way
+
+* Requirements:
+** allow for multiple species
+** separate methods for GO/KEGG (start with GO)
+
+* Get the GO terms
+Use an [org object](10.18129/B9.bioc.org.Hs.eg.db)
+These are species dependent, and provides genome wide mapping, using Entrez Gene identifiers
+```{r}
+org.Hs.eg.db
+```
+
+There are 3 objects available for GO ontology terms.
+```{r}
+c(org.Hs.egGO, org.Hs.egGO2ALLEGS, org.Hs.egGO2EG)
+```
+[1] maps entrez gene identifiers and GO ids they are directly associated with, NO CHILD TERMS
+[2] maps between GO and all of entrez gene ids annotated at that GO or to it's child terms
+[3] I think this one is just the reverse mapping of [1]
+
+Which to use?
+* missMethyl uses GO2ALLEGS
+* unclear what goseq defaults to
+
+AIM:
+* explore the impact of using GO or GO2ALLEGS
+```{r}
+xx <- as.list(org.Hs.egGO2EG)
+go_entrez_direct <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+go_entrez_direct <- go_entrez_direct %>% group_by(go) %>% mutate(num_genes = n()) %>% ungroup()
+go_entrez_direct <- data.frame(go_entrez_direct)
+xx <- as.list(org.Hs.egGO2ALLEGS)
+go_entrez_allegs <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+go_entrez_allegs <- go_entrez_allegs %>% group_by(go) %>% mutate(num_genes = n()) %>% ungroup()
+go_entrez_allegs <- data.frame(go_entrez_allegs)
+```
+
+```{r}
+go_entrez_direct %>% distinct(go)
+go_entrez_allegs %>% distinct(go)
+```
+```{r}
+mm_go <- .getGO()
+mm_go <- mm_go$idTable
+```
+
+```{r}
+unique(go_entrez_direct$go) %in% mm_go$GOID %>% summary()
+unique(go_entrez_allegs$go) %in% mm_go$GOID %>% summary()
+```
+```{r}
+mm_go <- mm_go %>% mutate(n_genes_direct = go_entrez_direct[match(.$GOID, go_entrez_direct$go), "num_genes"],
+                          n_genes_alleg = go_entrez_allegs[match(.$GOID, go_entrez_allegs$go), "num_genes"])
+mm_go[is.na(mm_go)] <- 0
+head(mm_go)
+```
+```{r}
+mm_go %>%
+  ggplot(aes(x = n_genes_direct, y = n_genes_alleg)) +
+  geom_point(alpha = 0.3)
+
+mm_go %>%
+  ggplot(aes(x = log2(n_genes_direct), y = log2(n_genes_alleg))) +
+  geom_point(alpha = 0.3)
+```
+
+```{r}
+cor.test(mm_go$n_genes_direct, mm_go$n_genes_alleg)
+```
+```{r}
+mm_go %>% filter(n_genes_direct == 0) %>% nrow(.)
+```
+
+```{r}
+mm_go %>% mutate(direct_0 = ifelse(n_genes_direct == 0, TRUE, FALSE)) %>%
+  ggplot(aes(x = log2(n_genes_alleg), colour = direct_0)) +
+  geom_density()
+
+mm_go %>% mutate(direct_0 = ifelse(n_genes_direct == 0, TRUE, FALSE)) %>%
+  ggplot(aes(x = direct_0, y = log2(n_genes_alleg), fill = direct_0)) +
+  geom_boxplot()
+```
+* gene sets with no genes in direct do not appear to be a subgroup of the allegs 
+
+* it would be nice to have a hierachy map with all of this to see how the gene sets are related
+(I know I looked into a few things back in the day, see if I can find them)
+* add in some cpg bias stuff here
+* but make the gene stuff a separate file so it doesn't get too chaotic
+
+Analysis continues in converting gene ids [here](03_genesToGST.html)
+
 
 ```{r}
 # For org.Hs.egGO2ALLEGS
