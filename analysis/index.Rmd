@@ -25,10 +25,10 @@ under the hg19 genome annotation.
 
 
 Analysis:
+0. [Summary of decisions]
+0. [Datasets used in the analyses](00_datasets.html) 
 
-0. [Datasets used in the analyses](00_datasets.Rmd) 
-
-1. [Exploration of CpG sites](00_exploreCpGDistrib)
+1. [Exploration of CpG sites](00_exploreCpGDistrib.html)
 
 1. Differential methylation methods and comparison
 
@@ -42,23 +42,30 @@ Analysis:
 
 2. Annotating DMRs to genes
 
+  a) [Collating genes](00_obtainGenes.html)
+
   a) Comparing significant genes
 
   a) Comparing microarray and sequencing genes
 
-2. [Methylation microarray gene set testing analysis](00_microarrayOntologyAnalysis.Rmd)
+2. [Methylation microarray gene set testing analysis](00_microarrayOntologyAnalysis.html)
 
 3. Identify bias for correction in gene set testing
 
-  a) [Explore CpG distribution across genome bins](01_exploreBiasByBins.Rmd)
+  a) [Explore CpG distribution across genome bins](01_exploreBiasByBins.html)
   
-  b) [Explore gene based biases](02_exploreBiasGenes.Rmd) *tba
+  b) [Explore gene based biases](02_exploreBiasGenes.html) *tba
+
+4. Gene Set Testing
+  [Summary page]
+  a) [Explore gene sets, ways to obtain, relationships, and bias](00_exploreCpGGST.html)
+  b) [Converting ]
   
-4. [Develop and evaludate gene set testing method for methylation sequencing](03_runGST.Rmd)
+4. [Develop and evaludate gene set testing method for methylation sequencing](03_runGST.html)
 
 6. Applying gene set testing method to different data sets
 
-  a) [Long read Analysis](00_longReadAnalysis)
+  a) [Long read Analysis](00_longReadAnalysis.html)
   
 
 ```{r}
@@ -71,13 +78,6 @@ https://www.techcoil.com/blog/how-to-save-and-load-environment-objects-in-r/#goo
 #load('myEnvironment.RData')
 ```
 
-
-
-
-
-[analysis/00_exploreCpGDistribution]
-* plots comparing array and sequencing
-** distance between cpgs, annotation to cpg and gene features
 
 
 

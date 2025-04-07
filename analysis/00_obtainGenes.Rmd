@@ -17,9 +17,29 @@ library(ggplot2)
 
 library(AnnotationHub)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(GenomicFeatures)
 library(ExperimentHub)
 library(biomaRt)
 ```
+
+## Description
+
+A description of some Bioconductor annotation resources: [here](https://bioconductor.github.io/BiocWorkshops/introduction-to-bioconductor-annotation-resources.html)
+
+# Possible methods to obtain Genes
+* AnnotationHub
+* ExperimentHub
+* TxDb object
+* biomaRt
+
+We want flexibility to be inbuilt in our function, and acknowledge that individuals will have different preferences for their gene annotations.
+Information that we will need to be flexible with:
+* species
+* genome version
+
+Minimum information we will require from the resource
+* species
+* genome version
 
 ## Using [AnnotationHub](https://bioconductor.org/packages/release/bioc/html/AnnotationHub.html)
 * What: access web resource
@@ -52,10 +72,14 @@ query(ah, c("hg19", "Homo sapiens"))
 ```
 
 
-```{r}
-#query(query(query(query(ah, "hg19"), "Homo sapiens"), "GRanges"), "GENCODE")
-```
-- ensembl, ucsc, and gencode don't give tss coords
+# Summary
+* A web resource so it is potentially unstable
+* Provides access to the widest range of data sources
+* ensembl, ucsc, and gencode don't give tss coords
+
+# Considerations for inclusion
+* the query used
+* package could be a recommends
 
 ## Using TxDb object
 * These are packages installed for the species and genome version interested in
@@ -65,8 +89,16 @@ TxDb.Hsapiens.UCSC.hg19.knownGene
 ```{r}
 genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
 ```
-- maybe like a combination of trancripts and genes?
-- but that seems terrible
+
+# Summary
+* Uses Entrez Gene Ids (also used for GST)
+* Can access genes and transcripts
+
+# Considerations for inclusion
+* Explicit documentation that the selected package must be installed separately
+* Do we care about the transcripts?
+* No gene symbol names - would need to be added
+* No TSS information
 
 ## Using Experiment Hub
 
@@ -80,23 +112,27 @@ eh["EH3132"]
 ```
 
 ```{r}
-eh$
 head(unique(eh$species))
 ```
 ```{r}
 query(eh, "Homo sapiens")
 ```
 
+# Summary
+* It's genes from DMRCate 
+* As this is an experiment, not appropriate 
+
+
 ## Using biomart
-- use biomart for now
-```{r}
+
+```{r eval=FALSE}
 listEnsemblArchives()
 ```
-```{r}
+```{r eval=FALSE}
 ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", version = "GRCh37")
 ```
 - need hg19 which is grch37
-```{r}
+```{r eval=FALSE}
 listAttributes(ensembl)
 ```
 - the old ensembl website has canonical transcript stuff
@@ -105,11 +141,11 @@ listAttributes(ensembl)
 
 - but ensembl transcript is longest, most high exp, and matches other databases
 - maybe run stuff just picking a random for now lol
-```{r}
+```{r eval=FALSE}
 wgbs_counts <- readRDS("../output/wgbs_counts.rds")
 ```
 
-```{r}
+```{r eval=FALSE}
 biomart_genes <- getBM(
         attributes = c("ensembl_gene_id", "external_gene_name", "ensembl_transcript_id",
             "chromosome_name", "start_position", "end_position", "strand",
@@ -120,121 +156,73 @@ biomart_genes <- getBM(
     )
 biomart_genes <- biomart_genes %>% .[order(.$chromosome_name, .$start_position), ]
 colnames(biomart_genes) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
-biomart_genes
-```
-```{r}
-biomart_genes %>% mutate(check_t_length = t_end - t_start, same = ifelse(t_length == check_t_length, TRUE, FALSE))  %>% group_by(same) %>% summarise(n())
-biomart_genes %>% mutate(check_t_length = t_end - t_start, same = ifelse(t_length == check_t_length, TRUE, FALSE)) %>% filter(same == TRUE)
-```
-- so the ensembl transcript length isn't taken from the start and stop
-- must be because it includes UTR's?
-- but does it change the largest transcript per gene??
-```{r}
-biomart_genes %>% mutate(check_t_length = t_end - t_start, same = ifelse(t_length == check_t_length, TRUE, FALSE), diff = check_t_length - t_length) %>% group_by(ensembl_gene_id) %>% mutate(max_trans = max(t_length), max_check = max(check_t_length), same_max = ifelse(max_trans == t_length & max_check == check_t_length, TRUE, FALSE))
-```
-- ok so that doesn't really match
-- maybe just go with the transcript length one?
-
-```{r}
-biomart_genes <- biomart_genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup() %>% mutate(seqnames = as.character(seqnames), seqnames = paste0("chr", seqnames))
-biomart_genes
-```
-```{r}
-biomart_genes %>% distinct(ensembl_gene_id) %>% nrow()
+head(biomart_genes)
 ```
 
-```{r}
-biomart_genes <- biomart_genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:n()) %>% filter(num_t == 1) %>% ungroup() 
-biomart_genes
-```
-- hold up these tss's are just matching the start site
-- that's not how it's supposed to work
-- hold up they used to be different - but seems like by picking the longest transcript - (or trying to), the tss is now same as the start
-```{r}
-biomart_genes %>% group_by(gene_name) %>% summarise(n=n()) %>% filter(n>1)
-```
-?????
-- let's ignore that
-```{r}
-biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .[order(.$gene_name),]
-```
-- ok so now bit nervous a screw up has happened because we have different ensembl-id but same gene-name
-- and lots of these are different chrom
-- i think i want to check on these before i do tss stuff
-```{r}
-biomart_cg <- find_overlaps(as_granges(biomart_genes), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(ensembl_gene_id) %>% summarise(num_cg = n())
-biomart_cg <- data.frame(biomart_cg)
-```
+# Summary
+* Uses a web resource so potentially unstable
+* Large depth in diversity of information
+
+# Considerations for inclusion
+* the way species and genome version are defined in the ensembl query
+* what type of information should be taken from it
+
+## Developing the function
+
+# Features
+* Allow for multiple potential inputs: biomaRt and TxDb
+* Contains TSS or estimates TSS (start site with strand information)
+* Identifies gene or promoter regions
+* Promoter defined as [TSS-2000, TSS + 500]
+* The number of CpGs: number of overall CpGs (not tested CpGs - this is experiment specific)
 
 ```{r}
-biomart_genes <- biomart_genes %>% mutate(num_cg = biomart_cg[match(.$ensembl_gene_id, biomart_cg$ensembl_gene_id), "num_cg"],
-                                          num_cg = ifelse(is.na(num_cg), 0, num_cg))
-```
+sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter")) {
+  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub"))
+  gene_feature <- match.arg(tolower(gene_feature), c("gene", "promoter"))
 
+  if(gene_source == "biomart") {
+    ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", version = "GRCh37")
+    genes <- getBM(
+      attributes = c("ensembl_gene_id", "external_gene_name", "ensembl_transcript_id",
+                     "chromosome_name", "start_position", "end_position", "strand",
+                     "transcription_start_site" , "transcript_start", "transcript_end", "transcript_length"),
+      filters = "chromosome_name",
+      values = gsub("chr", "", unique(counts$seqnames)[1:22]),
+      mart = ensembl
+    )
+    genes <- genes %>% .[order(.$chromosome_name, .$start_position), ]
+    colnames(genes) <- c("ensembl_gene_id", "gene_name", "ensembl_transcript_id", "seqnames", "start", "end", "strand", "TSS", "t_start", "t_end", "t_length")
+    genes <- genes %>% group_by(ensembl_gene_id) %>% filter(t_length == max(t_length)) %>% ungroup()
+    genes$seqnames <- paste0("chr", as.character(genes$seqnames))
+    genes <- genes %>% group_by(ensembl_gene_id) %>% mutate(num_t = 1:dplyr::n()) %>% filter(num_t == 1) %>% ungroup()
+  } else if (gene_source == "experimenthub") {
+    eh <- ExperimentHub()
+    genes <- eh[["EH3132"]]
+  }
+  genes <- genes %>% data.frame() %>% ungroup()
+  # ensure ensembl_id name consistency
+  colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
+  # double check only 1 ensembl id per gene entry
+  genes$width <- genes$end - genes$start + 1
+  genes <- genes %>% group_by(ensembl_gene_id) %>% filter(width == max(width)) %>% ungroup()
+  # add random identifier
+  genes$gene_num <- 1:nrow(genes)
+  #is it promoter???
+  if(length(gene_feature) == 1 & gene_feature == "promoter") {
+    genes$start <- ifelse(genes$strand == 1, genes$start - 2000, genes$end - 500)
+    genes$end <- ifelse(genes$strand == 1, genes$start + 2500, genes$end + 2000)
+    genes <- genes[,!colnames(genes) == "width"]
+  }
+  # add number of cpgs overlapping gene
+  gene_cpg <- find_overlaps(as_granges(genes), as_granges(counts)) %>% data.frame()
+  gene_cpg <- gene_cpg %>% group_by(gene_num) %>% summarise(n_cpg = dplyr::n()) %>% ungroup() %>% data.frame()
 
-```{r}
-nrow(eh_genes)
-nrow(distinct(eh_genes, gene))
-nrow(distinct(eh_genes, symbol))
-```
-```{r}
-eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% .[order(.$symbol),]
-```
-```{r}
-(eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.)) %in% (biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) %>% summary()
-(eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.)) %in% (biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) 
-```
-```{r}
-(biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) %in% (eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.)) %>% summary()
-(biomart_genes %>% group_by(gene_name) %>% mutate(n=n()) %>% filter(n>1) %>% .$gene_name %>% unique(.)) %in% (eh_genes %>% group_by(symbol) %>% mutate(n=n()) %>% filter(n>1) %>% ungroup() %>% .$symbol %>% unique(.))
-```
-- so all biomart in eh_genes
-- but eh_genes has some extras
-```{r}
-biomart_genes %>% group_by(gene_name) %>% summarise(n=n()) %>% .[order(.$n, decreasing = TRUE),]
-```
-```{r}
-biomart_genes <- biomart_genes %>% group_by(gene_name) %>% mutate(num_gene_name = n()) %>% ungroup() %>% filter(num_gene_name == 1) %>% data.frame()
-biomart_genes
+  genes$num_cg <- gene_cpg[match(genes$gene_num, gene_cpg$gene_num), "n_cpg"]
+  genes[is.na(genes)] <- 0
+  genes
+}
 ```
 
 
-
-
-# found a paper that used genomicfeatures and txdb to get start sites
-- genomfeatures vignette - promoters fn is area around tss for transcript
-```{r}
-library(GenomicFeatures)
-promoters(TxDb.Hsapiens.UCSC.hg19.knownGene, upstream = 0, downstream = 0)
-```
-- except that's way more than the genes - and no way to match unless overlapping i guess
-```{r}
-genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
-transcripts(TxDb.Hsapiens.UCSC.hg19.knownGene)
-```
-- stick with biomart genes for now i think
-
-# biomart
-```{r}
-biomart_genes
-```
-# allow for multiple sources with diff col names
-- which col has the ensembl_gene_id?? (ENSG)
-```{r}
-biomart_genes
-```
-
-```{r}
-colnames(biomart_genes)[grepl("ENSG", biomart_genes[1,])]
-```
-- i want the index of the true
-```{r}
-biomart_genes2 <- biomart_genes[1:5,]
-biomart_genes2
-colnames(biomart_genes2)[grepl("ENSG", biomart_genes2[1,])] <- "ensembl_id"
-biomart_genes2
-```
-```{r}
-rm(biomart_genes2)
-```
 
