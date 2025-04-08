@@ -31,78 +31,7 @@ Questions raised from that code are:
 
 ```
 
-# i want to compare the gene sets
-- figure out if that's what's going wrong
-(and maybe paste all my code in here lol)
-or just rename the other file to this
 
-
-## get the gene set from goseq
-goseq::goseq(pwf, "hg19", "ensGene")
-getgo(rownames(pwf),genome,id,fetch.cats=test.cats)
-```{r}
-rownames(pwf) %>% length()
-test_bias$ensembl_gene_id %>% length()
-```
-
-```{r}
-go_goseq <- getgo(test_bias$ensembl_gene_id, "hg19", "ensGene")
-names(go_goseq) <- test_bias$ensembl_gene_id
-go_goseq <- reversemapping(go_goseq)
-go_goseq <- reversemapping(go_goseq)
-goseq_go <- reversemapping(go_goseq)
-go_goseq
-```
-```{r}
-names(goseq_go)[1:5]
-names(go_goseq)[1:5]
-```
-
-```{r}
-length(unique(names(goseq_go))) # goseq 22258 
-length(unique(names(collection))) # mm 22124
-```
-
-```{r}
-ggVennDiagram(list(mm = unique(names(collection)), goseq = unique(names(goseq_go))))
-```
-
-
-```{r}
-names(goseq_go[test_bias$ensembl_gene_id]) %>% unique() %>% length()
-length(test_bias$ensembl_gene_id) - length(go_goseq)
-```
-```{r}
-test_bias$ensembl_gene_id %in% names(go_goseq) %>% summary()
-go_goseq[filter(test_bias, ensembl_gene_id %in% names(go_goseq))$ensembl_gene_id] %>% length()
-```
-```{r}
-go_goseq_filt <- go_goseq[filter(test_bias, ensembl_gene_id %in% names(go_goseq))$ensembl_gene_id]
-goseq_go_filt <- reversemapping(go_goseq_filt)
-```
-```{r}
-length(goseq_go_filt)
-names(goseq_go_filt)[1:5]
-```
-
-- so I filtered out the genes but it didn't change the categories
-```{r}
-lapply(go_goseq[1:5], length)
-lapply(goseq_go[1:5], length)
-```
-```{r}
-lapply(goseq_go, length) %>% unlist() %>% data.frame() %>% setNames("num_genes") #22258, same with filt
-lapply(goseq_go_filt, length) %>% unlist() %>% data.frame() %>% setNames("num_genes") %>% filter(num_genes > 0)
-```
-there's no diff between these
-```{r}
-ggVennDiagram(list(mm = unique(names(collection)), goseq = unique(names(goseq_go_filt))))
-```
-
-- ok so this can't be the cause of getting more res in mm - also they are fairly sim
-
-- so what is happening?
--running with the other inputs did not fix it
 ##############
 
 ```{r}
