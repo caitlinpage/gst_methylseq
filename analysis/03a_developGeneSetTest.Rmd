@@ -55,9 +55,8 @@ source("../code/function_binBiasPlot.R")
 sourceGenes(counts, gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter")) 
 ```
 Annotate genes to significant DMRs
-```{r eval=FALSE}
+```{r}
 source("../code/function_binBiasPlot.R")
-annoGeneDmr(counts, dmrs, gene_source = c("biomart", "experimenthub", "self"), genes)
 test_anno <- annoGeneDmr(bsseq_res, bsseq_dmrs, gene_source = "biomaRt", biomart_genes)
 ```
 
@@ -137,7 +136,7 @@ system.time(run_miss_methyl_a(biomart_genes, test_anno))
 }
 ```
 
-```{r}
+```{r eval=FALSE}
 run_miss_methyl_b <- function(out, correct_bias=TRUE, plot_bias=FALSE, ...) {
   sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
   eg.universe <- out$universe # entrez ids all cpgs(?) - but it's just all genes

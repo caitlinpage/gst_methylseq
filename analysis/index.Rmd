@@ -63,7 +63,9 @@ Analysis:
 
   b) [Reviewing code of existing methods](03_howToGST.html)
   
-4. [Develop and evaludate gene set testing method for methylation sequencing](03_runGST.html)
+  [Develop gene set testing method for methylation sequencing](03a_developGeneSetTest.Rmd)
+  
+4. [Evaludate gene set testing method for methylation sequencing](03_runGST.html)
 
 6. Applying gene set testing method to different data sets
 
