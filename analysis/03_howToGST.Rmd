@@ -1,0 +1,203 @@
+---
+title: "03_howToGST"
+author: "Caitlin Page"
+date: "2025-04-08"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Packages
+
+```{r}
+library(missMethyl)
+library(goseq)
+library(BiasedUrn)
+library(org.Hs.eg.db)
+library(GO.db)
+
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+```
+
+## Description
+Evaluate how previous methods conduct gene set testing in biased and unbiased ways
+Focussing on Over Representation Analysis (ORA)
+Takes a list of genes that have been defined as Sig or Not based on some threshold (p-value etc)
+Tests to see if gene sets (categories) are over-represented (have more of the Sig genes in them)
+
+PROBLEM: Test assumes every gene has the same chance of being ided as significant
+IMPACT: Sig gene sets do not reflect biology, but rather gene sets dominated by genes with a higher chance of being Sig (longer etc)
+
+## Biased Methods (Traditional)
+
+# statistic
+The Hypergeometric Test
+```{r}
+
+```
+
+## Unbiased Methods (incorporate the bias)
+
+# statistic
+The Wallenius non-central hypergeometric test
+Available in the `BiasedUrn` package
+```{r}
+
+```
+
+## [goseq](https://bioconductor.org/packages/release/bioc/html/goseq.html)
+
+* [Paper](https://link.springer.com/article/10.1186/gb-2010-11-2-r14)
+* [Code](https://github.com/nadiadavidson/goseq)
+
+Designed for RNA-Seq and adjusting for length based bias
+Is species independent
+Code is difficult to follow
+
+## [missMethyl](https://www.bioconductor.org/packages/release/bioc/html/missMethyl.html)
+
+* [Paper](https://link.springer.com/article/10.1186/s13059-021-02388-x)
+* [Code](https://github.com/Oshlack/missMethyl/tree/master)
+
+Designed for methylation microarray and adjusting for CpG bias
+Only works for human data, and either the 450k or EPIC array
+
+# workflow
+
+```{r eval=FALSE}
+gometh(sig.cpg, all.cpg, collection = "GO", array.type = "EPIC", 
+        plot.bias = FALSE, prior.prob = TRUE, genomic.features = "ALL")
+```
+
+# 1. Obtain Gene Sets `.getGO()`
+
+Under the hood, this runs `.getGO()` or `.getKEGG()`
+This function is not available for access when installing the package as it's designed to be used internally only.
+But we can look at the code
+```{r eval=FALSE}
+.getGO <- function(){
+  if(!requireNamespace("org.Hs.eg.db", quietly = TRUE))
+    stop("org.Hs.eg.db package required but not installed.")
+  egGO2ALLEGS <- utils::getFromNamespace("org.Hs.egGO2ALLEGS", "org.Hs.eg.db")
+  GeneID.PathID <- AnnotationDbi::toTable(egGO2ALLEGS)[,c("gene_id", "go_id", "Ontology")]
+  d <- !duplicated(GeneID.PathID[, c("gene_id", "go_id")])
+  GeneID.PathID <- GeneID.PathID[d, ]
+  GOID.TERM <- suppressMessages(AnnotationDbi::select(GO.db::GO.db, 
+                                                      keys=unique(GeneID.PathID$go_id), 
+                                                      columns=c("GOID","ONTOLOGY","TERM"), 
+                                                      keytype="GOID"))
+  go <- tapply(GeneID.PathID$gene_id, GeneID.PathID$go_id, list)
+    
+  list(idList=go, idTable=GOID.TERM)
+}
+go <- .getGO()
+```
+Requires the installation of `org.Hs.eb.db` 
+Contains mapping of entrez ids and GO gene sets
+
+There are 2 options of mapping GO ids and entrez genes
+Direct mapping - only the entrez ids that match that gene set
+Allows child terms - if the entrez id is in that gene set or any of it's child gene sets 
+Unsurprisingly, this version is far more permissive
+
+# Q: why did they choose egGO2ALLEGS? What is the impact? How do results change if using direct mapping only?
+
+# 2. Run `gsameth()`
+```{r eval=FALSE}
+gsameth(sig.cpg=sig.cpg, all.cpg=all.cpg, collection=go$idList, 
+        array.type=array.type, plot.bias=plot.bias, 
+        prior.prob=prior.prob, anno=anno, equiv.cpg=equiv.cpg,
+        fract.counts=fract.counts, 
+        genomic.features = genomic.features,
+        sig.genes = sig.genes)
+```
+* collection is now all of the gene sets with their entrez genes
+
+This function then runs
+
+# a). `getMappedEntrezIDs()`
+```{r eval=FALSE}
+getMappedEntrezIDs <- function(sig.cpg, all.cpg=NULL, 
+                               array.type=c("450K","EPIC"), anno=NULL, 
+                               genomic.features = c("ALL", "TSS200","TSS1500",
+                                                    "Body","1stExon","3'UTR",
+                                                    "5'UTR","ExonBnd"))
+```
+This function maps entrez ids to CpG sites.
+Genes are identified as significant if they overlap a significant CpG
+It uses the available microarray annotations to obtain gene information
+The output is:
+```{r eval=FALSE}
+out <- list(sig.eg = sorted.eg.sig, # vector of significant entrez gene ids
+            universe = eg.universe, # vector of all tested entrez gene ids
+            freq = freq_genes, # table of entrez gene ids and the number of tested CpGs overlapping them
+            equiv =  equivN, # same as above but if a CpG overlapped 2 genes, 0.5 value for each
+            de = test.de, # vector of 0,1s for if each gene in the universe was significant or not
+            fract.counts = data.frame(sigid=sorted.eg.sig,frac=fract.counts)) # or maybe this is the 0.5 thing
+```
+
+# b) Back to `gsameth` for all the testing
+Some filtering to check there's no empty gene sets
+Then the testing
+It can do regular old biased testing as well - or the bias corrected version
+Code is in a for loop so it runs one by one on the gene sets
+```{r eval=FALSE}
+.estimatePWF <- function(D,bias)
+  # An alternative to goseq function nullp, which is transformation invariant
+  # Belinda Phipson and Gordon Smyth
+  # 6 March 2015
+{
+  prior.prob <- bias
+  o <- order(bias)
+  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
+  prior.prob
+}
+pwf <- .estimatePWF(D=test.de,bias=as.vector(equiv))
+```
+This pwf is used to calculate the probability of genes being in the set or not
+
+```{r eval=FALSE}
+for(i in 1:length(collection)){
+      InSet <- eg.universe %in% collection[[i]]
+      pw.red <- sum(pwf[InSet])/results[i,"N"]
+      pw.white <- sum(pwf[!InSet])/(Nuniverse-results[i,"N"])
+      odds <- pw.red/pw.white
+      results[i,"P.DE"] <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
+                                                   results[i,"N"],
+                                                   Nuniverse-results[i,"N"],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,"DE"],
+                                  results[i,"N"],
+                                  Nuniverse-results[i,"N"],
+                                  m,odds)
+}
+```
+
+# Q: is there an alternative to a for-loop that would be appropriate?
+# Q: `BiasedUrn` has another test option - is there any practical difference in the tests offered?
+
+Function also has the offer to list the significant genes identified with the gene sets
+
+# Output: `topGSA()`
+Defaults to outputting top 20 sets, sorted by P.DE
+```{r eval=FALSE}
+sig_terms_array <- topGSA(gst, n = 1000) %>% filter(FDR < 0.05) %>% .[order(.$FDR),]
+sig_terms_array$GOID <- rownames(sig_terms_array)
+sig_terms_array$rank <- 1:nrow(sig_terms_array)
+```
+
+```{r}
+sig_terms_array <- readRDS("../output/mm_array_res.rds")
+head(sig_terms_array)
+```
+
+# Summary
+
+# Positives
+* code is well broken up into functions with specific purposes
+
+# Negatives
+* only works on human (feature of the arrays)
+* output is not sorted on FDR
