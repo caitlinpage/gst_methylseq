@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Caitlin Page" />
+
+<meta name="date" content="2024-11-15" />
+
+<title>03a_developGeneSetTest</title>
+
+<script src="site_libs/header-attrs-2.29/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">2_ontology_bias</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/caitlinpage/gst_methylseq">
+    <span class="fab fa-github"></span>
+     
+    Source code
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">03a_developGeneSetTest</h1>
+<h4 class="author">Caitlin Page</h4>
+<h4 class="date">2024-11-15</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
+</a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2025-04-08
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 0
+</p>
+<p>
+<strong>Knit directory:</strong> <code>2_ontology_bias/analysis/</code>
+<span class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.1). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date
+</a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguptodate"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great! Since the R Markdown file has been committed to the Git
+repository, you know the exact version of the code that produced these
+results.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20240905code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20240905)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20240905code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20240905)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr
+project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree892c07d325145306db0021627dee883cc59b2498targetblank892c07da">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong>
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/892c07d325145306db0021627dee883cc59b2498" target="_blank">892c07d</a>
+</a>
+</p>
+</div>
+<div
+id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree892c07d325145306db0021627dee883cc59b2498targetblank892c07da"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/892c07d325145306db0021627dee883cc59b2498" target="_blank">892c07d</a>.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/.DS_Store
+    Ignored:    analysis/input/
+    Ignored:    analysis/mc_h1/
+    Ignored:    analysis/myEnvironment.RData
+    Ignored:    data/cell_line_wgbs/
+    Ignored:    data/comp_bio_challenge/
+    Ignored:    data/gene_sets/
+    Ignored:    data/long_read/
+    Ignored:    data/microarray/
+    Ignored:    data/wgbs/
+    Ignored:    output/figures/
+    Ignored:    renv/library/
+    Ignored:    renv/staging/
+
+Untracked files:
+    Untracked:  analysis/05_vizResults.Rmd
+    Untracked:  analysis/clusterlog.txt
+    Untracked:  code/ChatGPT_translate.html
+    Untracked:  code/ChatGPT_translate_files/
+
+Unstaged changes:
+    Modified:   .gitignore
+    Modified:   2_ontology_bias.Rproj
+    Modified:   _workflowr.yml
+    Modified:   analysis/00_exploreCpGGST.Rmd
+    Modified:   analysis/03_genesToGST.Rmd
+    Modified:   analysis/03_howToGST.Rmd
+    Modified:   analysis/04a_compareGSTResults.Rmd
+    Modified:   analysis/06_decisionSummary.Rmd
+    Modified:   code/mmGST.R
+    Modified:   code/runSeqDmMethods.R
+    Modified:   renv.lock
+    Modified:   renv/.gitignore
+    Modified:   renv/activate.R
+    Modified:   renv/settings.json
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+These are the previous versions of the repository in which changes were
+made to the R Markdown
+(<code>analysis/03a_developGeneSetTest.Rmd</code>) and HTML
+(<code>docs/03a_developGeneSetTest.html</code>) files. If you’ve
+configured a remote Git repository (see <code>?wflow_git_remote</code>),
+click on the hyperlinks in the table below to view the files as they
+were in that past version.
+</p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/892c07d325145306db0021627dee883cc59b2498/analysis/03a_developGeneSetTest.Rmd" target="_blank">892c07d</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-08
+</td>
+<td>
+wflow_publish(c("index.Rmd", "03a_developGeneSetTest.Rmd"))
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/0e6884b2946c0611873064411f236322d4d2a676/analysis/03a_developGeneSetTest.Rmd" target="_blank">0e6884b</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-08
+</td>
+<td>
+remove old comparison code and shorter versions of the fn
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/b6c72d21036b68eff99bdf7d13e5d74b935474cf/analysis/03a_developGeneSetTest.Rmd" target="_blank">b6c72d2</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-08
+</td>
+<td>
+functions in order of use
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/75a9b15a886ccdc98c89ae4b5192e68ffc5896e0/analysis/03a_developGeneSetTest.Rmd" target="_blank">75a9b15</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-08
+</td>
+<td>
+removed weird goseq stuff
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/60ba205b62ad52c2bae977cd30a5437e539b8593/analysis/03a_developGeneSetTest.Rmd" target="_blank">60ba205</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-08
+</td>
+<td>
+removed code of borrowed mm gene sets
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/0c54a5fe6f79cbd0c02f13629459666277cf9658/analysis/03a_developGeneSetTest.Rmd" target="_blank">0c54a5f</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-02-21
+</td>
+<td>
+removed microbenchmark stuff
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/97bbe741649eece2f10da38a5fd0e0de28460604/analysis/03a_developGeneSetTest.Rmd" target="_blank">97bbe74</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-24
+</td>
+<td>
+testing versions of b to try and speed it up - unsucessful
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/0f75ff4cefda0cca85d232a661f809416f768efb/analysis/03a_developGeneSetTest.Rmd" target="_blank">0f75ff4</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-23
+</td>
+<td>
+removed working out for benchmarking small sections of a
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/29a849ae7a6244f1ab636706d6f4c7163f96ceab/analysis/03a_developGeneSetTest.Rmd" target="_blank">29a849a</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-23
+</td>
+<td>
+successfully sped up a by a crazy amount
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/43a4d63312eac061cf1a8038b4b83c488d1bfe36/analysis/03a_developGeneSetTest.Rmd" target="_blank">43a4d63</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-23
+</td>
+<td>
+speeding up fns
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/5af8505819a7cd600a7a705ecaa3ab135525917b/analysis/03a_developGeneSetTest.Rmd" target="_blank">5af8505</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-19
+</td>
+<td>
+master fn for the whole gst thing - it works!
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/0709825dcb1f020dee9bd7e3525d35ce52f8bcae/analysis/03a_developGeneSetTest.Rmd" target="_blank">0709825</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-17
+</td>
+<td>
+update
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/c04e7d3d04d2e5885ca42be3b7042f9c12d58aef/analysis/03a_developGeneSetTest.Rmd" target="_blank">c04e7d3</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-13
+</td>
+<td>
+working on functions - removing dplyr stuff - replace with base
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/4fe17179af03bd7b6c09912f2014cd281acb8be8/analysis/03a_developGeneSetTest.Rmd" target="_blank">4fe1717</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-12-09
+</td>
+<td>
+more comparisons and breaking the function stuff
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/86ec5cf390857f5160157e6b717e0d871cd8e8e5/analysis/03a_developGeneSetTest.Rmd" target="_blank">86ec5cf</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2024-11-22
+</td>
+<td>
+trying to make a fn
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div id="packages" class="section level2">
+<h2>Packages</h2>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>
+Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:stats&#39;:
+
+    filter, lag</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(plyranges)</code></pre>
+<pre><code>Loading required package: BiocGenerics</code></pre>
+<pre><code>
+Attaching package: &#39;BiocGenerics&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:dplyr&#39;:
+
+    combine, intersect, setdiff, union</code></pre>
+<pre><code>The following objects are masked from &#39;package:stats&#39;:
+
+    IQR, mad, sd, var, xtabs</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    anyDuplicated, aperm, append, as.data.frame, basename, cbind,
+    colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
+    get, grep, grepl, intersect, is.unsorted, lapply, Map, mapply,
+    match, mget, order, paste, pmax, pmax.int, pmin, pmin.int,
+    Position, rank, rbind, Reduce, rownames, sapply, setdiff, table,
+    tapply, union, unique, unsplit, which.max, which.min</code></pre>
+<pre><code>Loading required package: IRanges</code></pre>
+<pre><code>Loading required package: S4Vectors</code></pre>
+<pre><code>Loading required package: stats4</code></pre>
+<pre><code>
+Attaching package: &#39;S4Vectors&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:dplyr&#39;:
+
+    first, rename</code></pre>
+<pre><code>The following object is masked from &#39;package:utils&#39;:
+
+    findMatches</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    expand.grid, I, unname</code></pre>
+<pre><code>
+Attaching package: &#39;IRanges&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:dplyr&#39;:
+
+    collapse, desc, slice</code></pre>
+<pre><code>Loading required package: GenomicRanges</code></pre>
+<pre><code>Loading required package: GenomeInfoDb</code></pre>
+<pre><code>
+Attaching package: &#39;plyranges&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:IRanges&#39;:
+
+    slice</code></pre>
+<pre><code>The following objects are masked from &#39;package:dplyr&#39;:
+
+    between, n, n_distinct</code></pre>
+<pre><code>The following object is masked from &#39;package:stats&#39;:
+
+    filter</code></pre>
+<pre class="r"><code>library(missMethyl)</code></pre>
+<pre><code>Loading required package: IlluminaHumanMethylation450kanno.ilmn12.hg19</code></pre>
+<pre><code>Loading required package: minfi</code></pre>
+<pre><code>Loading required package: SummarizedExperiment</code></pre>
+<pre><code>Loading required package: MatrixGenerics</code></pre>
+<pre><code>Loading required package: matrixStats</code></pre>
+<pre><code>
+Attaching package: &#39;matrixStats&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:dplyr&#39;:
+
+    count</code></pre>
+<pre><code>
+Attaching package: &#39;MatrixGenerics&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:matrixStats&#39;:
+
+    colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse,
+    colCounts, colCummaxs, colCummins, colCumprods, colCumsums,
+    colDiffs, colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs,
+    colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats,
+    colProds, colQuantiles, colRanges, colRanks, colSdDiffs, colSds,
+    colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
+    colWeightedMeans, colWeightedMedians, colWeightedSds,
+    colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet,
+    rowCollapse, rowCounts, rowCummaxs, rowCummins, rowCumprods,
+    rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps,
+    rowMadDiffs, rowMads, rowMaxs, rowMeans2, rowMedians, rowMins,
+    rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks,
+    rowSdDiffs, rowSds, rowSums2, rowTabulates, rowVarDiffs, rowVars,
+    rowWeightedMads, rowWeightedMeans, rowWeightedMedians,
+    rowWeightedSds, rowWeightedVars</code></pre>
+<pre><code>Loading required package: Biobase</code></pre>
+<pre><code>Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    &#39;browseVignettes()&#39;. To cite Bioconductor, see
+    &#39;citation(&quot;Biobase&quot;)&#39;, and for packages &#39;citation(&quot;pkgname&quot;)&#39;.</code></pre>
+<pre><code>
+Attaching package: &#39;Biobase&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:MatrixGenerics&#39;:
+
+    rowMedians</code></pre>
+<pre><code>The following objects are masked from &#39;package:matrixStats&#39;:
+
+    anyMissing, rowMedians</code></pre>
+<pre><code>Loading required package: Biostrings</code></pre>
+<pre><code>Loading required package: XVector</code></pre>
+<pre><code>
+Attaching package: &#39;Biostrings&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:base&#39;:
+
+    strsplit</code></pre>
+<pre><code>Loading required package: bumphunter</code></pre>
+<pre><code>Loading required package: foreach</code></pre>
+<pre><code>Loading required package: iterators</code></pre>
+<pre><code>Loading required package: parallel</code></pre>
+<pre><code>Loading required package: locfit</code></pre>
+<pre><code>locfit 1.5-9.11      2025-01-27</code></pre>
+<pre><code>Setting options(&#39;download.file.method.GEOquery&#39;=&#39;auto&#39;)</code></pre>
+<pre><code>Setting options(&#39;GEOquery.inmemory.gpl&#39;=FALSE)</code></pre>
+<pre><code>Loading required package: IlluminaHumanMethylationEPICanno.ilm10b4.hg19</code></pre>
+<pre><code>
+Attaching package: &#39;IlluminaHumanMethylationEPICanno.ilm10b4.hg19&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:IlluminaHumanMethylation450kanno.ilmn12.hg19&#39;:
+
+    Islands.UCSC, Locations, Manifest, Other, SNPs.132CommonSingle,
+    SNPs.135CommonSingle, SNPs.137CommonSingle, SNPs.138CommonSingle,
+    SNPs.141CommonSingle, SNPs.142CommonSingle, SNPs.144CommonSingle,
+    SNPs.146CommonSingle, SNPs.147CommonSingle, SNPs.Illumina</code></pre>
+<pre><code></code></pre>
+<pre class="r"><code>library(BiasedUrn)
+library(org.Hs.eg.db)</code></pre>
+<pre><code>Loading required package: AnnotationDbi</code></pre>
+<pre><code>
+Attaching package: &#39;AnnotationDbi&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:plyranges&#39;:
+
+    select</code></pre>
+<pre><code>The following object is masked from &#39;package:dplyr&#39;:
+
+    select</code></pre>
+<pre class="r"><code>library(GO.db)</code></pre>
+<pre><code></code></pre>
+<pre class="r"><code>library(ggplot2)</code></pre>
+</div>
+<div id="files" class="section level2">
+<h2>Files</h2>
+<pre class="r"><code>biomart_genes &lt;- readRDS(&quot;../output/genes_biomart.rds&quot;)
+bsseq_dmrs &lt;- readRDS(&quot;../output/bsseq_dmrs.rds&quot;)
+bsseq_res &lt;- readRDS(&quot;../output/bsseq_res.rds&quot;)</code></pre>
+</div>
+<div id="description" class="section level2">
+<h2>Description</h2>
+<p>Develop method to conduct unbiased gene set testing This method will
+be based off the missMethyl code described <a
+href="03_howToGST.html">here</a> Questions raised from that code are: *
+i. Should gene set anno use the child or change to direct? * ii. Which
+statistical test should be used: Wallenius or Fishers? * iii. Is there a
+more suitable alternative to a for loop for the test?</p>
+<p>Steps required from the function(s) Prepare input: genes 1. Annotate
+genes to tested CpGs (the bias) 2. Identify significant genes (if they
+overlap a DMR) Prepare input: genes and gene sets 3. Obtain gene sets
+and matching genes 4. Share the information - deal with gene name issues
+(gene sets have entrez gene names, also a gene can have multiple(?))
+Testing 5. Make the pwf 6. Test each gene set 7. Compile results</p>
+</div>
+<div id="prepare-input-genes" class="section level1">
+<h1>Prepare input: genes</h1>
+<p>Decision process of obtaining genes can be found <a
+href="00_obtainGenes.html">here</a></p>
+<pre class="r"><code>source(&quot;../code/function_binBiasPlot.R&quot;)
+sourceGenes(counts, gene_source = c(&quot;biomaRt&quot;, &quot;ExperimentHub&quot;), gene_feature=c(&quot;gene&quot;, &quot;promoter&quot;)) </code></pre>
+<p>Annotate genes to significant DMRs</p>
+<pre class="r"><code>source(&quot;../code/function_binBiasPlot.R&quot;)</code></pre>
+<pre><code>Loading required package: GenomicAlignments</code></pre>
+<pre><code>Loading required package: Rsamtools</code></pre>
+<pre><code>
+Attaching package: &#39;GenomicAlignments&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:dplyr&#39;:
+
+    last</code></pre>
+<pre class="r"><code>test_anno &lt;- annoGeneDmr(bsseq_res, bsseq_dmrs, gene_source = &quot;biomaRt&quot;, biomart_genes)</code></pre>
+</div>
+<div id="prepare-input-genes-and-gene-sets" class="section level1">
+<h1>Prepare input: genes and gene sets</h1>
+<pre class="r"><code>run_miss_methyl_a &lt;- function(biomart_genes, test_anno) { # add something about extending the bias to include upstream of gene maybe??
+  entrez_genes &lt;- AnnotationDbi::select(org.Hs.eg.db, 
+                                keys=AnnotationDbi::keys(org.Hs.eg.db), 
+                                columns=c(&quot;ENTREZID&quot;,&quot;SYMBOL&quot;), 
+                                keytype=&quot;ENTREZID&quot;)
+  biomart_genes$entrez_id &lt;- entrez_genes[match(biomart_genes$gene_name, entrez_genes$SYMBOL), &quot;ENTREZID&quot;]
+  biomart_genes_filt &lt;- biomart_genes[!biomart_genes$entrez_id %in% NA,]
+  biomart_genes_filt &lt;- biomart_genes_filt %&gt;% group_by(gene_name) %&gt;% filter(num_cg == max(num_cg)) %&gt;% ungroup() #this line will be slow
+  
+  test_anno$entrez_id &lt;- entrez_genes[match(test_anno$gene_name, entrez_genes$SYMBOL), &quot;ENTREZID&quot;]
+  test_anno_filt &lt;- test_anno[!test_anno$entrez_id %in% NA,] 
+  test_anno_filt &lt;- test_anno_filt[test_anno_filt$tss_rel_peak %in% &quot;Overlap&quot;,]
+  biomart_genes_filt$bias &lt;- biomart_genes_filt$num_cg
+  
+  
+    
+  test_uni_freq &lt;- biomart_genes_filt %&gt;% .[order(.$entrez_id),] %&gt;% group_by(entrez_id) %&gt;% distinct(entrez_id, bias) %&gt;% ungroup() %&gt;% data.frame() # probs slow
+  test_uni_freq &lt;- test_uni_freq[test_uni_freq$bias &gt; 0,]
+  test_uni_freq
+
+  freq_make_table &lt;- rep(test_uni_freq$entrez_id, test_uni_freq$bias) #this has replaced the loop and sped it up
+
+  freq_make_table &lt;- table(freq_make_table)
+  biomart_genes_filt &lt;- biomart_genes_filt[biomart_genes_filt$bias &gt; 0,] 
+  test_anno_filt &lt;- test_anno_filt[test_anno_filt$ensembl_gene_id %in% biomart_genes_filt$ensembl_gene_id,]
+  biomart_genes_filt$is_de &lt;- ifelse(biomart_genes_filt$entrez_id %in% test_anno_filt$entrez_id, 1, 0)
+  biomart_genes_filt$is_de &lt;- as.integer(biomart_genes_filt$is_de)
+  out &lt;- list(
+  #fract.counts = biomart_genes_filt %&gt;%
+   # mutate(sigid = entrez_id) %&gt;% distinct(sigid) %&gt;% .[order(.$sigid),] %&gt;% data.frame() %&gt;% 
+   # mutate(frac = as.double(1)),
+  sig.eg = test_anno_filt %&gt;% distinct(entrez_id) %&gt;% .[order(.$entrez_id),],
+  universe = biomart_genes_filt %&gt;% distinct(entrez_id) %&gt;% 
+    .[order(.$entrez_id),] %&gt;% .$entrez_id,
+  freq = freq_make_table,
+  equiv = as.array(freq_make_table), # column names wrong but maybe not too bad?
+  de = biomart_genes_filt[order(biomart_genes_filt$entrez_id),] %&gt;% .$is_de
+)
+  out
+}
+system.time(run_miss_methyl_a(biomart_genes, test_anno))</code></pre>
+</div>
+<div id="testing" class="section level1">
+<h1>Testing</h1>
+<pre class="r"><code>.getGO &lt;- function(){
+  if(!requireNamespace(&quot;org.Hs.eg.db&quot;, quietly = TRUE))
+    stop(&quot;org.Hs.eg.db package required but not installed.&quot;)
+  egGO2ALLEGS &lt;- utils::getFromNamespace(&quot;org.Hs.egGO2ALLEGS&quot;, &quot;org.Hs.eg.db&quot;)
+  GeneID.PathID &lt;- AnnotationDbi::toTable(egGO2ALLEGS)[,c(&quot;gene_id&quot;, &quot;go_id&quot;, &quot;Ontology&quot;)]
+  d &lt;- !duplicated(GeneID.PathID[, c(&quot;gene_id&quot;, &quot;go_id&quot;)])
+  GeneID.PathID &lt;- GeneID.PathID[d, ]
+  GOID.TERM &lt;- suppressMessages(AnnotationDbi::select(GO.db::GO.db,
+                                                      keys=unique(GeneID.PathID$go_id),
+                                                      columns=c(&quot;GOID&quot;,&quot;ONTOLOGY&quot;,&quot;TERM&quot;),
+                                                      keytype=&quot;GOID&quot;))
+  go &lt;- tapply(GeneID.PathID$gene_id, GeneID.PathID$go_id, list)
+
+  list(idList=go, idTable=GOID.TERM)
+}
+
+
+.estimatePWF &lt;- function(D,bias)
+  # An alternative to goseq function nullp, which is transformation invariant
+  # Belinda Phipson and Gordon Smyth
+  # 6 March 2015
+{
+  prior.prob &lt;- bias
+  o &lt;- order(bias)
+  prior.prob[o] &lt;- limma::tricubeMovingAverage(D[o],span=0.5)
+  prior.prob
+}</code></pre>
+<pre class="r"><code>run_miss_methyl_b &lt;- function(out, correct_bias=TRUE, plot_bias=FALSE, ...) {
+  sorted.eg.sig &lt;- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe &lt;- out$universe # entrez ids all cpgs(?) - but it&#39;s just all genes
+  freq_genes &lt;- out$freq
+  test.de &lt;- out$de #res for each gene
+  #frac &lt;- out$fract.counts
+  equiv &lt;- out$equiv
+  ## setting up stuff
+  # Check collection is a list with character vectors
+  go &lt;- .getGO()
+  collection &lt;- go$idList  
+  #only if it&#39;s not a list
+  #collection &lt;- list(collection=go$idList)
+  collection &lt;- lapply(collection, as.character)
+  # Make sure gene set collections don&#39;t have any NAs
+  collection &lt;- lapply(collection, function(x) x[!is.na(x)])
+  # Remove genes that are NOT in the universe from collections
+  collection &lt;- lapply(collection, function(x) x[x %in% eg.universe])
+  # Remove collections with no genes left after universe filter
+  inUniv &lt;- sapply(collection, function(x) length(x) &gt; 0)
+  collection &lt;- collection[inUniv]
+  
+  
+  results &lt;- matrix(NA,ncol=4,nrow=length(collection))
+  colnames(results) &lt;- c(&quot;N&quot;, &quot;DE&quot;, &quot;P.DE&quot;,&quot;FDR&quot;)
+  rownames(results) &lt;- names(collection)
+  results[,&quot;N&quot;] &lt;- unlist(lapply(collection,length))
+  SigGenesInSet &lt;- rep(NA,length(collection)) # this one is optional
+  
+  results[,&quot;DE&quot;] &lt;- unlist(lapply(collection, function(x) 
+          sum((sorted.eg.sig %in% x))))
+  Nuniverse &lt;- length(eg.universe)
+  m &lt;- length(sorted.eg.sig)
+  
+  if(correct_bias == TRUE) {
+  test_pwf &lt;- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+  #  if(plot_bias == TRUE) {
+   #   plotBiasGrouped(genes = genes, anno_genes = , ...)
+  #  }
+  # the testing
+  results[, c(&quot;P.DE&quot;)] &lt;- 
+  t(sapply(1:length(collection), function(i) {
+    InSet &lt;- eg.universe %in% collection[[i]]
+    pw.red &lt;- sum(test_pwf[InSet], na.rm = TRUE) / results[i, &quot;N&quot;] # so i don&#39;t know why I get na&#39;s - or do i?
+    pw.white &lt;- sum(test_pwf[!InSet], na.rm = TRUE) / (Nuniverse - results[i, &quot;N&quot;]) #anyway the na removal is not in original code
+    odds &lt;- pw.red / pw.white
+    p_val &lt;- BiasedUrn::pWNCHypergeo(results[i,&quot;DE&quot;],
+                                                   results[i,&quot;N&quot;],
+                                                   Nuniverse-results[i,&quot;N&quot;],
+                                                   m,odds,lower.tail=FALSE) + 
+          BiasedUrn::dWNCHypergeo(results[i,&quot;DE&quot;],
+                                  results[i,&quot;N&quot;],
+                                  Nuniverse-results[i,&quot;N&quot;],
+                                  m,odds)
+    #the optional thing
+      # Get gene symbols of significant genes
+    SigGenesEntrezID &lt;- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+    SigGenesSymbol &lt;- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = &quot;SYMBOL&quot;))
+    SigGenesInSet[i] &lt;- paste(SigGenesSymbol$SYMBOL,collapse=&quot;,&quot;)
+    if(p_val==0){
+        message(&quot;Pvalue of exactly zero detected. Performing hypergeometric 
+                test for gene set &quot;, rownames(results)[i])
+        p_val &lt;- stats::phyper(q=results[i,&quot;DE&quot;]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,&quot;N&quot;],
+                                           lower.tail=FALSE)
+    }
+    c(p_val)  # return the values as a vector
+    })) #chatgpt translated loop to apply
+  } else {
+    results[, c(&quot;P.DE&quot;)] &lt;- 
+    t(sapply(1:length(collection), function(i) {
+      p_val &lt;- stats::phyper(q=results[i,&quot;DE&quot;]-0.5,m=m,
+                                           n=Nuniverse-m,k=results[i,&quot;N&quot;],
+                                           lower.tail=FALSE)
+      #the optional thing
+      # Get gene symbols of significant genes
+    SigGenesEntrezID &lt;- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
+    SigGenesSymbol &lt;- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
+                                             keys = SigGenesEntrezID,
+                                             columns = &quot;SYMBOL&quot;))
+    SigGenesInSet[i] &lt;- paste(SigGenesSymbol$SYMBOL,collapse=&quot;,&quot;)
+      c(p_val)
+    }))
+  }
+  
+  
+  results &lt;- results %&gt;% data.frame()
+  results[,&quot;FDR&quot;] &lt;- stats::p.adjust(results[,&quot;P.DE&quot;],method=&quot;BH&quot;)
+  results[,&quot;DE&quot;] &lt;- floor(results[,&quot;DE&quot;])
+  results &lt;- data.frame(results, SigGenesInSet)
+  
+  results &lt;- merge(go$idTable,results,by.x=&quot;GOID&quot;,by.y=&quot;row.names&quot;)
+  rownames(results) &lt;- results$GOID
+  results &lt;- results %&gt;% .[order(.$FDR),]
+  results
+  
+}
+
+test_b_num_unfilt &lt;- run_miss_methyl_b(test_out)
+test_b_num_null_unfilt &lt;- run_miss_methyl_b(test_out, correct_bias = FALSE)</code></pre>
+</div>
+<div id="compiled-function" class="section level1">
+<h1>Compiled function</h1>
+<pre class="r"><code>run_gst_seq &lt;- function(dmrs, tested_cpgs, 
+                        gene_source = c(&quot;biomaRt&quot;, &quot;ExperimentHub&quot;), gene_feature=c(&quot;gene&quot;, &quot;promoter&quot;),
+                        correct_bias=TRUE, plot_bias=TRUE, ...) {
+  gene_source &lt;- match.arg(tolower(gene_source), c(&quot;biomart&quot;, &quot;experimenthub&quot;))
+  gene_feature &lt;- match.arg(tolower(gene_feature), c(&quot;gene&quot;, &quot;promoter&quot;))
+  genes &lt;- sourceGenes(counts = tested_cpgs, gene_source = gene_source, gene_feature = gene_feature)
+  if(nrow(genes) == 0) {
+    stop(&quot;sourceGenes failed&quot;)
+  }
+  if(nrow(dmrs) &gt; 30000) {
+    stop(&quot;Please appropriately filter DMRs to most significant&quot;) 
+  }
+  anno &lt;- annoGeneDmr(counts=tested_cpgs, dmrs = dmrs, gene_source = gene_source, genes = genes)
+  if(nrow(anno) == 0) {
+    stop(&quot;anno failed&quot;)
+  }
+out &lt;- run_miss_methyl_a(genes, anno)
+  results &lt;- run_miss_methyl_b(out, correct_bias=correct_bias, plot_bias=plot_bias, ...)
+
+  list(res = results, genes = genes, anno = anno, out = out)
+}
+test_fn_res &lt;- run_gst_seq(bsseq_dmrs[1:1000,], bsseq_res, &quot;biomaRt&quot;, &quot;gene&quot;)</code></pre>
+</div>
+<div id="challengesbugs" class="section level1">
+<h1>Challenges/Bugs</h1>
+<ul>
+<li>Much slower run time than missMethyl for arrays</li>
+<li>Dealing with different gene annotations - Entrez vs Ensembl</li>
+<li>Writing functions can just be difficult You think the code works but
+the moment it enters a function it breaks</li>
+</ul>
+<div id="section" class="section level14">
+<p class="heading"></p>
+<pre class="r"><code>biomart_genes %&gt;% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(test_anno, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %&gt;%
+  group_by(num_cg) %&gt;%
+    mutate(num_bins_same_cg = n()) %&gt;% 
+  .[order(.$num_cg),] %&gt;%
+  ungroup() %&gt;%
+  mutate(bin_group = rep(1:ceiling(nrow(biomart_genes)/100), each = 100)[1:nrow(biomart_genes)]) %&gt;% 
+  group_by(bin_group) %&gt;%
+  mutate(num_cg_bin_group = mean(num_cg)) %&gt;%
+  group_by(num_cg_bin_group) %&gt;%
+    mutate(num_bins_group_same_cg = dplyr::n()) %&gt;%
+    group_by(num_cg_bin_group, has_dmr) %&gt;%
+    mutate(num_per_dmr = dplyr::n(), prop = dplyr::n()/num_bins_group_same_cg) %&gt;%
+    distinct(num_cg_bin_group, num_bins_group_same_cg, num_per_dmr, prop, has_dmr) %&gt;%
+    group_by(num_cg_bin_group) %&gt;%
+    .[order(.$num_cg_bin_group),] %&gt;%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %&gt;%
+    mutate(num = dplyr::n()) %&gt;%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %&gt;% filter(has_dmr == TRUE)</code></pre>
+<pre><code># A tibble: 357 × 6
+# Groups:   num_cg_bin_group [357]
+   num_cg_bin_group num_bins_group_same_cg num_per_dmr    prop has_dmr   num
+              &lt;dbl&gt;                  &lt;int&gt;       &lt;int&gt;   &lt;dbl&gt; &lt;lgl&gt;   &lt;int&gt;
+ 1             0                      2900          12 0.00414 TRUE        2
+ 2             0.41                    100           2 0.02    TRUE        2
+ 3             1                      2800          41 0.0146  TRUE        2
+ 4             1.3                     100           3 0.03    TRUE        2
+ 5             2                      2300          20 0.00870 TRUE        2
+ 6             2.54                    100           5 0.05    TRUE        2
+ 7             3                      1700          22 0.0129  TRUE        2
+ 8             3.11                    100           4 0.04    TRUE        2
+ 9             4                      1400          26 0.0186  TRUE        2
+10             4.77                    100           2 0.02    TRUE        2
+# ℹ 347 more rows</code></pre>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.4.2 (2024-10-31)
+Platform: aarch64-apple-darwin20
+Running under: macOS Sequoia 15.2
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.0
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+time zone: Australia/Melbourne
+tzcode source: internal
+
+attached base packages:
+[1] parallel  stats4    stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] biomaRt_2.60.1                                     
+ [2] ChIPseqSpikeInFree_1.2.4                           
+ [3] GenomicAlignments_1.40.0                           
+ [4] Rsamtools_2.20.0                                   
+ [5] reshape2_1.4.4                                     
+ [6] ggplot2_3.5.1                                      
+ [7] GO.db_3.19.1                                       
+ [8] org.Hs.eg.db_3.19.1                                
+ [9] AnnotationDbi_1.66.0                               
+[10] BiasedUrn_2.0.12                                   
+[11] missMethyl_1.38.0                                  
+[12] IlluminaHumanMethylationEPICanno.ilm10b4.hg19_0.6.0
+[13] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1 
+[14] minfi_1.50.0                                       
+[15] bumphunter_1.46.0                                  
+[16] locfit_1.5-9.11                                    
+[17] iterators_1.0.14                                   
+[18] foreach_1.5.2                                      
+[19] Biostrings_2.72.1                                  
+[20] XVector_0.44.0                                     
+[21] SummarizedExperiment_1.34.0                        
+[22] Biobase_2.64.0                                     
+[23] MatrixGenerics_1.16.0                              
+[24] matrixStats_1.5.0                                  
+[25] plyranges_1.24.0                                   
+[26] GenomicRanges_1.56.2                               
+[27] GenomeInfoDb_1.40.1                                
+[28] IRanges_2.38.1                                     
+[29] S4Vectors_0.42.1                                   
+[30] BiocGenerics_0.50.0                                
+[31] dplyr_1.1.4                                        
+
+loaded via a namespace (and not attached):
+  [1] splines_4.4.2             later_1.4.1              
+  [3] BiocIO_1.14.0             bitops_1.0-9             
+  [5] filelock_1.0.3            tibble_3.2.1             
+  [7] preprocessCore_1.66.0     XML_3.99-0.18            
+  [9] lifecycle_1.0.4           httr2_1.1.0              
+ [11] rprojroot_2.0.4           lattice_0.22-6           
+ [13] MASS_7.3-61               base64_2.0.2             
+ [15] scrime_1.3.5              magrittr_2.0.3           
+ [17] limma_3.60.6              sass_0.4.9               
+ [19] rmarkdown_2.29            jquerylib_0.1.4          
+ [21] yaml_2.3.10               httpuv_1.6.15            
+ [23] doRNG_1.8.6.1             askpass_1.2.1            
+ [25] DBI_1.2.3                 RColorBrewer_1.1-3       
+ [27] abind_1.4-8               zlibbioc_1.50.0          
+ [29] quadprog_1.5-8            purrr_1.0.4              
+ [31] RCurl_1.98-1.16           rappdirs_0.3.3           
+ [33] git2r_0.35.0              GenomeInfoDbData_1.2.12  
+ [35] genefilter_1.86.0         annotate_1.82.0          
+ [37] DelayedMatrixStats_1.26.0 codetools_0.2-20         
+ [39] DelayedArray_0.30.1       xml2_1.3.6               
+ [41] tidyselect_1.2.1          UCSC.utils_1.0.0         
+ [43] beanplot_1.3.1            BiocFileCache_2.12.0     
+ [45] illuminaio_0.46.0         jsonlite_1.8.9           
+ [47] multtest_2.60.0           survival_3.7-0           
+ [49] tools_4.4.2               progress_1.2.3           
+ [51] Rcpp_1.0.14               glue_1.8.0               
+ [53] SparseArray_1.4.8         xfun_0.50                
+ [55] HDF5Array_1.32.1          withr_3.0.2              
+ [57] fastmap_1.2.0             rhdf5filters_1.16.0      
+ [59] openssl_2.3.2             digest_0.6.37            
+ [61] R6_2.5.1                  colorspace_2.1-1         
+ [63] RSQLite_2.3.9             tidyr_1.3.1              
+ [65] generics_0.1.3            data.table_1.16.4        
+ [67] rtracklayer_1.64.0        prettyunits_1.2.0        
+ [69] httr_1.4.7                S4Arrays_1.4.1           
+ [71] whisker_0.4.1             pkgconfig_2.0.3          
+ [73] gtable_0.3.6              blob_1.2.4               
+ [75] workflowr_1.7.1           siggenes_1.78.0          
+ [77] htmltools_0.5.8.1         scales_1.3.0             
+ [79] png_0.1-8                 knitr_1.49               
+ [81] rstudioapi_0.17.1         tzdb_0.4.0               
+ [83] rjson_0.2.23              nlme_3.1-166             
+ [85] curl_6.2.0                cachem_1.1.0             
+ [87] rhdf5_2.48.0              stringr_1.5.1            
+ [89] restfulr_0.0.15           GEOquery_2.72.0          
+ [91] pillar_1.10.1             grid_4.4.2               
+ [93] reshape_0.8.9             vctrs_0.6.5              
+ [95] promises_1.3.2            dbplyr_2.5.0             
+ [97] xtable_1.8-4              evaluate_1.0.3           
+ [99] readr_2.1.5               GenomicFeatures_1.56.0   
+[101] cli_3.6.3                 compiler_4.4.2           
+[103] rlang_1.1.5               crayon_1.5.3             
+[105] rngtools_1.5.2            nor1mix_1.3-3            
+[107] mclust_6.1.1              plyr_1.8.9               
+[109] fs_1.6.5                  stringi_1.8.4            
+[111] BiocParallel_1.38.0       munsell_0.5.1            
+[113] Matrix_1.7-1              hms_1.1.3                
+[115] sparseMatrixStats_1.16.0  bit64_4.6.0-1            
+[117] Rhdf5lib_1.26.0           KEGGREST_1.44.1          
+[119] statmod_1.5.0             memoise_2.0.1            
+[121] bslib_0.9.0               bit_4.5.0.1              </code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
