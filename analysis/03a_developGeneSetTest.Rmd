@@ -6,15 +6,26 @@ output: workflowr::wflow_html
 editor_options:
   chunk_output_type: inline
 ---
+
+## Packages
+
 ```{r}
 library(dplyr)
 library(plyranges)
 library(missMethyl)
+library(BiasedUrn)
+library(org.Hs.eg.db)
 library(GO.db)
 library(ggplot2)
 ```
 
-## Introduction
+## Description
+Develop method to conduct unbiased gene set testing
+This method will be based off the missMethyl code described [here](03_howToGST.html)
+Questions raised from that code are:
+* i. Should gene set anno use the child or change to direct?
+* ii. Which statistical test should be used: Wallenius or Fishers?
+* iii. Is there a more suitable alternative to a for loop for the test?
 
 ```{r}
 
@@ -93,60 +104,7 @@ ggVennDiagram(list(mm = unique(names(collection)), goseq = unique(names(goseq_go
 - so what is happening?
 -running with the other inputs did not fix it
 ##############
-# functions
-```{r}
-# copied from mm
-.getGO <- function(){
-  if(!requireNamespace("org.Hs.eg.db", quietly = TRUE))
-    stop("org.Hs.eg.db package required but not installed.")
-  egGO2ALLEGS <- utils::getFromNamespace("org.Hs.egGO2ALLEGS", "org.Hs.eg.db")
-  GeneID.PathID <- AnnotationDbi::toTable(egGO2ALLEGS)[,c("gene_id", "go_id", "Ontology")]
-  d <- !duplicated(GeneID.PathID[, c("gene_id", "go_id")])
-  GeneID.PathID <- GeneID.PathID[d, ]
-  GOID.TERM <- suppressMessages(AnnotationDbi::select(GO.db::GO.db, 
-                                                      keys=unique(GeneID.PathID$go_id), 
-                                                      columns=c("GOID","ONTOLOGY","TERM"), 
-                                                      keytype="GOID"))
-  go <- tapply(GeneID.PathID$gene_id, GeneID.PathID$go_id, list)
-    
-  list(idList=go, idTable=GOID.TERM)
-}
-go <- .getGO()
 
-.estimatePWF <- function(D,bias)
-  # An alternative to goseq function nullp, which is transformation invariant
-  # Belinda Phipson and Gordon Smyth
-  # 6 March 2015
-{
-  prior.prob <- bias
-  o <- order(bias)
-  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
-  prior.prob
-}
-test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
-
-.plotBias <- function(D,bias)
-  # Plotting function to show gene level CpG density bias
-  # Belinda Phipson
-  # 5 March 2015
-{
-  o <- order(bias)
-  splitf <- rep(1:100,each=200)[1:length(bias)]
-  avgbias <- tapply(bias[o],factor(splitf),mean)
-  sumDM <- tapply(D[o],factor(splitf),sum)
-  propDM <- sumDM/table(splitf)
-  graphics::par(mar=c(5,5,2,2))
-  graphics::plot(avgbias,as.vector(propDM),
-                 xlab="Number of CpGs per gene (binned)",
-                 ylab="Proportion Differential Methylation",cex.lab=1.5,
-                 cex.axis=1.2)
-  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
-}
-.plotBias(D=test.de,bias=as.vector(freq_genes))
-```
-```{r}
-library(BiasedUrn)
-```
 ```{r}
 biomart_genes %>% mutate(width = end - start + 1, has_dmr = ifelse(ensembl_gene_id %in% filter(test_anno, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE)) %>%
   group_by(num_cg) %>%
@@ -751,113 +709,6 @@ test_out$
 ```
 
 
-was slow though
-for(i in 1:length(collection)){
-      InSet <- eg.universe %in% collection[[i]]
-      pw.red <- sum(test_pwf[InSet])/results[i,"N"]
-      pw.white <- sum(test_pwf[!InSet])/(Nuniverse-results[i,"N"])
-      odds <- pw.red/pw.white
-      results[i,"P.DE"] <- BiasedUrn::pWNCHypergeo(results[i,"DE"],
-                                                   results[i,"N"],
-                                                   Nuniverse-results[i,"N"],
-                                                   m,odds,lower.tail=FALSE) + 
-          BiasedUrn::dWNCHypergeo(results[i,"DE"],
-                                  results[i,"N"],
-                                  Nuniverse-results[i,"N"],
-                                  m,odds)
-      #the optional thing
-        # Get gene symbols of significant genes
-        SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
-        SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db, 
-                                             keys = SigGenesEntrezID,
-                                             columns = "SYMBOL"))
-        SigGenesInSet[i] <- paste(SigGenesSymbol$SYMBOL,collapse=",")
-      #end optional gene thing
-      if(results[i,"P.DE"]==0){
-        message("Pvalue of exactly zero detected. Performing hypergeometric 
-                test for gene set ", rownames(results)[i])
-        results[i,"P.DE"] <- stats::phyper(q=results[i,"DE"]-0.5,m=m,
-                                           n=Nuniverse-m,k=results[i,"N"],
-                                           lower.tail=FALSE)
-      }
-  }
-  #res for a
-  results <- matrix(NA,ncol=5,nrow=length(collection))
-+   colnames(results) <- c("N", "DE", "pw.red","pw.white","odds")
-+   rownames(results) <- names(collection)
-+   results[,"N"] <- unlist(lapply(collection,length))
-+   SigGenesInSet <- rep(NA,length(collection)) # this one is optional
-+   
-+   results[,"DE"] <- unlist(lapply(collection, function(x) 
-+           sum((sorted.eg.sig %in% x))))
-+   Nuniverse <- length(eg.universe)
-+   m <- length(sorted.eg.sig)
-+   test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
-+   # the testing
-+   results[, c("pw.red", "pw.white", "odds")] <- 
-+   t(sapply(1:length(collection), function(i) {
-+     InSet <- eg.universe %in% collection[[i]]
-+     pw.red <- sum(test_pwf[InSet], na.rm = TRUE) / results[i, "N"]
-+     pw.white <- sum(test_pwf[!InSet], na.rm = TRUE) / (Nuniverse - results[i, "N"])
-+     odds <- pw.red / pw.white
-+     c(pw.red, pw.white, odds)  # return the values as a vector
-+   })) #chatgpt translated loop to apply
-+   results %>% data.frame()
-
-translation 2 for whole section
-results <- do.call(rbind, lapply(1:length(collection), function(i) {
-  InSet <- eg.universe %in% collection[[i]]
-  pw.red <- sum(test_pwf[InSet]) / results[i, "N"]
-  pw.white <- sum(test_pwf[!InSet]) / (Nuniverse - results[i, "N"])
-  odds <- pw.red / pw.white
-  
-  p_value <- BiasedUrn::pWNCHypergeo(results[i, "DE"],
-                                      results[i, "N"],
-                                      Nuniverse - results[i, "N"],
-                                      m, odds, lower.tail = FALSE) +
-             BiasedUrn::dWNCHypergeo(results[i, "DE"],
-                                      results[i, "N"],
-                                      Nuniverse - results[i, "N"],
-                                      m, odds)
-  
-  # Optional gene part
-  SigGenesEntrezID <- sorted.eg.sig[sorted.eg.sig %in% collection[[i]]]
-  SigGenesSymbol <- suppressMessages(AnnotationDbi::select(org.Hs.eg.db,
-                                                           keys = SigGenesEntrezID,
-                                                           columns = "SYMBOL"))
-  SigGenesInSet <- paste(SigGenesSymbol$SYMBOL, collapse = ",")
-  
-  # Check for p-value equal to zero and re-calculate if needed
-  if (p_value == 0) {
-    message("Pvalue of exactly zero detected. Performing hypergeometric test for gene set ", rownames(results)[i])
-    p_value <- stats::phyper(q = results[i, "DE"] - 0.5, m = m,
-                             n = Nuniverse - m, k = results[i, "N"],
-                             lower.tail = FALSE)
-  }
-  
-  # Return a row as a data frame
-  results_row <- results[i, , drop = FALSE]
-  results_row["P.DE"] <- p_value
-  results_row["SigGenesInSet"] <- SigGenesInSet
-  
-  return(results_row)
-}))
-
-
-results <- results
-
-
-- if b works - readd the rest of the code to it
-- hey this part was pretty fast - the swap to apply must have helped
-- ok I get na's - I think that was the cause of the original error
-
-```{r}
-run_miss_methyl(biomart_genes, test_anno)
-```
-
-```{r}
-test_b
-```
 
 
 
