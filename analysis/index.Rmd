@@ -60,6 +60,8 @@ Analysis:
   [Summary page]
   a) [Explore gene sets, ways to obtain, relationships, and bias](00_exploreCpGGST.html)
   b) [Converting ]
+
+  b) [Reviewing code of existing methods](03_howToGST.html)
   
 4. [Develop and evaludate gene set testing method for methylation sequencing](03_runGST.html)
 
