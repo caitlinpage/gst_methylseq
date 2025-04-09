@@ -16,7 +16,7 @@ under the hg19 genome annotation. [GSE186458](https://www.ncbi.nlm.nih.gov/geo/q
 
 ## Packages used
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 library(DMRcate)
 library(bsseq)
 library(edgeR)
@@ -79,14 +79,22 @@ colnames(beta_nk)[5:13] <- paste0("nk_", colnames(beta_nk)[5:13])
 
 wgbs_counts <- cbind(beta_nk, beta_b[,5:13])
 
-saveRDS(wgbs_counts, "../output/wgbs_counts.rds")
+#saveRDS(wgbs_counts, "../output/wgbs_counts.rds")
 ```
+```{r, echo=FALSE}
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+```
+```{r}
+nrow(wgbs_counts)
+head(wgbs_counts)
+```
+
 
 
 ## Differential Methylation Analysis
 
 # bsseq pre-processing: bsseq and bsmooth objects
-```{r eval=FALSE}
+```{r, eval=FALSE}
 ## set up
 wgbs_counts <- wgbs_counts %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
 m_df <- wgbs_counts[,c(5,7,9,14,16,18)]
@@ -127,7 +135,7 @@ saveRDS(bsmooth_obj, "../output/bsmooth_obj.rds")
 
 
 # bsseq
-```{r eval=FALSE}
+```{r, eval=FALSE}
 ## testing
 bsseq.tstat <- BSmooth.tstat(bsmooth_obj, group1 = c("nk_TM", "nk_U1", "nk_UF"),
                             group2 = c("b_TX", "b_UB", "b_UR"),
@@ -191,12 +199,14 @@ seq_annot <- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE,
 seq_dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
 
 dmrcate_seq_dmr <- extractRanges(seq_dmrcate.res, genome = "hg19")
+dmrcate_seq_anno <- seq_annot@ranges %>% data.frame()
 #saveRDS(dmrcate_seq_dmr, "../output/dmrcate_seq_dmr.rds")
 ```
 
 ```{r include=FALSE}
 dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
-dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+dmrcate_seq_anno <- dmrcate_seq_anno@ranges %>% data.frame()
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") 
 ```
 
 ```{r}
