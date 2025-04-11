@@ -390,7 +390,7 @@ class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2025-04-09
+<strong>Last updated:</strong> 2025-04-11
 </p>
 <p>
 <strong>Checks:</strong> <span
@@ -521,15 +521,15 @@ project makes it easier to run your code on other machines.</p>
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree50cb92f9b70f45f0c5f4365ad36ad31d441d1b63targetblank50cb92fa">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeae3cb7017b640c80a6ace84f6378765cb692553atargetblankae3cb70a">
 <span class="glyphicon glyphicon-ok text-success"
 aria-hidden="true"></span> <strong>Repository version:</strong>
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/50cb92f9b70f45f0c5f4365ad36ad31d441d1b63" target="_blank">50cb92f</a>
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/ae3cb7017b640c80a6ace84f6378765cb692553a" target="_blank">ae3cb70</a>
 </a>
 </p>
 </div>
 <div
-id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree50cb92f9b70f45f0c5f4365ad36ad31d441d1b63targetblank50cb92fa"
+id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeae3cb7017b640c80a6ace84f6378765cb692553atargetblankae3cb70a"
 class="panel-collapse collapse">
 <div class="panel-body">
 <p>
@@ -539,7 +539,7 @@ reproducibility.
 </p>
 <p>
 The results in this page were generated with repository version
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/50cb92f9b70f45f0c5f4365ad36ad31d441d1b63" target="_blank">50cb92f</a>.
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/ae3cb7017b640c80a6ace84f6378765cb692553a" target="_blank">ae3cb70</a>.
 See the <em>Past versions</em> tab to see a history of the changes made
 to the R Markdown and HTML files.
 </p>
@@ -591,6 +591,7 @@ Unstaged changes:
     Modified:   analysis/03_runGST.Rmd
     Modified:   analysis/04a_compareGSTResults.Rmd
     Modified:   analysis/06_decisionSummary.Rmd
+    Modified:   analysis/index.Rmd
     Modified:   code/mmGST.R
     Modified:   code/runSeqDmMethods.R
     Modified:   renv.lock
@@ -642,6 +643,40 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/ae3cb7017b640c80a6ace84f6378765cb692553a/analysis/00_differentialMethylationSequencing.Rmd" target="_blank">ae3cb70</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-11
+</td>
+<td>
+wflow_publish("00_differentialMethylationSequencing.Rmd")
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/caitlinpage/gst_methylseq/67fb63b7b04f3976be5507b007139d70cf86649c/docs/00_differentialMethylationSequencing.html" target="_blank">67fb63b</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-09
+</td>
+<td>
+Build site.
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -726,6 +761,8 @@ href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186458">GSE186458</a
 <li>B cell type: 3 samples</li>
 <li>NK cell type: 3 samples</li>
 </ul>
+<p>Further description can be found <a
+href="00_datasets.html">here</a></p>
 </div>
 <div id="packages-used" class="section level2">
 <h2>Packages used</h2>
@@ -742,6 +779,36 @@ library(dplyr)
 library(ggplot2)
 library(ggVennDiagram)
 library(ComplexUpset)</code></pre>
+</div>
+<div id="description" class="section level2">
+<h2>Description</h2>
+<p>To understand the inputs of Gene Set Testing, I explored different
+differential methylation methods. I focussed on methods available within
+Bioconductor, and ones that were widely used. I tried the following
+methods: * <a
+href="https://www.bioconductor.org/packages/release/bioc/html/bsseq.html">bsseq</a>
+<a
+href="https://genomebiology.biomedcentral.com/articles/10.1186/gb-2012-13-10-r83">Paper</a>
+Years in Bioc: 12.5</p>
+<ul>
+<li><p><a
+href="https://www.bioconductor.org/packages/release/bioc/html/DMRcate.html">DMRcate</a>
+<a
+href="https://academic.oup.com/nar/article/49/19/e109/6329576?login=false">Paper</a>
+Years in Bioc: 11</p></li>
+<li><p><a
+href="https://www.bioconductor.org/packages/release/bioc/html/dmrseq.html">dmrseq</a>
+<a
+href="https://academic.oup.com/biostatistics/article/20/3/367/4899074?login=false">Paper</a>
+Years in Bioc: 7</p></li>
+<li><p><a
+href="https://www.bioconductor.org/packages/release/bioc/html/DSS.html">DSS</a>
+<a
+href="https://academic.oup.com/nar/article/42/8/e69/1074350?login=false">Paper</a>
+Years in Bioc: 12.5</p></li>
+<li><p><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5747346/">edgeR
+workflow</a></p></li>
+</ul>
 </div>
 <div id="obtain-counts" class="section level2">
 <h2>Obtain counts</h2>
@@ -950,6 +1017,7 @@ seq_annot &lt;- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE,
 seq_dmrcate.res &lt;- dmrcate(seq_annot, C=2, min.cpgs = 5)
 
 dmrcate_seq_dmr &lt;- extractRanges(seq_dmrcate.res, genome = &quot;hg19&quot;)
+dmrcate_seq_dmr &lt;- dmrcate_seq_dmr %&gt;% data.frame()
 dmrcate_seq_anno &lt;- seq_annot@ranges %&gt;% data.frame()
 #saveRDS(dmrcate_seq_dmr, &quot;../output/dmrcate_seq_dmr.rds&quot;)</code></pre>
 <pre class="r"><code>nrow(dmrcate_seq_anno)</code></pre>
@@ -963,35 +1031,29 @@ dmrcate_seq_anno &lt;- seq_annot@ranges %&gt;% data.frame()
 5     chr1 10493 10493     1      * -0.1626419 -0.1219368 0.9929045  FALSE
 6     chr1 10497 10497     1      * -0.2503823 -0.1957677 0.9876618  FALSE</code></pre>
 <pre class="r"><code>nrow(dmrcate_seq_dmr)</code></pre>
-<pre><code>NULL</code></pre>
+<pre><code>[1] 13542</code></pre>
 <pre class="r"><code>head(dmrcate_seq_dmr)</code></pre>
-<pre><code>GRanges object with 6 ranges and 8 metadata columns:
-      seqnames              ranges strand |   no.cpgs min_smoothed_fdr
-         &lt;Rle&gt;           &lt;IRanges&gt;  &lt;Rle&gt; | &lt;integer&gt;        &lt;numeric&gt;
-  [1]     chr1 167434091-167488800      * |       715                0
-  [2]    chr11 113932115-113948338      * |       336                0
-  [3]    chr19     8627507-8641759      * |       316                0
-  [4]    chr12   10456885-10466669      * |       127                0
-  [5]    chr10   72355543-72364759      * |       198                0
-  [6]    chr17   45811354-45822029      * |       208                0
-          Stouffer       HMFDR       Fisher   maxdiff  meandiff
-         &lt;numeric&gt;   &lt;numeric&gt;    &lt;numeric&gt; &lt;numeric&gt; &lt;numeric&gt;
-  [1]  0.00000e+00 0.000248133  0.00000e+00 -11.31159  -5.64322
-  [2]  0.00000e+00 0.000779737 7.26242e-315  -9.82536  -4.67408
-  [3] 7.54564e-243 0.000536035 1.00369e-278 -10.13648  -4.38679
-  [4] 3.05871e-290 0.000110076 4.32504e-267 -10.60482  -7.08827
-  [5] 1.12350e-263 0.000270498 4.44988e-261  -9.47231  -5.30293
-  [6] 3.71016e-216 0.000547849 2.54014e-232  -9.93683  -4.96263
-      overlapping.genes
-            &lt;character&gt;
-  [1]   AKR1D1P1, CD247
-  [2]            ZBTB16
-  [3]             MYO1F
-  [4]             KLRD1
-  [5]              PRF1
-  [6]             TBX21
-  -------
-  seqinfo: 22 sequences from an unspecified genome; no seqlengths</code></pre>
+<pre><code>  seqnames     start       end width strand no.cpgs min_smoothed_fdr
+1     chr1 167434091 167488800 54710      *     715                0
+2    chr11 113932115 113948338 16224      *     336                0
+3    chr19   8627507   8641759 14253      *     316                0
+4    chr12  10456885  10466669  9785      *     127                0
+5    chr10  72355543  72364759  9217      *     198                0
+6    chr17  45811354  45822029 10676      *     208                0
+       Stouffer        HMFDR        Fisher    maxdiff  meandiff
+1  0.000000e+00 0.0002481331  0.000000e+00 -11.311593 -5.643222
+2  0.000000e+00 0.0007797373 7.262418e-315  -9.825363 -4.674082
+3 7.545644e-243 0.0005360353 1.003690e-278 -10.136485 -4.386791
+4 3.058706e-290 0.0001100756 4.325037e-267 -10.604822 -7.088274
+5 1.123502e-263 0.0002704979 4.449882e-261  -9.472313 -5.302931
+6 3.710160e-216 0.0005478491 2.540144e-232  -9.936832 -4.962632
+  overlapping.genes
+1   AKR1D1P1, CD247
+2            ZBTB16
+3             MYO1F
+4             KLRD1
+5              PRF1
+6             TBX21</code></pre>
 </div>
 <div id="dmrseq" class="section level1">
 <h1>dmrseq</h1>
@@ -1098,6 +1160,77 @@ chr22-18077698  14.74929 -5.060096 120.3964 5.180342e-28 2.369875e-21      TRUE
 chr5-156608059 -14.72724 -5.081965 120.2161 5.673161e-28 2.369875e-21      TRUE
 chr12-10432700 -14.70074 -5.075146 120.2159 5.673586e-28 2.369875e-21      TRUE
 chr7-127645445  14.72284 -5.078940 120.1536 5.854606e-28 2.369875e-21      TRUE</code></pre>
+<div id="compare-approaches" class="section level2">
+<h2>Compare approaches</h2>
+<ul>
+<li>All methods were run on the HPC at PeterMac because they are very
+computationally intense.</li>
+<li>Despite this, DSS and dmrseq still failed - unclear as to why, so we
+moved on.</li>
+<li>The edgeR workflow does not identify DMRs</li>
+</ul>
+<pre class="r"><code>compare_dm &lt;- wgbs_counts[,1:4]
+bsseq_dmrs_filt &lt;- bsseq_dmrs %&gt;% filter(abs(areaStat) &gt;= 100)
+overlap_dm &lt;- find_overlaps(as_granges(dmrcate_seq_dmr[1:5000,]), as_granges(compare_dm)) %&gt;% data.frame()
+compare_dm &lt;- compare_dm %&gt;% mutate(seq_dmrcate_dmr_5k = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+overlap_dm &lt;- find_overlaps(as_granges(bsseq_dmrs_filt), as_granges(compare_dm)) %&gt;% data.frame()
+compare_dm &lt;- compare_dm %&gt;% mutate(bsseq_dmr_area100 = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+
+compare_dm &lt;- compare_dm %&gt;% mutate(edger_pos = edge_res[match(.$pos, rownames(edge_res)), &quot;signif.05&quot;])</code></pre>
+<pre class="r"><code>upset(filter(compare_dm, seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| edger_pos != FALSE), intersect = colnames(compare_dm)[5:7])</code></pre>
+<pre><code>Warning in upset_data(data, intersect, mode = mode, encode_sets = encode_sets,
+: Detected missing values in the columns indicating sets, coercing to FALSE</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="compare-bsseq-and-dmrcate" class="section level1">
+<h1>Compare bsseq and DMRCate</h1>
+<pre class="r"><code>rbind(cbind(width = bsseq_dmrs$width, method = &quot;bsseq&quot;), 
+      cbind(width = dmrcate_seq_dmr$width, method = &quot;dmrcate&quot;)) %&gt;% data.frame() %&gt;% 
+  mutate(width = as.double(width)) %&gt;%
+  ggplot(aes(x = log2(width), fill = method)) +
+  geom_density(alpha = 0.4) +
+  theme_bw()</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>rbind(cbind(width = dmrcate_seq_dmr$width, method = &quot;dmrcate&quot;),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = &quot;dmrcate_5k&quot;),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = &quot;dmrcate_1k&quot;),
+      cbind(width = bsseq_dmrs_filt$width, method = &quot;bsseq_area100&quot;)) %&gt;% data.frame() %&gt;% mutate(width = as.double(width)) %&gt;%
+  ggplot(aes(x = width, colour = method)) +
+  geom_density()</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>rbind(cbind(width = dmrcate_seq_dmr$width, method = &quot;dmrcate&quot;),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = &quot;dmrcate_5k&quot;),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = &quot;dmrcate_1k&quot;),
+      cbind(width = bsseq_dmrs_filt$width, method = &quot;bsseq_area100&quot;)) %&gt;% data.frame() %&gt;% mutate(width = as.double(width)) %&gt;%
+  ggplot(aes(x = log2(width), colour = method)) +
+  geom_density()</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-22-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = &quot;dmrcate&quot;),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = &quot;dmrcate_5k&quot;),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = &quot;dmrcate_1k&quot;),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = &quot;bsseq_area100&quot;)) %&gt;% data.frame() %&gt;% mutate(no.cpgs = as.double(no.cpgs)) %&gt;%
+  ggplot(aes(x = no.cpgs, colour = method)) +
+  geom_density()</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-23-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = &quot;dmrcate&quot;),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = &quot;dmrcate_5k&quot;),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = &quot;dmrcate_1k&quot;),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = &quot;bsseq_area100&quot;)) %&gt;% data.frame() %&gt;% mutate(no.cpgs = as.double(no.cpgs)) %&gt;%
+  ggplot(aes(x = log2(no.cpgs), colour = method)) +
+  geom_density()</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-23-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>cg_in_dmr &lt;- wgbs_counts[,c(&quot;pos&quot;, &quot;seqnames&quot;, &quot;start&quot;)]
+cg_in_dmr$end &lt;- cg_in_dmr$start
+overlap &lt;- find_overlaps(as_granges(cg_in_dmr), as_granges(bsseq_dmrs_filt)) %&gt;% data.frame()
+cg_in_dmr$bsseq &lt;- ifelse(cg_in_dmr$pos %in% overlap$pos, TRUE, FALSE)
+
+overlap &lt;- find_overlaps(as_granges(cg_in_dmr), as_granges(dmrcate_seq_dmr)) %&gt;% data.frame()
+cg_in_dmr$dmrcate &lt;- ifelse(cg_in_dmr$pos %in% overlap$pos, TRUE, FALSE)</code></pre>
+<pre class="r"><code>ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq == TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate == TRUE)$pos))</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-25-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq != TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate != TRUE)$pos))</code></pre>
+<p><img src="figure/00_differentialMethylationSequencing.Rmd/unnamed-chunk-25-2.png" width="672" style="display: block; margin: auto;" /></p>
 <br>
 <p>
 <button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
@@ -1161,153 +1294,154 @@ loaded via a namespace (and not attached):
  [18] base64_2.0.2                                       
  [19] preprocessCore_1.66.0                              
  [20] cli_3.6.3                                          
- [21] sass_0.4.9                                         
- [22] IlluminaHumanMethylationEPICanno.ilm10b4.hg19_0.6.0
- [23] readr_2.1.5                                        
- [24] genefilter_1.86.0                                  
- [25] askpass_1.2.1                                      
- [26] Rsamtools_2.20.0                                   
- [27] foreign_0.8-87                                     
- [28] siggenes_1.78.0                                    
- [29] illuminaio_0.46.0                                  
- [30] R.utils_2.12.3                                     
- [31] dichromat_2.0-0.1                                  
- [32] scrime_1.3.5                                       
- [33] rstudioapi_0.17.1                                  
- [34] RSQLite_2.3.9                                      
- [35] generics_0.1.3                                     
- [36] gtools_3.9.5                                       
- [37] Matrix_1.7-1                                       
- [38] interp_1.1-6                                       
- [39] abind_1.4-8                                        
- [40] R.methodsS3_1.8.2                                  
- [41] lifecycle_1.0.4                                    
- [42] whisker_0.4.1                                      
- [43] yaml_2.3.10                                        
- [44] rhdf5_2.48.0                                       
- [45] SparseArray_1.4.8                                  
- [46] BiocFileCache_2.12.0                               
- [47] grid_4.4.2                                         
- [48] blob_1.2.4                                         
- [49] promises_1.3.2                                     
- [50] ExperimentHub_2.12.0                               
- [51] crayon_1.5.3                                       
- [52] lattice_0.22-6                                     
- [53] GenomicFeatures_1.56.0                             
- [54] annotate_1.82.0                                    
- [55] KEGGREST_1.44.1                                    
- [56] pillar_1.10.1                                      
- [57] knitr_1.49                                         
- [58] beanplot_1.3.1                                     
- [59] rjson_0.2.23                                       
- [60] codetools_0.2-20                                   
- [61] glue_1.8.0                                         
- [62] data.table_1.16.4                                  
- [63] vctrs_0.6.5                                        
- [64] png_0.1-8                                          
- [65] gtable_0.3.6                                       
- [66] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1 
- [67] cachem_1.1.0                                       
- [68] xfun_0.50                                          
- [69] S4Arrays_1.4.1                                     
- [70] survival_3.7-0                                     
- [71] iterators_1.0.14                                   
- [72] statmod_1.5.0                                      
- [73] nlme_3.1-166                                       
- [74] bit64_4.6.0-1                                      
- [75] progress_1.2.3                                     
- [76] filelock_1.0.3                                     
- [77] rprojroot_2.0.4                                    
- [78] bslib_0.9.0                                        
- [79] nor1mix_1.3-3                                      
- [80] rpart_4.1.23                                       
- [81] colorspace_2.1-1                                   
- [82] DBI_1.2.3                                          
- [83] Hmisc_5.2-2                                        
- [84] nnet_7.3-19                                        
- [85] tidyselect_1.2.1                                   
- [86] bit_4.5.0.1                                        
- [87] compiler_4.4.2                                     
- [88] curl_6.2.0                                         
- [89] git2r_0.35.0                                       
- [90] httr2_1.1.0                                        
- [91] htmlTable_2.4.3                                    
- [92] xml2_1.3.6                                         
- [93] DelayedArray_0.30.1                                
- [94] checkmate_2.3.2                                    
- [95] scales_1.3.0                                       
- [96] quadprog_1.5-8                                     
- [97] rappdirs_0.3.3                                     
- [98] stringr_1.5.1                                      
- [99] digest_0.6.37                                      
-[100] rmarkdown_2.29                                     
-[101] GEOquery_2.72.0                                    
-[102] htmltools_0.5.8.1                                  
-[103] pkgconfig_2.0.3                                    
-[104] jpeg_0.1-10                                        
-[105] base64enc_0.1-3                                    
-[106] sparseMatrixStats_1.16.0                           
-[107] dbplyr_2.5.0                                       
-[108] fastmap_1.2.0                                      
-[109] ensembldb_2.28.1                                   
-[110] rlang_1.1.5                                        
-[111] htmlwidgets_1.6.4                                  
-[112] UCSC.utils_1.0.0                                   
-[113] DelayedMatrixStats_1.26.0                          
-[114] farver_2.1.2                                       
-[115] jquerylib_0.1.4                                    
-[116] jsonlite_1.8.9                                     
-[117] mclust_6.1.1                                       
-[118] R.oo_1.27.0                                        
-[119] VariantAnnotation_1.50.0                           
-[120] RCurl_1.98-1.16                                    
-[121] magrittr_2.0.3                                     
-[122] Formula_1.2-5                                      
-[123] GenomeInfoDbData_1.2.12                            
-[124] patchwork_1.3.0                                    
-[125] Rhdf5lib_1.26.0                                    
-[126] munsell_0.5.1                                      
-[127] Rcpp_1.0.14                                        
-[128] stringi_1.8.4                                      
-[129] zlibbioc_1.50.0                                    
-[130] MASS_7.3-61                                        
-[131] AnnotationHub_3.12.0                               
-[132] plyr_1.8.9                                         
-[133] bumphunter_1.46.0                                  
-[134] org.Hs.eg.db_3.19.1                                
-[135] minfi_1.50.0                                       
-[136] parallel_4.4.2                                     
-[137] deldir_2.0-4                                       
-[138] splines_4.4.2                                      
-[139] multtest_2.60.0                                    
-[140] hms_1.1.3                                          
-[141] locfit_1.5-9.11                                    
-[142] rngtools_1.5.2                                     
-[143] biomaRt_2.60.1                                     
-[144] BiocVersion_3.19.1                                 
-[145] missMethyl_1.38.0                                  
-[146] XML_3.99-0.18                                      
-[147] evaluate_1.0.3                                     
-[148] latticeExtra_0.6-30                                
-[149] biovizBase_1.52.0                                  
-[150] BiocManager_1.30.25                                
-[151] tzdb_0.4.0                                         
-[152] foreach_1.5.2                                      
-[153] httpuv_1.6.15                                      
-[154] tidyr_1.3.1                                        
-[155] openssl_2.3.2                                      
-[156] purrr_1.0.4                                        
-[157] reshape_0.8.9                                      
-[158] xtable_1.8-4                                       
-[159] restfulr_0.0.15                                    
-[160] AnnotationFilter_1.28.0                            
-[161] later_1.4.1                                        
-[162] tibble_3.2.1                                       
-[163] memoise_2.0.1                                      
-[164] AnnotationDbi_1.66.0                               
-[165] GenomicAlignments_1.40.0                           
-[166] cluster_2.1.6                                      
-[167] workflowr_1.7.1                                    </code></pre>
+ [21] labeling_0.4.3                                     
+ [22] sass_0.4.9                                         
+ [23] IlluminaHumanMethylationEPICanno.ilm10b4.hg19_0.6.0
+ [24] readr_2.1.5                                        
+ [25] genefilter_1.86.0                                  
+ [26] askpass_1.2.1                                      
+ [27] Rsamtools_2.20.0                                   
+ [28] foreign_0.8-87                                     
+ [29] siggenes_1.78.0                                    
+ [30] illuminaio_0.46.0                                  
+ [31] R.utils_2.12.3                                     
+ [32] dichromat_2.0-0.1                                  
+ [33] scrime_1.3.5                                       
+ [34] rstudioapi_0.17.1                                  
+ [35] RSQLite_2.3.9                                      
+ [36] generics_0.1.3                                     
+ [37] gtools_3.9.5                                       
+ [38] Matrix_1.7-1                                       
+ [39] interp_1.1-6                                       
+ [40] abind_1.4-8                                        
+ [41] R.methodsS3_1.8.2                                  
+ [42] lifecycle_1.0.4                                    
+ [43] whisker_0.4.1                                      
+ [44] yaml_2.3.10                                        
+ [45] rhdf5_2.48.0                                       
+ [46] SparseArray_1.4.8                                  
+ [47] BiocFileCache_2.12.0                               
+ [48] grid_4.4.2                                         
+ [49] blob_1.2.4                                         
+ [50] promises_1.3.2                                     
+ [51] ExperimentHub_2.12.0                               
+ [52] crayon_1.5.3                                       
+ [53] lattice_0.22-6                                     
+ [54] GenomicFeatures_1.56.0                             
+ [55] annotate_1.82.0                                    
+ [56] KEGGREST_1.44.1                                    
+ [57] pillar_1.10.1                                      
+ [58] knitr_1.49                                         
+ [59] beanplot_1.3.1                                     
+ [60] rjson_0.2.23                                       
+ [61] codetools_0.2-20                                   
+ [62] glue_1.8.0                                         
+ [63] data.table_1.16.4                                  
+ [64] vctrs_0.6.5                                        
+ [65] png_0.1-8                                          
+ [66] gtable_0.3.6                                       
+ [67] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1 
+ [68] cachem_1.1.0                                       
+ [69] xfun_0.50                                          
+ [70] S4Arrays_1.4.1                                     
+ [71] survival_3.7-0                                     
+ [72] iterators_1.0.14                                   
+ [73] statmod_1.5.0                                      
+ [74] nlme_3.1-166                                       
+ [75] bit64_4.6.0-1                                      
+ [76] progress_1.2.3                                     
+ [77] filelock_1.0.3                                     
+ [78] rprojroot_2.0.4                                    
+ [79] bslib_0.9.0                                        
+ [80] nor1mix_1.3-3                                      
+ [81] rpart_4.1.23                                       
+ [82] colorspace_2.1-1                                   
+ [83] DBI_1.2.3                                          
+ [84] Hmisc_5.2-2                                        
+ [85] nnet_7.3-19                                        
+ [86] tidyselect_1.2.1                                   
+ [87] bit_4.5.0.1                                        
+ [88] compiler_4.4.2                                     
+ [89] curl_6.2.0                                         
+ [90] git2r_0.35.0                                       
+ [91] httr2_1.1.0                                        
+ [92] htmlTable_2.4.3                                    
+ [93] xml2_1.3.6                                         
+ [94] DelayedArray_0.30.1                                
+ [95] checkmate_2.3.2                                    
+ [96] scales_1.3.0                                       
+ [97] quadprog_1.5-8                                     
+ [98] rappdirs_0.3.3                                     
+ [99] stringr_1.5.1                                      
+[100] digest_0.6.37                                      
+[101] rmarkdown_2.29                                     
+[102] GEOquery_2.72.0                                    
+[103] htmltools_0.5.8.1                                  
+[104] pkgconfig_2.0.3                                    
+[105] jpeg_0.1-10                                        
+[106] base64enc_0.1-3                                    
+[107] sparseMatrixStats_1.16.0                           
+[108] dbplyr_2.5.0                                       
+[109] fastmap_1.2.0                                      
+[110] ensembldb_2.28.1                                   
+[111] rlang_1.1.5                                        
+[112] htmlwidgets_1.6.4                                  
+[113] UCSC.utils_1.0.0                                   
+[114] DelayedMatrixStats_1.26.0                          
+[115] farver_2.1.2                                       
+[116] jquerylib_0.1.4                                    
+[117] jsonlite_1.8.9                                     
+[118] mclust_6.1.1                                       
+[119] R.oo_1.27.0                                        
+[120] VariantAnnotation_1.50.0                           
+[121] RCurl_1.98-1.16                                    
+[122] magrittr_2.0.3                                     
+[123] Formula_1.2-5                                      
+[124] GenomeInfoDbData_1.2.12                            
+[125] patchwork_1.3.0                                    
+[126] Rhdf5lib_1.26.0                                    
+[127] munsell_0.5.1                                      
+[128] Rcpp_1.0.14                                        
+[129] stringi_1.8.4                                      
+[130] zlibbioc_1.50.0                                    
+[131] MASS_7.3-61                                        
+[132] AnnotationHub_3.12.0                               
+[133] plyr_1.8.9                                         
+[134] bumphunter_1.46.0                                  
+[135] org.Hs.eg.db_3.19.1                                
+[136] minfi_1.50.0                                       
+[137] parallel_4.4.2                                     
+[138] deldir_2.0-4                                       
+[139] splines_4.4.2                                      
+[140] multtest_2.60.0                                    
+[141] hms_1.1.3                                          
+[142] locfit_1.5-9.11                                    
+[143] rngtools_1.5.2                                     
+[144] biomaRt_2.60.1                                     
+[145] BiocVersion_3.19.1                                 
+[146] missMethyl_1.38.0                                  
+[147] XML_3.99-0.18                                      
+[148] evaluate_1.0.3                                     
+[149] latticeExtra_0.6-30                                
+[150] biovizBase_1.52.0                                  
+[151] BiocManager_1.30.25                                
+[152] tzdb_0.4.0                                         
+[153] foreach_1.5.2                                      
+[154] httpuv_1.6.15                                      
+[155] tidyr_1.3.1                                        
+[156] openssl_2.3.2                                      
+[157] purrr_1.0.4                                        
+[158] reshape_0.8.9                                      
+[159] xtable_1.8-4                                       
+[160] restfulr_0.0.15                                    
+[161] AnnotationFilter_1.28.0                            
+[162] later_1.4.1                                        
+[163] tibble_3.2.1                                       
+[164] memoise_2.0.1                                      
+[165] AnnotationDbi_1.66.0                               
+[166] GenomicAlignments_1.40.0                           
+[167] cluster_2.1.6                                      
+[168] workflowr_1.7.1                                    </code></pre>
 </div>
 </div>
 </div>
