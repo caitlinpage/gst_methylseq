@@ -14,6 +14,8 @@ under the hg19 genome annotation. [GSE186458](https://www.ncbi.nlm.nih.gov/geo/q
 * B cell type: 3 samples
 * NK cell type: 3 samples
 
+Further description can be found [here](00_datasets.html)
+
 ## Packages used
 
 ```{r, message=FALSE, warning=FALSE}
@@ -31,6 +33,30 @@ library(ggplot2)
 library(ggVennDiagram)
 library(ComplexUpset)
 ```
+
+## Description
+To understand the inputs of Gene Set Testing, I explored different differential methylation methods.
+I focussed on methods available within Bioconductor, and ones that were widely used.
+I tried the following methods:
+* [bsseq](https://www.bioconductor.org/packages/release/bioc/html/bsseq.html)
+[Paper](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2012-13-10-r83)
+Years in Bioc: 12.5
+
+* [DMRcate](https://www.bioconductor.org/packages/release/bioc/html/DMRcate.html)
+[Paper](https://academic.oup.com/nar/article/49/19/e109/6329576?login=false)
+Years in Bioc: 11
+
+* [dmrseq](https://www.bioconductor.org/packages/release/bioc/html/dmrseq.html)
+[Paper](https://academic.oup.com/biostatistics/article/20/3/367/4899074?login=false)
+Years in Bioc: 7
+
+* [DSS](https://www.bioconductor.org/packages/release/bioc/html/DSS.html)
+[Paper](https://academic.oup.com/nar/article/42/8/e69/1074350?login=false)
+Years in Bioc: 12.5
+
+* [edgeR workflow](https://pmc.ncbi.nlm.nih.gov/articles/PMC5747346/)
+
+
 
 ## Obtain counts
 ```{r, eval=FALSE}
@@ -199,6 +225,7 @@ seq_annot <- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE,
 seq_dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
 
 dmrcate_seq_dmr <- extractRanges(seq_dmrcate.res, genome = "hg19")
+dmrcate_seq_dmr <- dmrcate_seq_dmr %>% data.frame()
 dmrcate_seq_anno <- seq_annot@ranges %>% data.frame()
 #saveRDS(dmrcate_seq_dmr, "../output/dmrcate_seq_dmr.rds")
 ```
@@ -207,6 +234,7 @@ dmrcate_seq_anno <- seq_annot@ranges %>% data.frame()
 dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
 dmrcate_seq_anno <- dmrcate_seq_anno@ranges %>% data.frame()
 dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") 
+dmrcate_seq_dmr <- dmrcate_seq_dmr %>% data.frame()
 ```
 
 ```{r}
@@ -325,5 +353,83 @@ head(edge_res)
 ```
 
 
+## Compare approaches
+* All methods were run on the HPC at PeterMac because they are very computationally intense.
+* Despite this, DSS and dmrseq still failed - unclear as to why, so we moved on.
+* The edgeR workflow does not identify DMRs
 
+```{r}
+compare_dm <- wgbs_counts[,1:4]
+bsseq_dmrs_filt <- bsseq_dmrs %>% filter(abs(areaStat) >= 100)
+overlap_dm <- find_overlaps(as_granges(dmrcate_seq_dmr[1:5000,]), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(seq_dmrcate_dmr_5k = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+overlap_dm <- find_overlaps(as_granges(bsseq_dmrs_filt), as_granges(compare_dm)) %>% data.frame()
+compare_dm <- compare_dm %>% mutate(bsseq_dmr_area100 = ifelse(pos %in% overlap_dm$pos, TRUE, FALSE))
+
+compare_dm <- compare_dm %>% mutate(edger_pos = edge_res[match(.$pos, rownames(edge_res)), "signif.05"])
+```
+
+```{r}
+upset(filter(compare_dm, seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| edger_pos != FALSE), intersect = colnames(compare_dm)[5:7])
+```
+
+
+
+# Compare bsseq and DMRCate
+
+```{r}
+rbind(cbind(width = bsseq_dmrs$width, method = "bsseq"), 
+      cbind(width = dmrcate_seq_dmr$width, method = "dmrcate")) %>% data.frame() %>% 
+  mutate(width = as.double(width)) %>%
+  ggplot(aes(x = log2(width), fill = method)) +
+  geom_density(alpha = 0.4) +
+  theme_bw()
+```
+
+```{r}
+rbind(cbind(width = dmrcate_seq_dmr$width, method = "dmrcate"),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = "dmrcate_5k"),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = "dmrcate_1k"),
+      cbind(width = bsseq_dmrs_filt$width, method = "bsseq_area100")) %>% data.frame() %>% mutate(width = as.double(width)) %>%
+  ggplot(aes(x = width, colour = method)) +
+  geom_density()
+
+rbind(cbind(width = dmrcate_seq_dmr$width, method = "dmrcate"),
+      cbind(width = dmrcate_seq_dmr[1:5000,]$width, method = "dmrcate_5k"),
+      cbind(width = dmrcate_seq_dmr[1:1000,]$width, method = "dmrcate_1k"),
+      cbind(width = bsseq_dmrs_filt$width, method = "bsseq_area100")) %>% data.frame() %>% mutate(width = as.double(width)) %>%
+  ggplot(aes(x = log2(width), colour = method)) +
+  geom_density()
+```
+
+```{r}
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = no.cpgs, colour = method)) +
+  geom_density()
+
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k"),
+      cbind(no.cpgs = bsseq_dmrs_filt$n, method = "bsseq_area100")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = log2(no.cpgs), colour = method)) +
+  geom_density()
+```
+
+```{r}
+cg_in_dmr <- wgbs_counts[,c("pos", "seqnames", "start")]
+cg_in_dmr$end <- cg_in_dmr$start
+overlap <- find_overlaps(as_granges(cg_in_dmr), as_granges(bsseq_dmrs_filt)) %>% data.frame()
+cg_in_dmr$bsseq <- ifelse(cg_in_dmr$pos %in% overlap$pos, TRUE, FALSE)
+
+overlap <- find_overlaps(as_granges(cg_in_dmr), as_granges(dmrcate_seq_dmr)) %>% data.frame()
+cg_in_dmr$dmrcate <- ifelse(cg_in_dmr$pos %in% overlap$pos, TRUE, FALSE)
+```
+
+```{r}
+ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq == TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate == TRUE)$pos))
+ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq != TRUE)$pos, dmrcate = filter(cg_in_dmr, dmrcate != TRUE)$pos))
+```
 
