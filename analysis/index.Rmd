@@ -34,7 +34,8 @@ Analysis:
 
   a) [Microarray](00_differentialMethylationArray.html)
   
-  b) Sequencing *tbd 00_differentialMethylationSequencing
+  b) [Sequencing](00_differentialMethylationSequencing.html)
+  
   
   c) Compare CpG level and DMR results
   

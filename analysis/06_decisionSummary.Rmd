@@ -10,6 +10,48 @@ editor_options:
 * I want to insert images into this
 ## Introduction
 
+# Datasets
+Immune cell types: B and NK
+available in array and WGBS
+processed files available for WGBS
+big changes in methylation
 
+# Differential Methylation
+original analysis: bsseq
+* basically it was the one I got to run
+* and the package structure and objects was used by others, it's one of the older ones
+* eventual problem: it finds so so many DMRs, (and I wasn't filtering)
+this was making the results not great, and the comparison to microarray was also not great
+* reanalysis of dm methods
+dmrcate
+* found less dmrs than bsseq
+* method for array and seq
+* gives overlapping genes
+* has FDR for dmrs
+
+# filtering dmrs
+* based on gene sets out - limit to top 1k
+* but also needs more investigation
+
+# Gene annotation
+* biomart because that's what I'm most familar with
+* gives ensembl genes
+
+# Bias identification
+* num cpgs in a gene
+* for testing this is summarised
+
+# Gene Set Testing
+
+# Getting the gene sets
+* allegs or direct
+* been using allegs
+
+# gene anno to entrez
+* this is awkward
+
+# the test
+* wallenius or fishers
+* about the same, so been using wallenius
 
 

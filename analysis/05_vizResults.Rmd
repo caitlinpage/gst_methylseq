@@ -1,0 +1,30 @@
+---
+title: "05_vizResults"
+author: "Caitlin Page"
+date: "2025-04-02"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+* maybe have an itty bit of this in exploreCpGGST - as an exploratory: and if any systems have more CpGs in them already
+* it would be nice to have a hierachy map with all of this to see how the gene sets are related
+(I know I looked into a few things back in the day, see if I can find them)
+
+* can't find what the packages were that I tried to do hierachy stuff with
+oh yeah it was [gosemsim](https://bioconductor.org/packages/release/bioc/html/GOSemSim.html)
+and also just googled
+[go.db](https://bioconductor.org/packages/release/data/annotation/html/GO.db.html) - this one can show all the child terms of a term
+[viseago](https://bioconductor.org/packages/release/bioc/html/ViSEAGO.html) - another semantic similarity one
+[rrvgo](https://www.bioconductor.org/packages/devel/bioc/vignettes/rrvgo/inst/doc/rrvgo.html)
+I think what I'm interested in this stuff is looking at the results overall and ways to do that and summarise those more elegantly than top 10
+and just general understanding
+I think this visualising is another file lol
+
+
+## Introduction
+
+```{r}
+
+```
+
