@@ -55,6 +55,14 @@ Available in the `BiasedUrn` package
 Designed for RNA-Seq and adjusting for length based bias
 Is species independent
 Code is difficult to follow
+```{r eval=FALSE}
+go_goseq <- getgo(test_bias$ensembl_gene_id, "hg19", "ensGene")
+names(go_goseq) <- test_bias$ensembl_gene_id
+go_goseq <- reversemapping(go_goseq)
+go_goseq <- reversemapping(go_goseq)
+goseq_go <- reversemapping(go_goseq)
+```
+
 
 ## [missMethyl](https://www.bioconductor.org/packages/release/bioc/html/missMethyl.html)
 
@@ -201,3 +209,8 @@ head(sig_terms_array)
 # Negatives
 * only works on human (feature of the arrays)
 * output is not sorted on FDR
+
+## How to Validate that Gene Set Testing should be done in unbiased way
+
+
+
