@@ -23,12 +23,14 @@ library(org.Hs.eg.db)
 
 ```{r}
 wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+biomart_genes <- readRDS("../output/genes_biomart.rds")
 dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
 dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
 dmrcate_seq_anno <- data.frame(dmrcate_seq_anno@ranges)
 
 immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
 names(immuneGO) <- "GOID"
+immuneGO <- distinct(immuneGO)
 ```
 
 
@@ -42,7 +44,8 @@ names(immuneGO) <- "GOID"
 
 ```{r}
 source("../code/mmGST.R")
-gst_res_dmr1 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Wallenius")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Wallenius")[[1]]
 gst_res_dmr1$rank_fdr <- 1:nrow(gst_res_dmr1)
 gst_res_dmr1 <- gst_res_dmr1 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 head(gst_res_dmr1)
@@ -60,11 +63,12 @@ gst_res_dmr1[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE, FA
 
 ```{r}
 source("../code/mmGST.R")
-gst_res_all <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")
+source("../code/function_binBiasPlot.R")
+gst_res_all <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")[[1]]
 gst_res_all$rank_fdr <- 1:nrow(gst_res_all)
 gst_res_all <- gst_res_all %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 
-gst_res_dmr5 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")
+gst_res_dmr5 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")[[1]]
 gst_res_dmr5$rank_fdr <- 1:nrow(gst_res_dmr5)
 gst_res_dmr5 <- gst_res_dmr5 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 ```
@@ -73,7 +77,7 @@ gst_res_dmr5 <- gst_res_dmr5 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE)
 venn_list <- list(
   dmr_all = gst_res_all %>% filter(FDR < 0.05) %>% .$GOID,
   dmr_5k = gst_res_dmr5 %>% filter(FDR < 0.05) %>% .$GOID,
-  dmr_1k = gst_res_dmr1 %>% filter(FDR < 0.05) %>% .$GOID,
+  dmr_1k = gst_res_dmr1 %>% filter(FDR < 0.05) %>% .$GOID
 )
 ggVennDiagram(venn_list)
 ```
@@ -82,7 +86,8 @@ ggVennDiagram(venn_list)
 ## Wallenius vs Fisher
 ```{r}
 source("../code/mmGST.R")
-gst_res_dmr1_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Fishers")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Fishers")[[1]]
 gst_res_dmr1_fish$rank_fdr <- 1:nrow(gst_res_dmr1_fish)
 gst_res_dmr1_fish <- gst_res_dmr1_fish %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 ```
@@ -90,6 +95,7 @@ gst_res_dmr1_fish <- gst_res_dmr1_fish %>% mutate(is.sig = ifelse(FDR < 0.05, TR
 
 ```{r}
 source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
 system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "Fishers"))
 system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "Wallenius"))
 ```
@@ -102,7 +108,8 @@ ggVennDiagram(venn_list)
 ## Wallenius vs Hypergeometric (Unbiased vs Biased)
 ```{r}
 source("../code/mmGST.R")
-gst_res_dmr1_hyper <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "None")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1_hyper <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "None")[[1]]
 gst_res_dmr1_hyper$rank_fdr <- 1:nrow(gst_res_dmr1_hyper)
 gst_res_dmr1_hyper <- gst_res_dmr1_hyper %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 ```
@@ -169,14 +176,17 @@ go_entrez %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>%
   labs(x = "Method", y = "Average number of CpGs per ontology category")
 ```
 
+```{r}
+gst_res_dmr1 %>% .[names(.) %in% c("GOID", "TERM")]
+```
 
 ```{r}
 truth_gst_100 <- rbind(
-  gst_res_dmr1[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1") %>% .[,8:10],
-  gst_res_dmr1_hyper$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1") %>% .[,8:10])
+  gst_res_dmr1[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_res_dmr1_hyper$dmr_all[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
 
 truth_gst_100 %>%
-  ggplot(aes(x = rank, y = in_imm, colour = method)) +
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
   geom_line() +
   labs(x = "Rank", y = "Cumulative no. in immune sets")
 ```
@@ -185,10 +195,10 @@ truth_gst_100 %>%
 ####
 
 ```{r}
-dmrcate_seq_dmr[1:500,] %>% summarise(sum(no.cpgs))
-dmrcate_seq_dmr[1:1000,] %>% summarise(sum(no.cpgs))
-dmrcate_seq_dmr[1:5000,] %>% summarise(sum(no.cpgs))
-dmrcate_seq_dmr %>% summarise(sum(no.cpgs))
+c(cpgs_500dmrs = dmrcate_seq_dmr[1:500,] %>% summarise(sum(no.cpgs)),
+  cpgs_1kdmrs = dmrcate_seq_dmr[1:1000,] %>% summarise(sum(no.cpgs)),
+  cpgs_5kdmrs = dmrcate_seq_dmr[1:5000,] %>% summarise(sum(no.cpgs)),
+  cpgs_alldmrs = dmrcate_seq_dmr %>% summarise(sum(no.cpgs)))
 ```
 
 ```{r}
