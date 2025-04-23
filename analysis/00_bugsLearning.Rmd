@@ -1,0 +1,38 @@
+---
+title: "00_bugsLearning"
+author: "Caitlin Page"
+date: "2025-04-09"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+# Gene set similarity fail
+* I wanted to run `rrvgo` and `GOSemSim` on the data
+* This would only work on GO because GO is the only database that is hierarchical
+* Wrote an R script and submitted to slurm
+* Got a simple error I can't figure out
+* Also had to submit as job because funningly enough, trying to do 20k x 20k matrix comparisons would exponentially increase the amount of time to do the thing
+* Especially when it's designed to further summarise GST results
+
+
+# Gene sets look wrong
+* There was like no overlap in significant gene sets to the array
+* And main stuff had nothing to do with immune system
+* Turns out that's what happens when you have ~69k DMRs from bsseq
+* Too much significance means way too much noise - because everything is significant
+* Microarray guideline is filter to top 10k CpGs
+* We need to figure out appropriate filtering
+
+
+# Run DM analysis on the cluster
+* DM analysis methods are very computationally intense
+* It's not worth trying to run them locally
+
+
+# Order of package library loading
+* Always load `plyranges` before `dplyr`
+* Because I like working in data frames, and because they share fn names, they won't work
+
+
+
