@@ -288,7 +288,7 @@ go_entrez <- go_entrez %>% mutate(coords = biomart_genes[match(.$symbol, biomart
                                   start = biomart_genes[match(.$symbol, biomart_genes$gene_name), "start"],
                                   end = biomart_genes[match(.$symbol, biomart_genes$gene_name), "end"],
                                   n_cg_gene = biomart_genes[match(.$symbol, biomart_genes$gene_name), "num_cg"]) 
-go_entrez %>% distinct(entrez, symbol, coords) %>% filter(is.na(coords))
+go_entrez %>% distinct(entrez, symbol, coords) %>% filter(is.na(coords)) %>% nrow(.)
 ```
 
 * quick side note - how much does this impact??
@@ -310,10 +310,12 @@ go_entrez %>% filter(symbol == "C10orf2")
 go_entrez <- go_entrez %>% group_by(go) %>% mutate(n_genes_go = n()) %>% ungroup()
 ```
 
-
 ```{r}
 go_entrez_filt <- go_entrez %>% filter(!is.na(start)) %>% group_by(go) %>% mutate(n_genes_go = n(), av_cg_go = mean(n_cg_gene), sum_cg_go = sum(n_cg_gene), gene_prop = sum(n_cg_gene)/n()) %>% ungroup()
+```
 
+
+```{r}
 go_entrez_filt %>% distinct(go, term, n_genes_go, av_cg_go) %>%
   ggplot(aes(x = n_genes_go, y = av_cg_go)) +
   geom_point(alpha = 0.3)
@@ -347,7 +349,9 @@ go_entrez_filt_simp
 * but I could still do a slightly more grouped thing?
 
 ```{r}
-go_entrez_filt_simp %>% group_by(n_genes_go) %>% summarise(n_cat = n())
+go_entrez_filt_simp %>% group_by(n_genes_go) %>% mutate(n_cat = n()) %>%
+  ggplot(aes(x = log2(n_genes_go), y = n_cat)) +
+  geom_point()
 ```
 
 ```{r}
@@ -363,6 +367,10 @@ go_entrez_filt_simp %>% group_by(n_genes_go) %>% mutate(n_cat = n()) %>%
 ```
 * more categories with not many genes
 ```{r}
+go_entrez_filt_simp %>% 
+  ggplot(aes(x = log2(n_genes_go), y = av_cg_go)) +
+  geom_point(alpha = 0.3)
+
 go_entrez_filt_simp %>% 
   ggplot(aes(x = n_genes_go, y = av_cg_go)) +
   geom_point(alpha = 0.3) +
@@ -436,11 +444,7 @@ go_entrez_filt %>% distinct(go, term, n_genes_go, av_cg_go) %>% group_by(n_genes
   geom_point(alpha = 0.3)
 ```
 
-```{r}
-go_entrez_filt %>% distinct(go, term, n_genes_go, av_cg_go) %>% .[order(.$n_genes_go),] %>% 
-  ggplot(aes(x = as.factor(n_genes_go), y = av_cg_go)) +
-  geom_boxplot()
-```
+
 
 
 ```{r}
@@ -449,57 +453,104 @@ go_entrez_filt %>% distinct(go, term, n_genes_go, av_cg_go) %>% filter(n_genes_g
   geom_point(alpha = 0.3)
 ```
 
+# bias in results
+* show that when running hypergeometric we get significant sets that have lots of cpgs?
 
 ```{r}
-go_entrez_filt %>% distinct(go, term, n_genes_go, av_cg_go)
-```
-
-
-###
-```{r}
-# For org.Hs.egGO2ALLEGS
-xx <- as.list(org.Hs.egGO2ALLEGS)
-if(length(xx) > 0){
-    # Gets the Entrez Gene identifiers for the top 2nd and 3nd GO identifiers
-    goids <- xx[2:3]
-    # Gets all the Entrez Gene identifiers for the first element of goids
-    goids[[1]]
-    # Evidence code for the mappings
-    names(goids[[1]])
-}
-go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
-go_entrez
-go_entrez %>% distinct(go) %>% nrow()
-```
-```{r}
-mm_go <- .getGO()
-mm_go <- mm_go$idTable
-```
-
-```{r}
-unique(go_entrez$go) %in% mm_go$GOID %>% summary()
-```
-* same terms
-
-```{r}
-go_entrez <- go_entrez %>% mutate(term = mm_go[match(.$go, mm_go$GOID), "TERM"],
-                     ontology = mm_go[match(.$go, mm_go$GOID), "ONTOLOGY"])
-go_entrez <- go_entrez %>% group_by(go) %>% mutate(num_genes = n()) %>% ungroup()
-```
-
-```{r}
-go_entrez_summ <- go_entrez %>% distinct(go, ontology, term, num_genes)
+go_entrez_filt_simp
 ```
 
 
 ```{r}
-go_entrez_summ %>%
-  ggplot(aes(x = log10(num_genes), colour = ontology)) +
-  geom_density()
-go_entrez_summ %>%
-  ggplot(aes(x = ontology, y = log10(num_genes))) +
-  geom_boxplot()
+saveRDS(go_entrez_filt_simp, "../output/go_cg_summ.rds")
 ```
 
+# i know what i want to do
+* which is: are the categories that have lots of cpgs closely related?
+* or any kind of connection?
 
+* so i need some way to know the hierarchy or similarity of terms
+* maybe have an itty bit of this in exploreCpGGST - as an exploratory: and if any systems have more CpGs in them already
+* it would be nice to have a hierachy map with all of this to see how the gene sets are related
+(I know I looked into a few things back in the day, see if I can find them)
+
+* can't find what the packages were that I tried to do hierachy stuff with
+oh yeah it was [gosemsim](https://bioconductor.org/packages/release/bioc/html/GOSemSim.html)
+and also just googled
+[go.db](https://bioconductor.org/packages/release/data/annotation/html/GO.db.html) - this one can show all the child terms of a term
+[viseago](https://bioconductor.org/packages/release/bioc/html/ViSEAGO.html) - another semantic similarity one
+[rrvgo](https://www.bioconductor.org/packages/devel/bioc/vignettes/rrvgo/inst/doc/rrvgo.html)
+I think what I'm interested in this stuff is looking at the results overall and ways to do that and summarise those more elegantly than top 10
+and just general understanding
+I think this visualising is another file lol
+
+```{r}
+renv::install("bioc::rrvgo")
+library(rrvgo)
+go_analysis <- read.delim(system.file("extdata/example.txt", package="rrvgo"))
+simMatrix <- calculateSimMatrix(go_analysis$ID,
+                                orgdb="org.Hs.eg.db",
+                                ont="BP",
+                                method="Rel")
+```
+```{r}
+scores <- setNames(-log10(go_analysis$qvalue), go_analysis$ID)
+reducedTerms <- reduceSimMatrix(simMatrix,
+                                scores,
+                                threshold=0.7,
+                                orgdb="org.Hs.eg.db")
+```
+* uses gosemsim in backend to do the sim
+```{r}
+scores %>% length(.)
+go_analysis %>% nrow(.)
+scores
+```
+```{r}
+go_analysis$ID %in% filter(go_entrez, ontology == "BP")$go %>% summary()
+```
+
+```{r}
+rownames(simMatrix) %in% go_analysis$ID
+```
+
+```{r}
+scatterPlot(simMatrix, reducedTerms)
+```
+
+```{r}
+treemapPlot(reducedTerms)
+```
+* in this one - space used by term proportional to score
+* so I could have this instead as the number of CpGs.
+
+```{r}
+?calculateSimMatrix
+```
+
+# try on all
+```{r}
+go_entrez_filt_simp
+```
+```{r}
+bsseq_dmrs
+```
+
+```{r}
+simMatrix <- calculateSimMatrix(go_entrez_filt_simp$go,
+                                orgdb="org.Hs.eg.db",
+                                ont="BP",
+                                method="Rel")
+```
+* unsuprisingly when you want to run this on everything - it takes a lot longer
+* the vignette says something about speeding it up but i think thats about rerunning it
+* so re-run this when I get home
+* because it is going to do what I want to do
+
+* the reduced terms fn gives individusl cat stats
+that i could add sum cg to
+and look at it
+```{r}
+go_entrez %>% distinct(ontology)
+```
 
