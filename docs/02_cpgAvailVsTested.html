@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Caitlin Page" />
+
+<meta name="date" content="2025-03-04" />
+
+<title>02_cpgAvailVsTested</title>
+
+<script src="site_libs/header-attrs-2.29/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">2_ontology_bias</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/caitlinpage/gst_methylseq">
+    <span class="fab fa-github"></span>
+     
+    Source code
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">02_cpgAvailVsTested</h1>
+<h4 class="author">Caitlin Page</h4>
+<h4 class="date">2025-03-04</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
+</a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2025-04-29
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 0
+</p>
+<p>
+<strong>Knit directory:</strong> <code>2_ontology_bias/analysis/</code>
+<span class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.1). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date
+</a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguptodate"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great! Since the R Markdown file has been committed to the Git
+repository, you know the exact version of the code that produced these
+results.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20240905code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20240905)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20240905code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20240905)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr
+project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeee50eb6c194db3e62058644dfcd61203e7854492targetblankee50eb6a">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong>
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/ee50eb6c194db3e62058644dfcd61203e7854492" target="_blank">ee50eb6</a>
+</a>
+</p>
+</div>
+<div
+id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtreeee50eb6c194db3e62058644dfcd61203e7854492targetblankee50eb6a"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/ee50eb6c194db3e62058644dfcd61203e7854492" target="_blank">ee50eb6</a>.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/.DS_Store
+    Ignored:    analysis/figure/
+    Ignored:    analysis/input/
+    Ignored:    analysis/mc_h1/
+    Ignored:    analysis/myEnvironment.RData
+    Ignored:    data/cell_line_wgbs/
+    Ignored:    data/gene_sets/
+    Ignored:    data/long_read/
+    Ignored:    data/microarray/
+    Ignored:    data/wgbs/
+    Ignored:    data/wgbs_2/
+    Ignored:    output/figures/
+    Ignored:    renv/library/
+    Ignored:    renv/staging/
+
+Untracked files:
+    Untracked:  analysis/clusterlog.txt
+    Untracked:  code/ChatGPT_translate.html
+    Untracked:  code/ChatGPT_translate_files/
+    Untracked:  code/background.R
+
+Unstaged changes:
+    Modified:   .gitignore
+    Modified:   2_ontology_bias.Rproj
+    Modified:   _workflowr.yml
+    Modified:   analysis/00_datasets.Rmd
+    Modified:   analysis/03_genesToGST.Rmd
+    Modified:   renv.lock
+    Modified:   renv/.gitignore
+    Modified:   renv/activate.R
+    Modified:   renv/settings.json
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+These are the previous versions of the repository in which changes were
+made to the R Markdown (<code>analysis/02_cpgAvailVsTested.Rmd</code>)
+and HTML (<code>docs/02_cpgAvailVsTested.html</code>) files. If you’ve
+configured a remote Git repository (see <code>?wflow_git_remote</code>),
+click on the hyperlinks in the table below to view the files as they
+were in that past version.
+</p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/ee50eb6c194db3e62058644dfcd61203e7854492/analysis/02_cpgAvailVsTested.Rmd" target="_blank">ee50eb6</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-29
+</td>
+<td>
+move code over so can keep it but not figure it out - it’s the annotatr
+stuff that was comp intense and not very insightful anyway
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/22296d6edd61d790336c5d9962f1b3e9b38f1122/analysis/02_cpgAvailVsTested.Rmd" target="_blank">22296d6</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-01
+</td>
+<td>
+tidying up code - cpg island and distance stuff
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/ceabd7130c511faf19cf0fae212d49a29e6cae70/analysis/02_cpgAvailVsTested.Rmd" target="_blank">ceabd71</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-03-31
+</td>
+<td>
+code copied from explore cpg distrib
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/44d73b6ff1c83ffc263d2f4a964e7caeebbc1483/analysis/02_cpgAvailVsTested.Rmd" target="_blank">44d73b6</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-03-17
+</td>
+<td>
+commit
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>Not all of the available CpGs will be utilised in the DM testing
+procedure - some will be filtered out because they have no/low
+counts.</p>
+<p><a
+href="https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009935">Wijesooria
+et al., 2022</a> highlights the importance of using a correct background
+gene set in regards to gene set testing analysis. This means using the
+only the genes that were testing in the differential analysis, as
+opposed to all possible genes.</p>
+<p>This will be relevant to us in both the genes input as the background
+- making sure that they are only included if they contain CpGs that were
+tested, and in the bias correction - making sure that only CpGs used in
+the differential testing are provided as the bias.</p>
+<p>In my early analysis, I did not realise this was an important
+feature, and had been getting my bias (number of CpGs) by merely
+overlapping the CpGs to a gene. Here, I wish to do some analysis to
+understand how using only the tested CpGs changes the results, and the
+relationships between them all.</p>
+</div>
+<div id="packages" class="section level2">
+<h2>Packages</h2>
+<pre class="r"><code>library(plyranges)</code></pre>
+<pre><code>Loading required package: BiocGenerics</code></pre>
+<pre><code>
+Attaching package: &#39;BiocGenerics&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:stats&#39;:
+
+    IQR, mad, sd, var, xtabs</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    anyDuplicated, aperm, append, as.data.frame, basename, cbind,
+    colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
+    get, grep, grepl, intersect, is.unsorted, lapply, Map, mapply,
+    match, mget, order, paste, pmax, pmax.int, pmin, pmin.int,
+    Position, rank, rbind, Reduce, rownames, sapply, setdiff, table,
+    tapply, union, unique, unsplit, which.max, which.min</code></pre>
+<pre><code>Loading required package: IRanges</code></pre>
+<pre><code>Loading required package: S4Vectors</code></pre>
+<pre><code>Loading required package: stats4</code></pre>
+<pre><code>
+Attaching package: &#39;S4Vectors&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:utils&#39;:
+
+    findMatches</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    expand.grid, I, unname</code></pre>
+<pre><code>Loading required package: GenomicRanges</code></pre>
+<pre><code>Loading required package: GenomeInfoDb</code></pre>
+<pre><code>
+Attaching package: &#39;plyranges&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:IRanges&#39;:
+
+    slice</code></pre>
+<pre><code>The following object is masked from &#39;package:stats&#39;:
+
+    filter</code></pre>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>
+Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:plyranges&#39;:
+
+    between, n, n_distinct</code></pre>
+<pre><code>The following objects are masked from &#39;package:GenomicRanges&#39;:
+
+    intersect, setdiff, union</code></pre>
+<pre><code>The following object is masked from &#39;package:GenomeInfoDb&#39;:
+
+    intersect</code></pre>
+<pre><code>The following objects are masked from &#39;package:IRanges&#39;:
+
+    collapse, desc, intersect, setdiff, slice, union</code></pre>
+<pre><code>The following objects are masked from &#39;package:S4Vectors&#39;:
+
+    first, intersect, rename, setdiff, setequal, union</code></pre>
+<pre><code>The following objects are masked from &#39;package:BiocGenerics&#39;:
+
+    combine, intersect, setdiff, union</code></pre>
+<pre><code>The following objects are masked from &#39;package:stats&#39;:
+
+    filter, lag</code></pre>
+<pre><code>The following objects are masked from &#39;package:base&#39;:
+
+    intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(ggplot2)
+library(BSDA)</code></pre>
+<pre><code>Loading required package: lattice</code></pre>
+<pre><code>
+Attaching package: &#39;BSDA&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:datasets&#39;:
+
+    Orange</code></pre>
+<pre class="r"><code>library(ggVennDiagram)
+library(gplots)</code></pre>
+<pre><code>
+Attaching package: &#39;gplots&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:IRanges&#39;:
+
+    space</code></pre>
+<pre><code>The following object is masked from &#39;package:S4Vectors&#39;:
+
+    space</code></pre>
+<pre><code>The following object is masked from &#39;package:stats&#39;:
+
+    lowess</code></pre>
+<pre class="r"><code>library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)</code></pre>
+<pre><code>Loading required package: minfi</code></pre>
+<pre><code>Loading required package: SummarizedExperiment</code></pre>
+<pre><code>Loading required package: MatrixGenerics</code></pre>
+<pre><code>Loading required package: matrixStats</code></pre>
+<pre><code>
+Attaching package: &#39;matrixStats&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:dplyr&#39;:
+
+    count</code></pre>
+<pre><code>
+Attaching package: &#39;MatrixGenerics&#39;</code></pre>
+<pre><code>The following objects are masked from &#39;package:matrixStats&#39;:
+
+    colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse,
+    colCounts, colCummaxs, colCummins, colCumprods, colCumsums,
+    colDiffs, colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs,
+    colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats,
+    colProds, colQuantiles, colRanges, colRanks, colSdDiffs, colSds,
+    colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
+    colWeightedMeans, colWeightedMedians, colWeightedSds,
+    colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet,
+    rowCollapse, rowCounts, rowCummaxs, rowCummins, rowCumprods,
+    rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps,
+    rowMadDiffs, rowMads, rowMaxs, rowMeans2, rowMedians, rowMins,
+    rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks,
+    rowSdDiffs, rowSds, rowSums2, rowTabulates, rowVarDiffs, rowVars,
+    rowWeightedMads, rowWeightedMeans, rowWeightedMedians,
+    rowWeightedSds, rowWeightedVars</code></pre>
+<pre><code>Loading required package: Biobase</code></pre>
+<pre><code>Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    &#39;browseVignettes()&#39;. To cite Bioconductor, see
+    &#39;citation(&quot;Biobase&quot;)&#39;, and for packages &#39;citation(&quot;pkgname&quot;)&#39;.</code></pre>
+<pre><code>
+Attaching package: &#39;Biobase&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:MatrixGenerics&#39;:
+
+    rowMedians</code></pre>
+<pre><code>The following objects are masked from &#39;package:matrixStats&#39;:
+
+    anyMissing, rowMedians</code></pre>
+<pre><code>Loading required package: Biostrings</code></pre>
+<pre><code>Loading required package: XVector</code></pre>
+<pre><code>
+Attaching package: &#39;Biostrings&#39;</code></pre>
+<pre><code>The following object is masked from &#39;package:base&#39;:
+
+    strsplit</code></pre>
+<pre><code>Loading required package: bumphunter</code></pre>
+<pre><code>Loading required package: foreach</code></pre>
+<pre><code>Loading required package: iterators</code></pre>
+<pre><code>Loading required package: parallel</code></pre>
+<pre><code>Loading required package: locfit</code></pre>
+<pre><code>locfit 1.5-9.11      2025-01-27</code></pre>
+<pre><code>Setting options(&#39;download.file.method.GEOquery&#39;=&#39;auto&#39;)</code></pre>
+<pre><code>Setting options(&#39;GEOquery.inmemory.gpl&#39;=FALSE)</code></pre>
+<pre class="r"><code>library(IlluminaHumanMethylationEPICmanifest)
+
+library(annotatr)</code></pre>
+</div>
+<div id="pre-processed-files" class="section level2">
+<h2>Pre-processed files</h2>
+<pre class="r"><code>wgbs_counts &lt;- readRDS(&quot;../output/wgbs_counts.rds&quot;)
+anno_array &lt;- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+anno_array &lt;- anno_array %&gt;% data.frame() %&gt;% 
+  mutate(seqnames = chr, start = pos, width = 1,
+         position = paste0(chr, &quot;-&quot;, pos)) %&gt;% relocate(c(seqnames, start, width))
+
+DMPs &lt;- readRDS(&quot;../output/array_dmps.rds&quot;) 
+DMPs$pos &lt;- paste0(DMPs$seqnames, &quot;-&quot;, DMPs$start)
+dmrcate_array_anno &lt;- readRDS(&quot;../output/dmrcate_array_anno.rds&quot;)
+dmrcate_array_anno &lt;- dmrcate_array_anno@ranges %&gt;% data.frame() %&gt;%
+  mutate(pos = paste0(seqnames, &quot;-&quot;, start))
+dmrcate_array_anno &lt;- dmrcate_array_anno %&gt;% 
+  mutate(cg_id = anno_array[match(.$pos, anno_array$position), &quot;Name&quot;])
+
+bsseq_res &lt;- readRDS(&quot;../output/bsseq_res.rds&quot;)
+dmrcate_seq_anno &lt;- readRDS(&quot;../output/dmrcate_seq_anno.rds&quot;)
+dmrcate_seq_anno &lt;- dmrcate_seq_anno@ranges %&gt;% data.frame() %&gt;%
+  mutate(pos = paste0(seqnames, &quot;-&quot;, start))
+
+biomart_genes &lt;- readRDS(&quot;../output/genes_biomart.rds&quot;)</code></pre>
+</div>
+<div id="overlap" class="section level1">
+<h1>overlap</h1>
+<ul>
+<li>Seq</li>
+</ul>
+<pre class="r"><code>list_venn &lt;- list(seq = wgbs_counts$pos, 
+                  bsseq = bsseq_res$position,
+                  dmrcate = dmrcate_seq_anno$pos)
+ggVennDiagram(list_venn)</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" /></p>
+<ul>
+<li>array</li>
+</ul>
+<pre class="r"><code>list_venn &lt;- list(seq = anno_array$position, 
+                  minfi = DMPs$pos,
+                  dmrcate = dmrcate_array_anno$pos)
+ggVennDiagram(list_venn)</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" /></p>
+<div id="compare-distance-between-tested-sites" class="section level2">
+<h2>Compare distance between tested sites</h2>
+<p>Q: Are there significant differences (on average) for the distance
+between sites depending on if they were tested or not?</p>
+<pre class="r"><code>dmrcate_seq_anno &lt;- dmrcate_seq_anno %&gt;% .[order(.$seqnames, .$start),] %&gt;%
+  group_by(seqnames) %&gt;% mutate(dist_to_next = lead(start) - start) %&gt;% ungroup()
+bsseq_res &lt;- bsseq_res %&gt;% .[order(.$seqnames, .$start),] %&gt;%
+  group_by(seqnames) %&gt;% mutate(dist_to_next = lead(start) - start) %&gt;% ungroup()
+
+dmrcate_array_anno &lt;- dmrcate_array_anno %&gt;% .[order(.$seqnames, .$start),] %&gt;%
+  group_by(seqnames) %&gt;% mutate(dist_to_next = lead(start) - start) %&gt;% ungroup()
+DMPs &lt;- DMPs %&gt;% .[order(.$seqnames, .$start),] %&gt;%
+  group_by(seqnames) %&gt;% mutate(dist_to_next = lead(start) - start) %&gt;% ungroup()</code></pre>
+</div>
+</div>
+<div id="wgbs" class="section level1">
+<h1>WGBS</h1>
+<pre class="r"><code>dmrcate_seq_anno %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = seqnames)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>dmrcate_seq_anno %&gt;%
+  ggplot(aes(y = log2(dist_to_next), x = seqnames, colour = seqnames)) +
+  geom_boxplot() +
+  theme(legend.position = &quot;none&quot;)</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_boxplot()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-6-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>bsseq_res %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = seqnames)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-7-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>bsseq_res %&gt;%
+  ggplot(aes(y = log2(dist_to_next), x = seqnames, colour = seqnames)) +
+  geom_boxplot() +
+  theme(legend.position = &quot;none&quot;)</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_boxplot()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-7-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>t.test(dmrcate_seq_anno$dist_to_next, bsseq_res$dist_to_next)</code></pre>
+<pre><code>
+    Welch Two Sample t-test
+
+data:  dmrcate_seq_anno$dist_to_next and bsseq_res$dist_to_next
+t = 0.3428, df = 52133047, p-value = 0.7318
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -2.829982  4.029744
+sample estimates:
+mean of x mean of y 
+ 107.5599  106.9600 </code></pre>
+</div>
+<div id="compare-all-sites-to-tested-sites" class="section level1">
+<h1>compare all sites to tested sites</h1>
+<pre class="r"><code>wgbs_counts &lt;- wgbs_counts %&gt;% group_by(seqnames) %&gt;% mutate(dist_to_next = lead(start) - start) %&gt;% ungroup()
+c(mean = mean(wgbs_counts$dist_to_next, na.rm=TRUE), sd = sd(wgbs_counts$dist_to_next, na.rm=TRUE))</code></pre>
+<pre><code>     mean        sd 
+ 106.6961 8330.1619 </code></pre>
+<pre class="r"><code>z.test(dmrcate_seq_anno$dist_to_next, mu=mean(wgbs_counts$dist_to_next, na.rm=TRUE), sigma.x = sd(wgbs_counts$dist_to_next, na.rm=TRUE))</code></pre>
+<pre><code>
+    One-sample z-Test
+
+data:  dmrcate_seq_anno$dist_to_next
+z = 0.52869, p-value = 0.597
+alternative hypothesis: true mean is not equal to 106.6961
+95 percent confidence interval:
+ 104.3577 110.7621
+sample estimates:
+mean of x 
+ 107.5599 </code></pre>
+<ul>
+<li>do not reject null</li>
+<li>basically the tested sites are not a distinct group in terms of the
+distance between them</li>
+</ul>
+</div>
+<div id="array" class="section level1">
+<h1>array</h1>
+<pre class="r"><code>dmrcate_array_anno %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = seqnames)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>dmrcate_array_anno %&gt;%
+  ggplot(aes(y = log2(dist_to_next), x = seqnames, colour = seqnames)) +
+  geom_boxplot() +
+  theme(legend.position = &quot;none&quot;)</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_boxplot()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-11-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>DMPs %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = seqnames)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>DMPs %&gt;%
+  ggplot(aes(y = log2(dist_to_next), x = seqnames, colour = seqnames)) +
+  geom_boxplot() +
+  theme(legend.position = &quot;none&quot;)</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_boxplot()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-12-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>t.test(dmrcate_array_anno$dist_to_next, DMPs$dist_to_next)</code></pre>
+<pre><code>
+    Welch Two Sample t-test
+
+data:  dmrcate_array_anno$dist_to_next and DMPs$dist_to_next
+t = 0.27304, df = 1549461, p-value = 0.7848
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -107.4208  142.1947
+sample estimates:
+mean of x mean of y 
+ 3612.478  3595.091 </code></pre>
+<ul>
+<li>2 groups are not distinct as expected</li>
+</ul>
+</div>
+<div id="compare-tested-and-all" class="section level1">
+<h1>Compare tested and all</h1>
+<pre class="r"><code>anno_array &lt;- anno_array %&gt;% .[order(.$seqnames, .$start),] %&gt;%
+  group_by(seqnames) %&gt;% mutate(dist_to_next = lead(start) - start) %&gt;% ungroup()
+c(mean = mean(anno_array$dist_to_next, na.rm = TRUE), sd = sd(anno_array$dist_to_next, na.rm = TRUE))</code></pre>
+<pre><code>     mean        sd 
+ 3467.239 49569.982 </code></pre>
+<pre class="r"><code>z.test(dmrcate_array_anno$dist_to_next, mu = mean(anno_array$dist_to_next, na.rm = TRUE), sigma.x = sd(anno_array$dist_to_next, na.rm = TRUE))</code></pre>
+<pre><code>
+    One-sample z-Test
+
+data:  dmrcate_array_anno$dist_to_next
+z = 2.5759, p-value = 0.009998
+alternative hypothesis: true mean is not equal to 3467.239
+95 percent confidence interval:
+ 3501.967 3722.988
+sample estimates:
+mean of x 
+ 3612.478 </code></pre>
+<ul>
+<li>in the array, tested sites are a significant separate group to
+overall in regards to the distance between the sites</li>
+</ul>
+</div>
+<div id="compare-array-and-seq" class="section level1">
+<h1>Compare array and seq</h1>
+<pre class="r"><code>t.test(dmrcate_seq_anno$dist_to_next[!is.na(dmrcate_seq_anno$dist_to_next)], dmrcate_array_anno$dist_to_next[!is.na(dmrcate_array_anno$dist_to_next)])</code></pre>
+<pre><code>
+    Welch Two Sample t-test
+
+data:  dmrcate_seq_anno$dist_to_next[!is.na(dmrcate_seq_anno$dist_to_next)] and dmrcate_array_anno$dist_to_next[!is.na(dmrcate_array_anno$dist_to_next)]
+t = -77.616, df = 774073, p-value &lt; 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -3593.424 -3416.412
+sample estimates:
+mean of x mean of y 
+ 107.5599 3612.4779 </code></pre>
+<ul>
+<li>2 groups are significantly different</li>
+<li>sequencing has much smaller gaps between tested CpGs</li>
+</ul>
+<div
+id="distribution-of-tested-cpgs-among-cpg-annotations---islands-etc"
+class="section level2">
+<h2>Distribution of tested CpGs among CpG annotations - islands etc</h2>
+</div>
+</div>
+<div id="array-1" class="section level1">
+<h1>array</h1>
+<ul>
+<li>relationship to CpG annotation is included in the EPIC annotation
+file/package</li>
+</ul>
+<pre class="r"><code>anno_array &lt;- data.frame(anno_array)
+head(anno_array)</code></pre>
+<pre><code>  seqnames start width  chr   pos strand       Name AddressA AddressB
+1     chr1 10525     1 chr1 10525      + cg14817997 21611527         
+2     chr1 10848     1 chr1 10848      - cg26928153 91693541 47784201
+3     chr1 10850     1 chr1 10850      - cg16269199 82663207  3701821
+4     chr1 15865     1 chr1 15865      + cg13869341  2665852 39757192
+5     chr1 18827     1 chr1 18827      + cg14008030 84794291         
+6     chr1 29407     1 chr1 29407      + cg12045430 77731415  4799528
+                                           ProbeSeqA
+1 AAACRAAACTACRTTATCCTCTACACAAATTTCRATAATACTCTAAAAAC
+2 ACACATACTAACACATCAAAATAAAAACATAACACAAACACAAAAAAACA
+3 ACATACTAACACATCAAAATAAAAACATAACACAAACACAAAAAAACACA
+4 CCAATAACTAACCACTCTACTAAAATCCATCCACCAAACTAAAAACATCA
+5 ACTCRAAATTTACTCAATAAACCRTTCAATATATACAAAAACAATTCCCC
+6 AAAAAAAACACAATAAAAAACAAACAACAACATTAAAACCCAAAAACACA
+                                           ProbeSeqB Type NextBase Color
+1                                                      II               
+2 ACACATACTAACGCGTCGAAATAAAAACGTAACGCAAACGCAAAAAAACG    I        C   Grn
+3 ACATACTAACGCGTCGAAATAAAAACGTAACGCAAACGCAAAAAAACGCG    I        C   Grn
+4 CCGATAACTAACCACTCTACTAAAATCCATCCGCCAAACTAAAAACATCG    I        A   Red
+5                                                      II               
+6 GAAAAAAACGCAATAAAAAACGAACGACGACGTTAAAACCCGAAAACGCG    I        A   Red
+  Probe_rs Probe_maf CpG_rs CpG_maf SBE_rs SBE_maf     Islands_Name
+1     &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA                 
+2     &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA                 
+3     &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA                 
+4     &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA                 
+5     &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA                 
+6     &lt;NA&gt;        NA   &lt;NA&gt;      NA   &lt;NA&gt;      NA chr1:28735-29810
+  Relation_to_Island
+1            OpenSea
+2            OpenSea
+3            OpenSea
+4            OpenSea
+5            OpenSea
+6             Island
+                                                                                                              Forward_Sequence
+1 CCCTCGCGGTACCCTCAGCCGGCCCGCCCGCCCGGGTCTGACCTGAGGAGAACTGTGCTC[CG]CCTTCAGAGTACCACCGAAATCTGTGCAGAGGACAACGCAGCTCCGCCCTCGCGGTGCTC
+2 GCGCAGGCGCAGACACATGCTAGCGCGTCGGGGTGGAGGCGTGGCGCAGGCGCAGAGAGG[CG]CGCCGCGCCGGCGCAGGCGCAGAGACACATGCTACCGCGTCCAGGGGTGGAGGCGTGGCG
+3 GCAGGCGCAGACACATGCTAGCGCGTCGGGGTGGAGGCGTGGCGCAGGCGCAGAGAGGCG[CG]CCGCGCCGGCGCAGGCGCAGAGACACATGCTACCGCGTCCAGGGGTGGAGGCGTGGCGCA
+4 GCTCCTTCTGCTGCTGCTTCTCCAGCTTTCGCTCCTTCATGCTGCGCAGCTTGGCCTTGC[CG]ATGCCCCCAGCTTGGCGGATGGACTCTAGCAGAGTGGCCAGCCACCGGAGGGGTCAACCA
+5 ACGGAGACCGGAGGCTGAGACTGGCAAGGCTGGACCTGAGTGTCGTCACCTAAATTCAGA[CG]GGGAACTGCCCCTGCACATACTGAACGGCTCACTGAGCAAACCCCGAGTCCCGACCACCG
+6 CGCCGCCGCTTCCGCTCTGCCGGAGCCGCTGGGTCCTAGCCCCGCCGCCCCCAGTCCGCC[CG]CGCCTCCGGGTCCTAACGCCGCCGCTCGCCCTCCACTGCGCCCTCCCCGAGCGCGGCTCC
+                                           SourceSeq UCSC_RefGene_Name
+1 CGCCTTCAGAGTACCACCGAAATCTGTGCAGAGGACAACGCAGCTCCGCC           DDX11L1
+2 ACACATGCTAGCGCGTCGGGGTGGAGGCGTGGCGCAGGCGCAGAGAGGCG           DDX11L1
+3 ACATGCTAGCGCGTCGGGGTGGAGGCGTGGCGCAGGCGCAGAGAGGCGCG           DDX11L1
+4 CCGGTGGCTGGCCACTCTGCTAGAGTCCATCCGCCAAGCTGGGGGCATCG            WASH5P
+5 CGGGGAACTGCCCCTGCACATACTGAACGGCTCACTGAGCAAACCCCGAG            WASH5P
+6 GGGGAGGGCGCAGTGGAGGGCGAGCGGCGGCGTTAGGACCCGGAGGCGCG            WASH5P
+  UCSC_RefGene_Accession UCSC_RefGene_Group Phantom4_Enhancers
+1              NR_046018            TSS1500                   
+2              NR_046018            TSS1500                   
+3              NR_046018            TSS1500                   
+4              NR_024540               Body                   
+5              NR_024540               Body                   
+6              NR_024540             TSS200                   
+  Phantom5_Enhancers DMR X450k_Enhancer    HMM_Island Regulatory_Feature_Name
+1                                          1:484-1103                        
+2                                          1:484-1103                        
+3                                          1:484-1103                        
+4                                                                            
+5                                                                            
+6                                       1:18599-19663                        
+  Regulatory_Feature_Group             GencodeBasicV12_NAME
+1                                                   DDX11L1
+2                                                   DDX11L1
+3                                                   DDX11L1
+4                                                          
+5                                                          
+6                          MIR1302-11;MIR1302-11;MIR1302-11
+                              GencodeBasicV12_Accession  GencodeBasicV12_Group
+1                                     ENST00000456328.2                TSS1500
+2                                     ENST00000456328.2                TSS1500
+3                                     ENST00000456328.2                TSS1500
+4                                                                             
+5                                                                             
+6 ENST00000469289.1;ENST00000408384.1;ENST00000473358.1 TSS1500;TSS1500;TSS200
+               GencodeCompV12_NAME
+1                          DDX11L1
+2                          DDX11L1
+3                          DDX11L1
+4                                 
+5                                 
+6 MIR1302-11;MIR1302-11;MIR1302-11
+                               GencodeCompV12_Accession   GencodeCompV12_Group
+1                                     ENST00000456328.2                TSS1500
+2                                     ENST00000456328.2                TSS1500
+3                                     ENST00000456328.2                TSS1500
+4                                                                             
+5                                                                             
+6 ENST00000469289.1;ENST00000408384.1;ENST00000473358.1 TSS1500;TSS1500;TSS200
+  DNase_Hypersensitivity_NAME DNase_Hypersensitivity_Evidence_Count
+1            chr1:10345-10590                                     3
+2                                                                  
+3                                                                  
+4                                                                  
+5                                                                  
+6                                                                  
+  OpenChromatin_NAME OpenChromatin_Evidence_Count TFBS_NAME TFBS_Evidence_Count
+1                                                                              
+2                                                                              
+3                                                                              
+4                                                                              
+5                                                                              
+6                                                                              
+  Methyl27_Loci Methyl450_Loci Random_Loci   position dist_to_next
+1                                          chr1-10525          323
+2                                          chr1-10848            2
+3                                          chr1-10850         5015
+4                         TRUE             chr1-15865         2962
+5                         TRUE             chr1-18827        10580
+6                         TRUE             chr1-29407           18</code></pre>
+<pre class="r"><code>dmrcate_array_anno &lt;- data.frame(dmrcate_array_anno)
+dmrcate_array_anno$cpg_feature &lt;- anno_array[match(dmrcate_array_anno$cg_id, anno_array$Name), &quot;Relation_to_Island&quot;]</code></pre>
+<pre class="r"><code>dmrcate_array_anno %&gt;% group_by(cpg_feature) %&gt;% summarise(n=n()) %&gt;% ungroup() %&gt;% mutate(total = sum(n), prop = n/sum(n))</code></pre>
+<pre><code># A tibble: 6 × 4
+  cpg_feature      n  total   prop
+  &lt;chr&gt;        &lt;int&gt;  &lt;int&gt;  &lt;dbl&gt;
+1 Island      146893 772927 0.190 
+2 N_Shelf      27662 772927 0.0358
+3 N_Shore      75452 772927 0.0976
+4 OpenSea     432880 772927 0.560 
+5 S_Shelf      25645 772927 0.0332
+6 S_Shore      64395 772927 0.0833</code></pre>
+<pre class="r"><code>dmrcate_array_anno %&gt;%
+  ggplot(aes(x = cpg_feature, fill = cpg_feature)) +
+  geom_bar() +
+  theme(legend.position = &quot;none&quot;)</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" />
+* so far I’ve just been comparing array and seq * not diff between
+tested and non tested * i still think some kind of chi-square - because
+I want to compare how the proportions change/distributions change * dist
+to next would be a z test I think - because the tested is a subgroup of
+the all</p>
+<pre class="r"><code>dt &lt;- cbind(dmrcate_array_anno %&gt;% group_by(cpg_feature) %&gt;% summarise(tested_n=n()), 
+      all_n = anno_array %&gt;% group_by(Relation_to_Island) %&gt;% summarise(all_n=n()) %&gt;% .$all_n)
+rownames(dt) &lt;- dt$cpg_feature
+dt &lt;- dt[,2:3]
+dt</code></pre>
+<pre><code>        tested_n  all_n
+Island    146893 161441
+N_Shelf    27662  31991
+N_Shore    75452  83364
+OpenSea   432880 488181
+S_Shelf    25645  29700
+S_Shore    64395  71182</code></pre>
+<pre class="r"><code>balloonplot(t(as.table(as.matrix(dt))),
+      main = &quot;Array CpG features&quot;, xlab = &quot;&quot;, ylab = &quot;&quot;, label = FALSE, show.margins = FALSE)</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" />
+* frequencies appear to be very similar</p>
+</div>
+<div id="sequencing" class="section level1">
+<h1>sequencing</h1>
+<pre class="r"><code>anno_cpg &lt;- build_annotations(genome=&quot;hg19&quot;, annotations = &quot;hg19_cpgs&quot;)</code></pre>
+<pre><code>Building CpG islands...</code></pre>
+<pre><code>loading from cache</code></pre>
+<pre><code>Building CpG shores...</code></pre>
+<pre><code>Building CpG shelves...</code></pre>
+<pre><code>Building inter-CpG-islands...</code></pre>
+<pre class="r"><code>anno_cpg &lt;- anno_cpg %&gt;% data.frame()
+
+overlap_feature &lt;- find_overlaps(as_granges(wgbs_counts), as_granges(anno_cpg)) %&gt;% data.frame() 
+dmrcate_seq_anno &lt;- find_overlaps(as_granges(dmrcate_seq_anno), as_granges(anno_cpg)) %&gt;% data.frame()</code></pre>
+<pre class="r"><code>dt &lt;- cbind(dmrcate_seq_anno %&gt;% group_by(type) %&gt;% summarise(tested_n=n()), 
+      all_n = overlap_feature %&gt;% group_by(type) %&gt;% summarise(all_n=n()) %&gt;% .$all_n)
+rownames(dt) &lt;- dt$type
+dt &lt;- dt[,2:3]
+dt</code></pre>
+<pre><code>                 tested_n    all_n
+hg19_cpg_inter   21148264 22921402
+hg19_cpg_islands  1874061  2089538
+hg19_cpg_shelves  1108798  1185270
+hg19_cpg_shores   1864589  2022366</code></pre>
+<pre class="r"><code>balloonplot(t(as.table(as.matrix(dt))),
+      main = &quot;Seq CpG features&quot;, xlab = &quot;&quot;, ylab = &quot;&quot;, label = FALSE, show.margins = FALSE)</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-25-1.png" width="672" style="display: block; margin: auto;" />
+* similar frequencies</p>
+</div>
+<div id="seq-and-array" class="section level1">
+<h1>Seq and Array</h1>
+<ul>
+<li>For Array, OpenSea is Inter, and combine N and S shelves and
+shores</li>
+</ul>
+<pre class="r"><code>dt &lt;- cbind(dmrcate_array_anno %&gt;% group_by(cpg_feature) %&gt;% summarise(array_test=n()), 
+      array_all = anno_array %&gt;% group_by(Relation_to_Island) %&gt;% summarise(all_n=n()) %&gt;% .$all_n)
+dt &lt;- rbind(dt, c(cpg_feature = &quot;shelf&quot;, array_test = dt[2,2] + dt[5,2], array_all = dt[2,3] + dt[5,3]),
+      c(cpg_feature = &quot;shore&quot;, array_test = dt[3,2] + dt[6,2], array_all = dt[3,3] + dt[6,3])) %&gt;% .[c(4,1,7,8),]
+rownames(dt) &lt;- NULL
+dt &lt;- cbind(cbind(dmrcate_seq_anno %&gt;% group_by(type) %&gt;% summarise(seq_test=n()), 
+      seq_all = overlap_feature %&gt;% group_by(type) %&gt;% summarise(all_n=n()) %&gt;% .$all_n), dt)
+rownames(dt) &lt;- dt$type
+dt &lt;- dt[,c(2,3,5,6)]
+dt</code></pre>
+<pre><code>                 seq_test  seq_all array_test array_all
+hg19_cpg_inter   21148264 22921402     432880    488181
+hg19_cpg_islands  1874061  2089538     146893    161441
+hg19_cpg_shelves  1108798  1185270      53307     61691
+hg19_cpg_shores   1864589  2022366     139847    154546</code></pre>
+<pre class="r"><code>balloonplot(t(as.table(as.matrix(dt))),
+      main = &quot;CpG features&quot;, xlab = &quot;&quot;, ylab = &quot;&quot;, label = FALSE, show.margins = FALSE)</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-27-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>dmrcate_array_anno %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = cpg_feature)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-28-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>anno_array %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = Relation_to_Island)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 24 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-28-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>dmrcate_seq_anno %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = type)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 22 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-29-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>overlap_feature %&gt;%
+  ggplot(aes(x = log2(dist_to_next), colour = type)) +
+  geom_density()</code></pre>
+<pre><code>Warning: Removed 25 rows containing non-finite outside the scale range
+(`stat_density()`).</code></pre>
+<p><img src="figure/02_cpgAvailVsTested.Rmd/unnamed-chunk-29-2.png" width="672" style="display: block; margin: auto;" />
+* CpGs in islands have a shorter distance between them</p>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.4.2 (2024-10-31)
+Platform: aarch64-apple-darwin20
+Running under: macOS Sequoia 15.2
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.0
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+time zone: Australia/Melbourne
+tzcode source: internal
+
+attached base packages:
+[1] parallel  stats4    stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] annotatr_1.30.0                                    
+ [2] IlluminaHumanMethylationEPICmanifest_0.3.0         
+ [3] IlluminaHumanMethylationEPICanno.ilm10b4.hg19_0.6.0
+ [4] minfi_1.50.0                                       
+ [5] bumphunter_1.46.0                                  
+ [6] locfit_1.5-9.11                                    
+ [7] iterators_1.0.14                                   
+ [8] foreach_1.5.2                                      
+ [9] Biostrings_2.72.1                                  
+[10] XVector_0.44.0                                     
+[11] SummarizedExperiment_1.34.0                        
+[12] Biobase_2.64.0                                     
+[13] MatrixGenerics_1.16.0                              
+[14] matrixStats_1.5.0                                  
+[15] gplots_3.2.0                                       
+[16] ggVennDiagram_1.5.2                                
+[17] BSDA_1.2.2                                         
+[18] lattice_0.22-6                                     
+[19] ggplot2_3.5.1                                      
+[20] dplyr_1.1.4                                        
+[21] plyranges_1.24.0                                   
+[22] GenomicRanges_1.56.2                               
+[23] GenomeInfoDb_1.40.1                                
+[24] IRanges_2.38.1                                     
+[25] S4Vectors_0.42.1                                   
+[26] BiocGenerics_0.50.0                                
+
+loaded via a namespace (and not attached):
+  [1] splines_4.4.2             later_1.4.1              
+  [3] BiocIO_1.14.0             bitops_1.0-9             
+  [5] filelock_1.0.3            tibble_3.2.1             
+  [7] preprocessCore_1.66.0     XML_3.99-0.18            
+  [9] lifecycle_1.0.4           rprojroot_2.0.4          
+ [11] MASS_7.3-61               base64_2.0.2             
+ [13] scrime_1.3.5              magrittr_2.0.3           
+ [15] limma_3.60.6              sass_0.4.9               
+ [17] rmarkdown_2.29            jquerylib_0.1.4          
+ [19] yaml_2.3.10               httpuv_1.6.15            
+ [21] doRNG_1.8.6.1             askpass_1.2.1            
+ [23] DBI_1.2.3                 RColorBrewer_1.1-3       
+ [25] abind_1.4-8               zlibbioc_1.50.0          
+ [27] quadprog_1.5-8            purrr_1.0.4              
+ [29] RCurl_1.98-1.16           rappdirs_0.3.3           
+ [31] git2r_0.35.0              GenomeInfoDbData_1.2.12  
+ [33] genefilter_1.86.0         annotate_1.82.0          
+ [35] DelayedMatrixStats_1.26.0 codetools_0.2-20         
+ [37] DelayedArray_0.30.1       xml2_1.3.6               
+ [39] tidyselect_1.2.1          farver_2.1.2             
+ [41] UCSC.utils_1.0.0          beanplot_1.3.1           
+ [43] BiocFileCache_2.12.0      illuminaio_0.46.0        
+ [45] GenomicAlignments_1.40.0  jsonlite_1.8.9           
+ [47] multtest_2.60.0           e1071_1.7-16             
+ [49] survival_3.7-0            tools_4.4.2              
+ [51] Rcpp_1.0.14               glue_1.8.0               
+ [53] SparseArray_1.4.8         xfun_0.50                
+ [55] HDF5Array_1.32.1          withr_3.0.2              
+ [57] BiocManager_1.30.25       fastmap_1.2.0            
+ [59] rhdf5filters_1.16.0       openssl_2.3.2            
+ [61] caTools_1.18.3            digest_0.6.37            
+ [63] mime_0.12                 R6_2.5.1                 
+ [65] colorspace_2.1-1          gtools_3.9.5             
+ [67] RSQLite_2.3.9             utf8_1.2.4               
+ [69] tidyr_1.3.1               generics_0.1.3           
+ [71] data.table_1.16.4         rtracklayer_1.64.0       
+ [73] class_7.3-22              httr_1.4.7               
+ [75] S4Arrays_1.4.1            whisker_0.4.1            
+ [77] regioneR_1.36.0           pkgconfig_2.0.3          
+ [79] gtable_0.3.6              blob_1.2.4               
+ [81] workflowr_1.7.1           siggenes_1.78.0          
+ [83] htmltools_0.5.8.1         scales_1.3.0             
+ [85] png_0.1-8                 knitr_1.49               
+ [87] rstudioapi_0.17.1         reshape2_1.4.4           
+ [89] tzdb_0.4.0                rjson_0.2.23             
+ [91] nlme_3.1-166              curl_6.2.0               
+ [93] proxy_0.4-27              cachem_1.1.0             
+ [95] rhdf5_2.48.0              stringr_1.5.1            
+ [97] BiocVersion_3.19.1        KernSmooth_2.23-24       
+ [99] AnnotationDbi_1.66.0      restfulr_0.0.15          
+[101] GEOquery_2.72.0           pillar_1.10.1            
+[103] grid_4.4.2                reshape_0.8.9            
+[105] vctrs_0.6.5               promises_1.3.2           
+[107] dbplyr_2.5.0              xtable_1.8-4             
+[109] evaluate_1.0.3            readr_2.1.5              
+[111] GenomicFeatures_1.56.0    cli_3.6.3                
+[113] compiler_4.4.2            Rsamtools_2.20.0         
+[115] rlang_1.1.5               crayon_1.5.3             
+[117] rngtools_1.5.2            labeling_0.4.3           
+[119] nor1mix_1.3-3             mclust_6.1.1             
+[121] plyr_1.8.9                fs_1.6.5                 
+[123] stringi_1.8.4             BiocParallel_1.38.0      
+[125] munsell_0.5.1             Matrix_1.7-1             
+[127] BSgenome_1.72.0           hms_1.1.3                
+[129] sparseMatrixStats_1.16.0  bit64_4.6.0-1            
+[131] Rhdf5lib_1.26.0           KEGGREST_1.44.1          
+[133] statmod_1.5.0             AnnotationHub_3.12.0     
+[135] memoise_2.0.1             bslib_0.9.0              
+[137] bit_4.5.0.1              </code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
