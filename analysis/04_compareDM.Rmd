@@ -138,10 +138,6 @@ compare_dm <- compare_dm %>% mutate(array_dmrcate_filt = ifelse(pos %in% overlap
 
 
 ```{r}
-compare_dm %>% filter(seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| seq_edger_pos != FALSE| array_dmrcate_filt != FALSE| array_minfi_filt != FALSE)
-```
-
-```{r}
 upset(filter(compare_dm, seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| seq_edger_pos != FALSE| array_dmrcate_filt != FALSE| array_minfi_filt != FALSE), intersect = colnames(compare_dm)[5:9])
 ```
 ```{r}
