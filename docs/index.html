@@ -310,7 +310,7 @@ class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2025-04-08
+<strong>Last updated:</strong> 2025-04-29
 </p>
 <p>
 <strong>Checks:</strong> <span
@@ -441,15 +441,15 @@ project makes it easier to run your code on other machines.</p>
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree892c07d325145306db0021627dee883cc59b2498targetblank892c07da">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree4b703902def2c8e2fc4bcd10971ee1bab0719e57targetblank4b70390a">
 <span class="glyphicon glyphicon-ok text-success"
 aria-hidden="true"></span> <strong>Repository version:</strong>
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/892c07d325145306db0021627dee883cc59b2498" target="_blank">892c07d</a>
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/4b703902def2c8e2fc4bcd10971ee1bab0719e57" target="_blank">4b70390</a>
 </a>
 </p>
 </div>
 <div
-id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree892c07d325145306db0021627dee883cc59b2498targetblank892c07da"
+id="strongRepositoryversionstrongahrefhttpsgithubcomcaitlinpagegstmethylseqtree4b703902def2c8e2fc4bcd10971ee1bab0719e57targetblank4b70390a"
 class="panel-collapse collapse">
 <div class="panel-body">
 <p>
@@ -459,7 +459,7 @@ reproducibility.
 </p>
 <p>
 The results in this page were generated with repository version
-<a href="https://github.com/caitlinpage/gst_methylseq/tree/892c07d325145306db0021627dee883cc59b2498" target="_blank">892c07d</a>.
+<a href="https://github.com/caitlinpage/gst_methylseq/tree/4b703902def2c8e2fc4bcd10971ee1bab0719e57" target="_blank">4b70390</a>.
 See the <em>Past versions</em> tab to see a history of the changes made
 to the R Markdown and HTML files.
 </p>
@@ -482,32 +482,27 @@ Ignored files:
     Ignored:    analysis/mc_h1/
     Ignored:    analysis/myEnvironment.RData
     Ignored:    data/cell_line_wgbs/
-    Ignored:    data/comp_bio_challenge/
     Ignored:    data/gene_sets/
     Ignored:    data/long_read/
     Ignored:    data/microarray/
     Ignored:    data/wgbs/
+    Ignored:    data/wgbs_2/
     Ignored:    output/figures/
     Ignored:    renv/library/
     Ignored:    renv/staging/
 
 Untracked files:
-    Untracked:  analysis/05_vizResults.Rmd
     Untracked:  analysis/clusterlog.txt
     Untracked:  code/ChatGPT_translate.html
     Untracked:  code/ChatGPT_translate_files/
+    Untracked:  code/background.R
 
 Unstaged changes:
     Modified:   .gitignore
     Modified:   2_ontology_bias.Rproj
     Modified:   _workflowr.yml
-    Modified:   analysis/00_exploreCpGGST.Rmd
+    Modified:   analysis/00_datasets.Rmd
     Modified:   analysis/03_genesToGST.Rmd
-    Modified:   analysis/03_howToGST.Rmd
-    Modified:   analysis/04a_compareGSTResults.Rmd
-    Modified:   analysis/06_decisionSummary.Rmd
-    Modified:   code/mmGST.R
-    Modified:   code/runSeqDmMethods.R
     Modified:   renv.lock
     Modified:   renv/.gitignore
     Modified:   renv/activate.R
@@ -555,6 +550,57 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/4b703902def2c8e2fc4bcd10971ee1bab0719e57/analysis/index.Rmd" target="_blank">4b70390</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-29
+</td>
+<td>
+wflow_publish("index.Rmd")
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/caitlinpage/gst_methylseq/blob/d090bc2192df62ef6d57ed9bfac88cf51749d21e/analysis/index.Rmd" target="_blank">d090bc2</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-23
+</td>
+<td>
+update
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/caitlinpage/gst_methylseq/3c54b6aa50ae2cf0d91d2774a391e080a08a6da8/docs/index.html" target="_blank">3c54b6a</a>
+</td>
+<td>
+Caitlin Page
+</td>
+<td>
+2025-04-08
+</td>
+<td>
+Build site.
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -898,7 +944,8 @@ sites</a></p></li>
 <ol style="list-style-type: lower-alpha">
 <li><p><a
 href="00_differentialMethylationArray.html">Microarray</a></p></li>
-<li><p>Sequencing *tbd 00_differentialMethylationSequencing</p></li>
+<li><p><a
+href="00_differentialMethylationSequencing.html">Sequencing</a></p></li>
 <li><p>Compare CpG level and DMR results</p></li>
 <li><p>Compare microarray and sequencing DMRcate results</p></li>
 </ol>
@@ -934,7 +981,7 @@ methods</a></p></li>
 <p><a href="03a_developGeneSetTest.Rmd">Develop gene set testing method
 for methylation sequencing</a></p>
 <ol start="4" style="list-style-type: decimal">
-<li><p><a href="03_runGST.html">Evaludate gene set testing method for
+<li><p><a href="03_runGST.html">Evaluate gene set testing method for
 methylation sequencing</a></p></li>
 <li><p>Applying gene set testing method to different data sets</p></li>
 </ol>
