@@ -7,6 +7,12 @@ editor_options:
   chunk_output_type: inline
 ---
 
+## Introduction
+Comparison of differential methylation results.
+
+
+## Packages
+
 ```{r}
 library(plyranges)
 library(dplyr)
@@ -16,36 +22,105 @@ library(ComplexUpset)
 ```
 
 
-## Introduction
+## Pre-processed files
 ```{r}
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+#sequencing
 dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
+dmrcate_seq_anno <- dmrcate_seq_anno@ranges %>% data.frame() %>%
+  mutate(pos = paste0(seqnames, "-", start))
+dmrcate_seq_anno <- dmrcate_seq_anno %>% .[order(.$ind.fdr),] %>% mutate(rank = 1:n())
+
 dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds")
+dmrcate_seq_dmr <- dmrcate_seq_dmr %>% data.frame()
 
-bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds") # we want bsseq_dmrs_filt # abs(areaStat) > 100
+bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds") 
 bsseq_res <- readRDS("../output/bsseq_res.rds")
-```
 
-```{r}
 seq_edge_res <- readRDS("../output/seq_edge_res.rds")
+
+#array
+DMPs <- readRDS("../output/array_dmps.rds") 
+DMPs$pos <- paste0(DMPs$seqnames, "-", DMPs$start)
+
+dmrcate_array_dmr <- readRDS("../output/dmrcate_array_dmr.rds")
+dmrcate_array_dmr <- dmrcate_array_dmr %>% data.frame()
+
+dmrcate_array_anno <- readRDS("../output/dmrcate_array_anno.rds")
+dmrcate_array_anno <- dmrcate_array_anno@ranges %>% data.frame() %>%
+  mutate(pos = paste0(seqnames, "-", start)) %>% .[order(.$ind.fdr),] %>% mutate(rank = 1:n())
+#dmrcate_array_anno <- dmrcate_array_anno %>% mutate(cg_id = anno_array[match(.$pos, anno_array$position), "Name"])
 ```
 
+
+## Filtering parameters
+
+# minfi
 ```{r}
-dmrcate_array_anno
-dmrcate_seq_anno$pos <- paste0(dmrcate_seq_anno$seqnames, "-", dmrcate_seq_anno$start)
+head(DMPs)
 ```
 ```{r}
-bsseq_dmrs_filt
+nrow(DMPs)
 ```
+* recommended filtering parameter for GST is maximum of 10k CpGs.
+* using more results in more noise - because you end up identifying every gene as significant.
+
+# dmrcate array
+```{r}
+head(dmrcate_array_dmr)
+```
+
 ```{r}
 dmrcate_array_dmr_filt <- dmrcate_array_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
-DMPs$pos <- paste0(DMPs$seqnames, "-", DMPs$start)
+c(array = nrow(dmrcate_array_dmr), filt = nrow(dmrcate_array_dmr_filt))
 ```
+
+Sum of CpGs across those DMRs
+```{r}
+c(array = sum(dmrcate_array_dmr$no.cpgs), filt = sum(dmrcate_array_dmr$no.cpgs))
+```
+
+# bsseq
+```{r}
+head(bsseq_dmrs)
+```
+
+```{r}
+bsseq_dmrs_filt <- bsseq_dmrs %>% filter(abs(areaStat) > 100)
+c(dmrs = nrow(bsseq_dmrs), filt = nrow(bsseq_dmrs_filt))
+```
+
+Sum of CpGs across DMRs
+```{r}
+c(dmrs = sum(bsseq_dmrs$n), filt = sum(bsseq_dmrs_filt$n))
+```
+
+
+# dmrcate seq
+```{r}
+head(dmrcate_seq_dmr)
+```
+
+```{r}
+c(dmrs = nrow(dmrcate_seq_dmr), `5k` = 5000, `1k` = 1000)
+```
+```{r}
+c(dmrs = sum(dmrcate_seq_dmr$no.cpgs), `5k` = sum(dmrcate_seq_dmr[1:5000,"no.cpgs"]), 
+  `1k` = sum(dmrcate_seq_dmr[1:1000,"no.cpgs"]))
+```
+
+
+# edgeR
+```{r}
+head(seq_edge_res)
+```
+
+
+
+## compare dm methods
 
 ```{r}
 compare_dm <- wgbs_counts[,1:4]
-```
-```{r}
-rownames(seq_edge_res) %in% wgbs_counts$pos %>% summary()
 ```
 
 ```{r}
@@ -61,19 +136,7 @@ compare_dm <- compare_dm %>% mutate(array_dmrcate_filt = ifelse(pos %in% overlap
                                     array_minfi_filt = ifelse(pos %in% DMPs[1:10000,]$pos, TRUE, FALSE))
 ```
 
-```{r}
-dmrcate_seq_dmr
-```
-```{r}
-dmrcate_seq_dmr %>% filter(no.cpgs > 3, abs(meandiff) > 0.1)
-```
 
-```{r}
-compare_dm 
-```
-```{r}
-compare_dm[1:10,c(1,5:9)] %>% t(.) %>% data.frame()
-```
 ```{r}
 compare_dm %>% filter(seq_dmrcate_dmr_5k != FALSE| bsseq_dmr_area100 != FALSE| seq_edger_pos != FALSE| array_dmrcate_filt != FALSE| array_minfi_filt != FALSE)
 ```
@@ -113,30 +176,12 @@ rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
   geom_density()
 ```
 
-```{r}
-dmrcate_seq_dmr
-```
 
-```{r}
-compare_dm
-```
 
 ```{r}
 upset(compare_dm[1:100000,], intersect = colnames(compare_dm)[5:9])
 ```
 
-```{r}
-overlap_dmr
-```
-
-
-```{r}
-dmrcate_seq_dmr <- dmrcate_seq_dmr %>% data.frame()
-dmrcate_seq_anno <- dmrcate_seq_anno@ranges %>% data.frame()
-```
-```{r}
-dmrcate_seq_anno <- dmrcate_seq_anno %>% .[order(.$ind.fdr),] %>% mutate(rank = 1:n())
-```
 
 
 * ditch the overlapping DMRs for a minute because the venn diagrams are always ugly and they get messy
@@ -178,9 +223,7 @@ ggVennDiagram(list(bsseq = filter(cg_in_dmr, bsseq != TRUE)$pos, dmrcate = filte
                    array_dmr = filter(cg_in_dmr, dmrcate_array != TRUE)$pos))
 ```
 * this doesn't acknowledge that the array does not cover all the sites seq does - it would just add to the FALSE
-```{r}
-cg_in_dmr
-```
+
 
 
 
@@ -200,12 +243,6 @@ ggVennDiagram(list(seq_rank = filter(dmrcate_seq_anno, is.sig == TRUE)$rank, ove
 
 
 ```{r}
-dmrcate_array_anno
-dmrcate_seq_anno
-```
-
-```{r}
-dmrcate_array_dmr
 dmrcate_seq_dmr$num <- 1:nrow(dmrcate_seq_dmr)
 ```
 
