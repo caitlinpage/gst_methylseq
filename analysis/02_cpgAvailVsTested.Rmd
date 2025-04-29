@@ -9,13 +9,18 @@ editor_options:
 
 ## Introduction
 
+Not all of the available CpGs will be utilised in the DM testing procedure - some will be filtered out because they have no/low counts.
 
-* problem is I have been getting my number of CpG per gene from the counts overlap for sequencing
-* which does not necessarily reflect tested CpGs
+[Wijesooria et al., 2022](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009935) highlights the importance of using a correct background gene set in regards to gene set testing analysis. This means using the only the genes that were testing in the differential analysis, as opposed to all possible genes.
 
-* copied from 00_exploreCpGDistrib
-* actually I want to copy it all over - because it did a lot on tested stuff
-* and I want to do a bit that's just looking at the positions - pre-testing
+This will be relevant to us in both the genes input as the background - making sure that they are only included if they contain CpGs that were tested, and in the bias correction - making sure that only CpGs used in the differential testing are provided as the bias.
+
+In my early analysis, I did not realise this was an important feature, and had been getting my bias (number of CpGs) by merely overlapping the CpGs to a gene.
+Here, I wish to do some analysis to understand how using only the tested CpGs changes the results, and the relationships between them all.
+
+
+## Packages
+
 ```{r}
 library(plyranges)
 library(dplyr)
@@ -30,24 +35,30 @@ library(IlluminaHumanMethylationEPICmanifest)
 library(annotatr)
 ```
 
-## Introduction
+## Pre-processed files
 ```{r}
 wgbs_counts <- readRDS("../output/wgbs_counts.rds")
 anno_array <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
-anno_array <- anno_array %>% data.frame() %>% mutate(seqnames = chr, start = pos, width = 1) %>% relocate(c(seqnames, start, width))
+anno_array <- anno_array %>% data.frame() %>% 
+  mutate(seqnames = chr, start = pos, width = 1,
+         position = paste0(chr, "-", pos)) %>% relocate(c(seqnames, start, width))
 
-DMPs <- readRDS("../output/DMPs.rds") # bsseq res
+DMPs <- readRDS("../output/array_dmps.rds") 
+DMPs$pos <- paste0(DMPs$seqnames, "-", DMPs$start)
 dmrcate_array_anno <- readRDS("../output/dmrcate_array_anno.rds")
-dmrcate_array_anno <- dmrcate_array_annoranges %>% data.frame() %>%
+dmrcate_array_anno <- dmrcate_array_anno@ranges %>% data.frame() %>%
   mutate(pos = paste0(seqnames, "-", start))
+dmrcate_array_anno <- dmrcate_array_anno %>% 
+  mutate(cg_id = anno_array[match(.$pos, anno_array$position), "Name"])
 
 bsseq_res <- readRDS("../output/bsseq_res.rds")
 dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
 dmrcate_seq_anno <- dmrcate_seq_anno@ranges %>% data.frame() %>%
   mutate(pos = paste0(seqnames, "-", start))
 
-biomart_genes <- readRDS("../output/biomart_genes.rds")
+biomart_genes <- readRDS("../output/genes_biomart.rds")
 ```
+
 
 
 # overlap
@@ -69,6 +80,8 @@ ggVennDiagram(list_venn)
 
 
 ## Compare distance between tested sites
+Q: Are there significant differences (on average) for the distance between sites depending on if they were tested or not?
+
 ```{r}
 dmrcate_seq_anno <- dmrcate_seq_anno %>% .[order(.$seqnames, .$start),] %>%
   group_by(seqnames) %>% mutate(dist_to_next = lead(start) - start) %>% ungroup()
@@ -279,354 +292,5 @@ overlap_feature %>%
 * CpGs in islands have a shorter distance between them
 
 
-## Gene features
-```{r}
-# Build the annotations (a single GRanges object)
-anno_gene <- build_annotations(genome = 'hg19', annotations = c('hg19_basicgenes', 'hg19_genes_intergenic',
-    'hg19_genes_intronexonboundaries'))
-```
-```{r}
-anno_gene %>% data.frame() %>% distinct(symbol)
-anno_gene %>% data.frame() %>% distinct(type)
-```
-
-```{r}
-#annotate_regions(as_granges(tested_seq), anno_gene) %>% data.frame() %>% .[,!colnames(.) %in% c("annot.id.1", "annot_tx_id.1", "annot.gene_id.1")]
-```
-** come back to this
-
-######
-```{r}
-unique(bsseq_res$seqnames)
-annots_gene <- annots_gene %>% data.frame() %>% filter(seqnames %in% unique(bseq_all_res$seqnames)) %>% as_granges()
-```
-
-```{r}
-anno_cpg_by_gene <- annotate_regions(as_granges(bsseq_res), annots_gene) %>% data.frame()
-```
-
-```{r}
-annotate_regions(as_granges(bsseq_dmrs), annots_gene) %>% data.frame()
-```
-```{r}
-bseq_dmrs_genes <- annotate_regions(as_granges(bseq_dmrs), annots_gene) %>% data.frame()
-```
-
-```{r}
-annotate_regions(as_granges(bseq_dmrs), annots_gene) %>% data.frame() %>% group_by(bseq_rank, annot.symbol, annot.type) %>% summarise(n=n())
-```
-
-```{r}
-bseq_dmrs_genes %>% group_by(annot.type) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
-```
-- ok what am i looking at??
-- gotta say i don't get what the 1-5kb thing is
-- it's 1-5kb upstream of TSS
-
-
-- ok so where are the dmrs in genes
-- i feel like i want a level of is it within etc
-
-- wait i need the genes and cpg info
-- not the cpg sites
-- and then i'll also know some more info about density
-- but bonus would be adding num cpgs in the cpg info
-
-```{r}
-find_overlaps(annotations, annots_gene) %>% data.frame()
-```
-```{r}
-find_overlaps(annotations, annots_gene) %>% data.frame() %>% group_by(type.y, type.x) %>% summarise(n=n()) %>% group_by(type.y) %>% mutate(n_group = sum(n), ratio = n/sum(n))
-```
-
-```{r}
-annots %>% data.frame()
-```
-
-```{r}
-bseq_all_res_anno
-```
-```{r}
-find_overlaps(annots_gene, as_granges(bseq_all_res_anno)) %>% data.frame()
-```
-- split by chrom will probs work
-- maybe even just half
-```{r}
-unique(bseq_all_res$seqnames)
-```
-
-```{r}
-annot_gene_cpg_1 <- find_overlaps(filter(annots_gene, seqnames %in% unique(bseq_all_res$seqnames)[1]), as_granges(filter(bseq_all_res_anno, seqnames %in% unique(bseq_all_res$seqnames)[1]))) %>% data.frame()
-```
-```{r}
-annot_gene_cpg <- rbind(annot_gene_cpg, data.frame(find_overlaps(filter(annots_gene, seqnames %in% unique(bseq_all_res$seqnames)[7:12]), as_granges(filter(bseq_all_res_anno, seqnames %in% unique(bseq_all_res$seqnames)[7:12])))))
-```
-- ok well we've got chrom 1-6 so that's something at least
-```{r}
-annot_gene_cpg
-```
-- and we want some kind of plot
-- i think the idea is to be able to show the bias?
-- so need to make that
-```{r}
-annot_gene_cpg_1 <- annot_gene_cpg %>% filter(seqnames == "chr1")
-```
-```{r}
-annot_gene_cpg_1 %>% group_by(type) %>% mutate(n_cpgs = n()) %>% group_by(type, signif) %>% mutate(n_signif_cpgs = n()) %>% group_by(type, n_cpgs, n_signif_cpgs, signif, annot.type) %>% summarise(n=n())
-```
-- but how to make some kind of bias plot?
-- oh i need some kind of info about significance damn
-- i don't know how to plot 
-- because it's all these categorical variables
-- maybe it would be easier to do by bin
-```{r}
-annot_gene_cpg_1 %>% group_by(type, signif) %>% summarise(n_signif_cpgs = n()) %>% group_by(type) %>% mutate(n_cpgs = sum(n_signif_cpgs)) %>% 
-  ggplot(aes(x = type, y = n_signif_cpgs, colour = signif, fill = signif)) +
-  geom_point()
-```
-- what about something with the width?? - because everything is always size based 
-- ooh width distrib of each of these things - oh that's an anno thing
-- which i just deleted
-```{r}
-annot_gene_cpg_1 %>% distinct(id, gene_id, symbol, width, type) %>%
-  ggplot(aes(x = log2(width), colour = type)) +
-  geom_density()
-
-annot_gene_cpg_1 %>% distinct(id, gene_id, symbol, width, type) %>%
-  ggplot(aes(x = type, y = log2(width), colour = type)) +
-  geom_boxplot()
-```
-```{r}
-annot_gene_cpg_1 %>% group_by(id, gene_id, symbol, width, type) %>% summarise(n_cpg = n()) %>%
-  ggplot(aes(x = log2(width), y = n_cpg, colour = type)) +
-  geom_point(alpha = 0.3)
-```
-
-```{r}
-annots_gene
-```
-
-```{r}
-ontology_list <- ontology_list %>% 
-  mutate(gene_chr = data.frame(eh_genes)[match(.$gene, data.frame(eh_genes)$gene), "seqnames"], 
-         gene_start = data.frame(eh_genes)[match(.$gene, data.frame(eh_genes)$gene), "start"],
-         gene_end = data.frame(eh_genes)[match(.$gene, data.frame(eh_genes)$gene), "end"],
-         gene_width = gene_end - gene_start + 1,
-         gene_strand = data.frame(eh_genes)[match(.$gene, data.frame(eh_genes)$gene), "strand"])
-```
-
-```{r}
-ontology_list$symbol %in% unique(annot_gene_cpg_1$symbol) %>% summary()
-
-```
-
-```{r}
-annot_gene_cpg_1
-```
-- what am i trying to do??
-- plots by cpg density
-```{r}
-annot_gene_cpg_1 %>% group_by(id, gene_id, symbol, width, signif, type) %>% summarise(n_cpg = n())
-```
-
-```{r}
-annot_gene_cpg_1 %>% group_by(id, gene_id, symbol, width, signif, type) %>% summarise(n_cpg = n()) %>%
-  ggplot(aes(x = log2(width), y = n_cpg, colour = signif)) +
-  geom_point(alpha = 0.3) +
-  facet_wrap(~type)
-```
-- oops i think i did this plot wrong
-- take out gene id maybe?
-```{r}
-annot_gene_cpg_1 %>% group_by(id, width, signif, type) %>% summarise(n_cpg = n()) %>%
-  ggplot(aes(x = log2(width), y = n_cpg, colour = signif)) +
-  geom_point(alpha = 0.3) +
-  facet_wrap(~type)
-```
-- oh looks the same that's good
-```{r}
-annot_gene_cpg_1 %>% group_by(id, width, signif, type) %>% summarise(n_cpg = n())
-```
-```{r}
-annot_gene_cpg_1 %>% group_by(type, signif) %>% summarise(n_cpg = n()) %>% group_by(type) %>% mutate(n_type = sum(n_cpg), ratio = n_cpg/sum(n_cpg))
-```
-
-- i really don't know what i'm doing
-- i definitely knew after the last meeting
-- but now - empty brain of confuzzlement
-- i think i want to connect this to the bin stuff
-- i probs want some stat tests about these summary type stuff
-- like are signigicant cpgs associated with a specific gene feature? 
-- and just comparing the number of cpgs in the different annotation features
-- which feels like anova?
-- because categories and can count
-- oh yeah that's what i was doing and getting stuck on - how to stat test
-
-- ok try anova
-- our group is - gene feature
-- but then what's our stat - i suppose we could do one for width - and then that just compares the annotation features by themselves
-- and then maybe whatever score/fdr for the cpg associated with it?
-
-```{r}
-annot_gene_cpg_1 %>% distinct(id, width, symbol, type) %>%
-  ggplot(aes(x = type, y = log2(width))) +
-  geom_boxplot()
-```
-
-```{r}
-res.aov <- aov(width ~ type, data = distinct(annot_gene_cpg_1, id, width, symbol, type))
-summary(res.aov)
-```
-```{r}
-TukeyHSD(res.aov)
-```
-```{r}
-TukeyHSD(res.aov)$type %>% data.frame() %>% filter(p.adj < 0.05) %>% .[order(.$p.adj),]
-```
--28 comparisons - 17 signif at 0.05
-
-- ok do this but for num of cpgs - which can do because group by the indiv 
-
-```{r}
-annot_gene_cpg_1 %>% group_by(id, type) %>% summarise(n_cpg = n()) %>%
-  ggplot(aes(x = type, y = n_cpg)) +
-  geom_boxplot()
-```
-```{r}
-annot_gene_cpg_1 %>% group_by(id, type) %>% summarise(n_cpg = n()) %>%
-  ggplot(aes(x = type, y = log2(n_cpg))) +
-  geom_boxplot()
-```
-```{r}
-annot_gene_cpg_1 %>%
-  ggplot(aes(x = ))
-```
-
-```{r}
-res.aov <- aov(n_cpg ~ type, data = summarise(group_by(annot_gene_cpg_1, id, type), n_cpg = n()))
-summary(res.aov)
-```
-```{r}
-TukeyHSD(res.aov)
-```
-
-```{r}
-TukeyHSD(res.aov)$type %>% data.frame() %>% filter(p.adj < 0.05) %>% .[order(.$p.adj),]
-```
-- ok so i think this is showing what i want
-- basically that the number of cpgs are in specific areas
-- but binning will really highlight that because that removes the length bias and we just talk about overlap
-
-
-- ok the problem with trying to do this with a score - is that
-- it's done via a corrected t score
-- and signif is determined by taking the top and bottom
-- oh wait - put it as abs values??
-- no that still wouldn't do it
-```{r}
-bseq_all_res %>% ggplot(aes(x = tstat.corrected)) +
-  geom_density()
-```
-
-- because significance is more like a z score thing - with the taking the top quantiles
-- is there a version of the anova that's more like a z score? - instead of being expanded t test basically - where means are compared
-- no a z test still compares means
-- maybe it's just an expanded anova - where the groups are split??
-- do i want a stat test?
-- oh actually maybe those tests should have been chi-square tests
-- categories and counts
-- no but signif one should be - b/c 2 categorical things
-
-```{r}
-chisq <- annot_gene_cpg_1 %>% group_by(type, signif) %>% summarise(n_cpg = n()) %>% group_by(type) %>% mutate(is_signif = ifelse(signif == TRUE, n_cpg, NA), not_signif = ifelse(signif == FALSE, n_cpg, NA)) %>% tidyr::fill(not_signif, .direction = "downup") %>% tidyr::fill(is_signif, .direction = "updown") %>% distinct(type, is_signif, not_signif) %>% ungroup() %>% tibble::column_to_rownames(var = "type") %>% chisq.test(.)
-chisq
-```
-```{r}
-chisq$residuals
-```
-```{r}
-#install.packages("corrplot")
-library(corrplot)
-corrplot(chisq$residuals, is.cor = FALSE)
-```
-- blue is top of scale, red is bottom
-- blue is positive assoc, red is negative assoc (not assoc)
--good that it's either red or blue - not the same
-
-- ok now i want binning stuff
-```{r}
-unique(annot_gene_cpg_1$annot.type)
-```
-
-```{r}
-chisq <- annot_gene_cpg_1 %>% group_by(type, annot.type) %>% summarise(n_cpg = n()) %>% group_by(annot.type) %>% mutate(is_island = ifelse(annot.type == "hg19_cpg_islands", n_cpg, NA), is_shore = ifelse(annot.type == "hg19_cpg_shores", n_cpg, NA), is_inter = ifelse(annot.type == "hg19_cpg_inter", n_cpg, NA), is_shelf = ifelse(annot.type == "hg19_cpg_shelves", n_cpg, NA)) %>% group_by(type) %>% tidyr::fill(is_shore, .direction = "downup") %>% tidyr::fill(is_island, .direction = "updown") %>% tidyr::fill(is_shelf, .direction = "downup") %>% tidyr::fill(is_inter, .direction = "downup") %>% distinct(type, is_island, is_shore, is_shelf, is_inter) %>% ungroup() %>% tibble::column_to_rownames(var = "type") %>% chisq.test(.)
-chisq
-```
-```{r}
-chisq$stdres
-```
-```{r}
-find_overlaps(as_granges(bseq_dmrs), annotations) %>% data.frame() %>% group_by(type) %>% summarise(n())
-```
-```{r}
-find_overlaps(annotations, as_granges(anno_seq)) %>% data.frame() %>% group_by(id, type) %>% summarise(n_cg = n()) %>%
-  ggplot(aes(x = n_cg, colour = type)) +
-  geom_density()
-```
-
-#######################################################
-# compare array and seq genes and num cpg
-```{r}
-DMPs # this is all the tested cpgs from array
-```
-```{r}
-wgbs_counts # this is all the sites for sequencing 
-bsseq_res # sites tested
-```
-```{r}
-find_overlaps(as_granges(biomart_genes_filt), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(ensembl_gene_id) %>% mutate(num_wgbs = n()) %>% ungroup() %>% mutate(match = ifelse(num_cg == num_wgbs, TRUE, FALSE)) %>% group_by(match) %>% summarise(n())
-```
-- nice
-```{r}
-biomart_genes_filt <- data.frame(biomart_genes_filt)
-biomart_genes_filt
-```
-```{r}
-mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>% filter(Freq == 0 | num_cg_wgbs == 0)
-```
-
-
-```{r}
-mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>%
-  ggplot(aes(x = Freq, y = num_cg_wgbs)) +
-  geom_point(alpha = 0.3) +
-  labs(x = "num_probes")
-
-mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>%
-  ggplot(aes(x = log2(Freq + 1), y = log2(num_cg_wgbs + 1))) +
-  geom_point(alpha = 0.3) +
-  labs(x = "log2(num_probes + 1)")
-```
-```{r}
-mapped_genes$freq %>% data.frame() %>% mutate(num_cg_wgbs = biomart_genes_filt[match(.$eg.all, biomart_genes_filt$entrez_id), "num_cg"]) %>% filter(!is.na(num_cg_wgbs)) %>% cor.test(.$Freq, .$num_cg_wgbs) # yeah ok i knew i couldn't shove it in like that
-```
-```{r}
-cor.test()
-```
-
-```{r}
-array_freq <- mapped_genes$freq %>% data.frame()
-```
-
-```{r}
-biomart_genes_filt %>% mutate(num_cg_array = array_freq[match(.$entrez_id, array_freq$eg.all), "Freq"]) %>%
-  ggplot(aes(x = num_cg_array, y = num_cg)) +
-  geom_point(alpha = 0.3)
-```
-- ok so both ways not all overlap but plot is similar
-- what am I saying - plot is the same b/c missing values are removed
-```{r}
-ggVennDiagram(list(wgbs=biomart_genes_filt$entrez_id, array=as.character(array_freq$eg.all)))
-```
 
 
