@@ -36,6 +36,7 @@ Analysis:
   
   b) [Sequencing](00_differentialMethylationSequencing.html)
   
+  [Compare results](04_compareDM.html)
   
   c) Compare CpG level and DMR results
   
