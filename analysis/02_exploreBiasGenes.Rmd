@@ -8,6 +8,9 @@ editor_options:
 ---
 
 ## Introduction
+Early analysis exploring how to define the gene based bias.
+
+## Packages
 
 ```{r}
 library(plyranges)
@@ -18,6 +21,8 @@ library(ExperimentHub)
 library(BSgenome.Hsapiens.UCSC.hg19)
 ```
 
+## Pre-processed files 
+
 ```{r}
 wgbs_counts <- readRDS("../output/wgbs_counts.rds")
 bsseq_res <- readRDS("../output/bsseq_res.rds")
@@ -25,6 +30,7 @@ bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
 bsseq_dmrs$rank <- 1:nrow(bsseq_dmrs)
 bsseq_dmrs_filt <- bsseq_dmrs %>% filter(abs(areaStat) > 100)
 ```
+
 # gene source
 
 ```{r}
@@ -75,24 +81,47 @@ cor.test(biomart_genes$num_cg, biomart_genes$width)
 ```
 
 
-## Potential biases
-
 
 ```{r}
 source("../code/function_binBiasPlot.R")
 test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs, "biomart", biomart_genes)
 test_anno_filt <- annoGeneDmr(wgbs_counts, bsseq_dmrs_filt, "biomart", biomart_genes)
 
-overlap_gene_dmr <- find_overlaps(as_granges(bsseq_dmrs), eh_genes) %>% data.frame()
+overlap_gene_dmr <- find_overlaps(as_granges(bsseq_dmrs), as_granges(eh_genes)) %>% data.frame()
+```
+```{r}
+head(test_anno)
 ```
 
+Number of DMRs present
+```{r}
+c(dmrs = nrow(distinct(test_anno, position)), filt = nrow(distinct(test_anno_filt, position)))
+```
+
+Number of genes identified as significant
+```{r}
+c(genes = nrow(distinct(test_anno, ensembl_gene_id)), filt = nrow(distinct(test_anno_filt, ensembl_gene_id)))
+```
+
+## Bias
+
+Some genes will be more likely to be identified as significant than others.
+And significance is defined by the overlap to a DMR.
+A DMR requires at least 3 CpGs identified as significant.
+Therefore logically, a gene that overlaps more CpGs could be expected to be more likely to overlap a DMR.
+That gene would also likely be longer.
+This is what we wish to visualise.
+
 # Length of gene bias
+
 ```{r}
 source("../code/function_binBiasPlot.R")
 plotBiasGeneLength(biomart_genes, test_anno_filt, bin_size = 100)
 plotBiasGeneLength(biomart_genes, test_anno_filt, bin_size = 200)
 
 ```
+
+In order to plot, we group the gene lengths together into bins and take an average. Changing the bin size clearly changes the proportions.
 
 # Number of CpGs in Genes
 ```{r gene-bias}
@@ -104,6 +133,11 @@ plotBiasGrouped(biomart_genes, test_anno, log2_scale = TRUE)
 plotBiasGrouped(biomart_genes, test_anno_filt, log2_scale = TRUE)
 ```
 
+```{r}
+eh_genes <- as_granges(eh_genes)
+bsseq_dmrs$bsseq_rank <- bsseq_dmrs$rank
+bsseq_dmrs_filt$bsseq_rank <- bsseq_dmrs_filt$rank
+```
 
 ## Analyses
 ```{r}
@@ -196,106 +230,13 @@ bsseq_dmrs %>% mutate(overlap_gene = overlap_gene_dmr[match(.$bsseq_rank, overla
 
 
 
-# more detailed gene features
-```{r}
-library(annotatr)
-```
-
-```{r}
-annots_gene <- build_annotations(genome = 'hg19', annotations = c('hg19_basicgenes', 'hg19_genes_intergenic',
-    'hg19_genes_intronexonboundaries'))
-```
-
-```{r}
-annots_gene <- annots_gene %>% data.frame() %>% filter(seqnames %in% unique(bsseq_res$seqnames)) %>% as_granges()
-```
-
-```{r}
-#anno_cpg_by_gene <- annotate_regions(as_granges(bsseq_res), annots_gene) %>% data.frame()
-```
-
-```{r}
-bseq_dmrs_genes <- annotate_regions(as_granges(bsseq_dmrs), annots_gene) %>% data.frame()
-```
-
-
-```{r}
-bseq_dmrs_genes %>% group_by(annot.type) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
-```
-```{r}
-bseq_dmrs_genes %>% distinct(rank, annot.type) %>% group_by(annot.type) %>% summarise(n_dmr = n(), prop_total_dmr = n()/69858)
-```
-
-
-
-# cpg annotations - ISLANDS
-```{r}
-annotations %>% head()
-```
-```{r}
-anno_islands <- annotations %>% data.frame() %>% filter(type == "hg19_cpg_islands") %>% mutate(island_num = 1:n())
-island_cg <- find_overlaps(as_granges(anno_islands), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(island_num) %>% summarise(num_cg = n()) %>% data.frame()
-```
-```{r}
-head(anno_islands)
-```
-
-```{r}
-find_overlaps(as_granges(eh_genes), as_granges(anno_islands)) %>% data.frame() %>% group_by(gene, num_cg.x) %>% summarise(n_islands = n()) %>%
-  ggplot(aes(x = num_cg.x, y = n_islands)) +
-  geom_point(alpha = 0.4)
-```
-```{r}
-find_overlaps(as_granges(eh_genes), as_granges(anno_islands)) %>% data.frame() %>%
-  group_by(width) %>% summarise(n_islands = n()) %>%
-  ggplot(aes(x = log2(width), y = n_islands)) +
-  geom_point(alpha = 0.4)
-```
-
-
-```{r}
-anno_islands <- anno_islands %>% mutate(num_cg = island_cg[match(.$island_num, island_cg$island_num), "num_cg"])
-anno_islands %>% group_by(num_cg) %>% summarise(n= n()) %>%
-  ggplot(aes(x = num_cg, y = n)) +
-  geom_point()
-```
-
-```{r}
-bseq_dmrs_cpg_anno <- annotate_regions(as_granges(bsseq_dmrs), annotations) %>% data.frame()
-```
-```{r}
-bseq_dmrs_cpg_isl <- filter(bseq_dmrs_cpg_anno, annot.type == "hg19_cpg_islands")
-```
-
-```{r}
-anno_islands %>% mutate(has_dmr = ifelse(id %in% bseq_dmrs_cpg_isl$annot.id, TRUE, FALSE)) %>% group_by(num_cg) %>%
-      mutate(num_bins_same_cg = n()) %>%
-    group_by(num_cg, has_dmr) %>%
-    mutate(num_per_dmr = n(), prop = n()/num_bins_same_cg) %>%
-    distinct(num_cg, num_bins_same_cg, num_per_dmr, prop, has_dmr) %>%
-    group_by(num_cg) %>%
-    .[order(.$num_cg),] %>%
-    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
-    mutate(num = n()) %>%
-    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
-    ggplot(aes(x = num_cg, y = prop)) +
-      geom_point(alpha = 0.4) +
-      geom_smooth()
-```
-
-
-- prop of dmrs that have island
-```{r}
-bsseq_dmrs %>% mutate(has_island = ifelse(rank %in% bseq_dmrs_cpg_isl$rank, TRUE, FALSE)) %>% group_by(has_island) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
-```
-
 #################
 # repeat for biomart (has a tss)
 
 
 
 ```{r}
-anno_biomart_dmr %>%
+test_anno %>%
   ggplot(aes(x = min_dist)) +
   geom_density()
 ```
@@ -314,7 +255,7 @@ biomart_genes %>% mutate(width = end - start + 1, density = num_cg/width) %>%
 - is it about if more dense genes have dmr?
 ```{r}
 biomart_genes <- biomart_genes %>% mutate(width = end - start + 1, density = num_cg/width)
-biomart_genes <- biomart_genes %>% mutate(overlap_dmr = ifelse(ensembl_gene_id %in% filter(anno_biomart_dmr, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE))
+biomart_genes <- biomart_genes %>% mutate(overlap_dmr = ifelse(ensembl_gene_id %in% filter(test_anno, abs(min_dist) == 0)$ensembl_gene_id, TRUE, FALSE))
 ```
 
 ```{r}
