@@ -205,8 +205,9 @@ truth_gst_100 <- rbind(
 
 truth_gst_100 %>%
   ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
-  geom_line() +
-  labs(x = "Rank", y = "Cumulative no. in immune sets")
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
 ```
 
 
