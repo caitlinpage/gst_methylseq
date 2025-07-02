@@ -1,0 +1,254 @@
+---
+title: "08_broadGeneSetDatabase"
+author: "Caitlin Page"
+date: "2025-05-14"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+renv::install("bioc::KEGGREST")
+renv::install("bioc::msigdb")
+```
+## MsigDB Analysis
+
+[following vignette](https://bioconductor.org/packages/release/data/experiment/vignettes/msigdb/inst/doc/msigdb.html)
+
+
+The database is broken down into collections, including GO. Collections are available for human and mouse. It is advised to not run analysis on all gene sets, but on a specific collection.
+[Description of collections](https://www.gsea-msigdb.org/gsea/msigdb/human/collections.jsp#C5)
+```{r}
+library(msigdb)
+library(ExperimentHub)
+library(GSEABase)
+```
+
+```{r}
+eh <- ExperimentHub()
+query(eh , 'msigdb')
+```
+
+```{r}
+msigdb.hs <- getMsigdb(org = 'hs', id = 'SYM', version = '7.4')
+msigdb.hs
+```
+
+```{r}
+msigdb.hs
+```
+
+data is broken up into chromosome and position
+```{r}
+example_gs <- msigdb.hs[[1000]]
+```
+
+```{r}
+geneIds(example_gs)
+```
+```{r}
+geneIdType(example_gs)
+```
+
+```{r}
+collectionType(example_gs)
+```
+
+```{r}
+bcCategory(collectionType(example_gs))
+```
+
+```{r}
+description(example_gs)
+```
+
+```{r}
+details(example_gs)
+```
+
+# summarise info
+
+```{r}
+table(sapply(lapply(msigdb.hs, collectionType), bcCategory))
+```
+
+```{r}
+table(sapply(lapply(msigdb.hs, collectionType), bcSubCategory))
+```
+
+```{r}
+hist(sapply(lapply(msigdb.hs, geneIds), length),
+     main = 'MSigDB signature size distribution',
+     xlab = 'Signature size')
+```
+
+# subset collection for analysis
+
+```{r}
+listCollections(msigdb.hs)
+```
+
+```{r}
+listSubCollections(msigdb.hs)
+```
+
+
+```{r}
+subsetCollection(msigdb.hs, 'h')
+```
+
+```{r}
+subsetCollection(msigdb.hs, 'c5', 'GO:BP')
+```
+
+# prepare for usage
+```{r}
+library(limma)
+```
+make expression data
+```{r}
+allg <- unique(unlist(geneIds(msigdb.hs)))
+emat <- matrix(0, nrow = length(allg), ncol = 6)
+rownames(emat) <- allg
+colnames(emat) <- paste0('sample', 1:6)
+head(emat)
+```
+get collection
+```{r}
+hallmarks <- subsetCollection(msigdb.hs, 'h')
+msigdb_ids <- geneIds(hallmarks)
+```
+convert gene sets into list of gene indices
+
+```{r}
+fry_indices = ids2indices(msigdb_ids, rownames(emat))
+fry_indices[1:2]
+```
+
+# ok so now what?
+how do we do the test?
+what did this fry thing do? 
+are those gene indices like entrez gene ids?
+or is it the position of the gene symbol from the other matrix thing?
+```{r}
+length(emat)
+```
+
+```{r}
+fry_indices[[1]][1:5] %>% class()
+```
+ok this implies to me that it is the index of the gene symbol, not an entrez id (entrez id is character)
+
+but we can get entrez ids with a different function
+
+# implement into function
+want something like this
+```{r}
+mm_out <- readRDS("../output/mm_fn_out.rds")
+mm_out$sig.eg[1:3]
+mm_out$universe[1:5]
+mm_out$freq %>% data.frame() %>% head()
+mm_out$equiv %>% data.frame() %>% head()
+mm_out$de[1:5]
+```
+which doesn't even involve gene sets yet
+which means that part can stay as it is
+
+all I need is a collection that is a list with the gene sets, and within that is entrez ids
+
+so the important functions to make that happen are...
+```{r}
+msigdb.hs <- getMsigdb(org = 'hs', id = 'EZID', version = '7.4')
+```
+basically just this
+org can be "hs" or "mm" (human or mouse)
+id can be "SYM" or "EZID" (symbol or entrez gene id)
+and then version - which is based on version of MSigDb
+
+then there was some weird make expression data stuff which I don't think we need it was weird
+
+want to subset the collection
+```{r}
+hallmarks <- subsetCollection(gsc = msigdb.hs, collection = 'h')
+msigdb_ids <- geneIds(hallmarks)
+msigdb_ids$HALLMARK_TNFA_SIGNALING_VIA_NFKB
+```
+(sub)/collection must be part of list(Sub)Collection or else:
+Error in subsetCollection(gsc = msigdb.hs, collection = "a") : 
+  all(collection %in% listCollections(gsc)) is not TRUE
+
+all we had to do was add the gene ids to the gene sets
+and that's it
+
+change code:
+* add in collection parameter for source and subcollection parameter for msigdb
+* add appropriate checks
+* new small function to make the msigdb object
+
+```{r}
+getMsig <- function(species, version = version, collection, subcollection = NULL) {
+  species <- species
+  msigdb <- msigdb::getMsigdb(org = species, id = 'EZID', version = version)
+  hallmarks <- msigdb::subsetCollection(gsc = msigdb, collection = collection, subcollection = subcollection)
+  msigdb_ids <- GSEABase::geneIds(hallmarks)
+  msigdb_ids
+}
+getMsig("hs", "7.4", "h")
+```
+```{r}
+listCollections(msigdb.hs)
+listSubCollections(msigdb.hs)
+```
+* incorporate into testing function miss_methyl_b
+```{r}
+run_gst_seq <- function(dmrs, tested_cpgs,
+                        gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter"),
+                        collection = c("GO", "MsigDb"), subcollection = NULL,
+                        method = c("Wallenius", "Fishers", "None"), plot_bias=TRUE, ...) {
+  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub"))
+  gene_feature <- match.arg(tolower(gene_feature), c("gene", "promoter"))
+  genes <- sourceGenes(counts = tested_cpgs, gene_source = gene_source, gene_feature = gene_feature)
+  if(nrow(genes) == 0) {
+    stop("sourceGenes failed")
+  }
+  if(nrow(dmrs) > 30000) {
+    stop("Please appropriately filter DMRs to most significant") #idk
+  }
+  anno <- annoGeneDmr(counts=tested_cpgs, dmrs = dmrs, gene_source = gene_source, genes = genes)
+  if(nrow(anno) == 0) {
+    stop("anno failed")
+  }
+  out <- run_miss_methyl_a(genes, anno)
+  
+  collection <- match.arg(tolower(collection), c("go", "msigdb"))
+  
+  results <- run_miss_methyl_b(out, correct_bias=correct_bias, plot_bias=plot_bias, ...)
+
+  list(res = results, genes = genes, anno = anno, out = out)
+}
+```
+
+## KEGG
+```{r}
+?limma::getGeneKEGGLinks()
+```
+
+missMethyl does KEGG as well
+.getKEGG <- function(){
+  GeneID.PathID <- limma::getGeneKEGGLinks(species.KEGG = "hsa", convert = TRUE)
+  GeneID.PathID$PathwayID <- gsub("path:", "", GeneID.PathID$PathwayID)
+  isna <- rowSums(is.na(GeneID.PathID[, 1:2])) > 0.5
+  GeneID.PathID <- GeneID.PathID[!isna, ]
+  ID.ID <- paste(GeneID.PathID[, 1], GeneID.PathID[, 2], sep = ".")
+  d <- !duplicated(ID.ID)
+  GeneID.PathID <- GeneID.PathID[d, ]
+  PathID.PathName <- limma::getKEGGPathwayNames(species.KEGG = "hsa", 
+                                         remove.qualifier = TRUE)
+  #PathID.PathName$PathwayID <- paste0("path:", PathID.PathName$PathwayID)
+  GeneID.PathID <- merge(GeneID.PathID, PathID.PathName, by="PathwayID")
+  kegg <- tapply(GeneID.PathID$GeneID, GeneID.PathID$PathwayID, list)
+  
+  list(idList = kegg, idTable = PathID.PathName)
+}
