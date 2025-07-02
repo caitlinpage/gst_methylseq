@@ -1,0 +1,109 @@
+---
+title: "00_cpgFeatures"
+author: "Caitlin Page"
+date: "2025-05-01"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+
+```
+
+
+# more detailed gene features
+```{r}
+library(annotatr)
+```
+
+```{r}
+annots_gene <- build_annotations(genome = 'hg19', annotations = c('hg19_basicgenes', 'hg19_genes_intergenic',
+    'hg19_genes_intronexonboundaries'))
+```
+
+```{r}
+annots_gene <- annots_gene %>% data.frame() %>% filter(seqnames %in% unique(bsseq_res$seqnames)) %>% as_granges()
+```
+
+```{r}
+#anno_cpg_by_gene <- annotate_regions(as_granges(bsseq_res), annots_gene) %>% data.frame()
+```
+
+```{r}
+bseq_dmrs_genes <- annotate_regions(as_granges(bsseq_dmrs), annots_gene) %>% data.frame()
+```
+
+
+```{r}
+bseq_dmrs_genes %>% group_by(annot.type) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
+```
+```{r}
+bseq_dmrs_genes %>% distinct(rank, annot.type) %>% group_by(annot.type) %>% summarise(n_dmr = n(), prop_total_dmr = n()/69858)
+```
+
+
+
+# cpg annotations - ISLANDS
+```{r}
+annotations %>% head()
+```
+```{r}
+anno_islands <- annotations %>% data.frame() %>% filter(type == "hg19_cpg_islands") %>% mutate(island_num = 1:n())
+island_cg <- find_overlaps(as_granges(anno_islands), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(island_num) %>% summarise(num_cg = n()) %>% data.frame()
+```
+```{r}
+head(anno_islands)
+```
+
+```{r}
+find_overlaps(as_granges(eh_genes), as_granges(anno_islands)) %>% data.frame() %>% group_by(gene, num_cg.x) %>% summarise(n_islands = n()) %>%
+  ggplot(aes(x = num_cg.x, y = n_islands)) +
+  geom_point(alpha = 0.4)
+```
+```{r}
+find_overlaps(as_granges(eh_genes), as_granges(anno_islands)) %>% data.frame() %>%
+  group_by(width) %>% summarise(n_islands = n()) %>%
+  ggplot(aes(x = log2(width), y = n_islands)) +
+  geom_point(alpha = 0.4)
+```
+
+
+```{r}
+anno_islands <- anno_islands %>% mutate(num_cg = island_cg[match(.$island_num, island_cg$island_num), "num_cg"])
+anno_islands %>% group_by(num_cg) %>% summarise(n= n()) %>%
+  ggplot(aes(x = num_cg, y = n)) +
+  geom_point()
+```
+
+```{r}
+bseq_dmrs_cpg_anno <- annotate_regions(as_granges(bsseq_dmrs), annotations) %>% data.frame()
+```
+```{r}
+bseq_dmrs_cpg_isl <- filter(bseq_dmrs_cpg_anno, annot.type == "hg19_cpg_islands")
+```
+
+```{r}
+anno_islands %>% mutate(has_dmr = ifelse(id %in% bseq_dmrs_cpg_isl$annot.id, TRUE, FALSE)) %>% group_by(num_cg) %>%
+      mutate(num_bins_same_cg = n()) %>%
+    group_by(num_cg, has_dmr) %>%
+    mutate(num_per_dmr = n(), prop = n()/num_bins_same_cg) %>%
+    distinct(num_cg, num_bins_same_cg, num_per_dmr, prop, has_dmr) %>%
+    group_by(num_cg) %>%
+    .[order(.$num_cg),] %>%
+    mutate(prop = ifelse(has_dmr == FALSE, 0, prop)) %>%
+    mutate(num = n()) %>%
+    mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
+    ggplot(aes(x = num_cg, y = prop)) +
+      geom_point(alpha = 0.4) +
+      geom_smooth()
+```
+
+
+- prop of dmrs that have island
+```{r}
+bsseq_dmrs %>% mutate(has_island = ifelse(rank %in% bseq_dmrs_cpg_isl$rank, TRUE, FALSE)) %>% group_by(has_island) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
+```
+
