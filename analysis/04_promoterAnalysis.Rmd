@@ -1,0 +1,45 @@
+---
+title: "04_promoterAnalysis"
+author: "Caitlin Page"
+date: "2025-05-01"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+
+```
+
+```{r}
+biomart_promoter <- biomart_genes 
+biomart_promoter$start <- ifelse(biomart_promoter$strand == 1, biomart_promoter$start - 2000, biomart_promoter$end - 500)
+biomart_promoter$end <- ifelse(biomart_promoter$strand == 1, biomart_promoter$start + 2500, biomart_promoter$end + 2000)
+biomart_promoter$width <- biomart_promoter$end - biomart_promoter$start + 1
+```
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1_prom <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_promoter)), "Wallenius")[[1]]
+gst_res_dmr1_prom$rank_fdr <- 1:nrow(gst_res_dmr1_prom)
+gst_res_dmr1_prom <- gst_res_dmr1_prom %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_dmr1_prom)
+saveRDS(gst_res_dmr1_prom, "../output/gst_res_dmrcate_1k_prom.rds")
+```
+
+```{r}
+gst_res_dmr1_prom
+```
+
+
+```{r}
+gst_res_dmr_prom_all <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_promoter)), "Wallenius")[[1]]
+gst_res_dmr_prom_all$rank_fdr <- 1:nrow(gst_res_dmr_prom_all)
+gst_res_dmr_prom_all <- gst_res_dmr_prom_all %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_dmr_prom_all)
+saveRDS(gst_res_dmr_prom_all, "../output/gst_res_dmrcate_prom_all.rds")
+```
+
