@@ -1044,3 +1044,16 @@ library(RSNNS)
 readPatFile("../../1_methods/data/blood/blood_wgbs/b_cells/GSM5652299_Blood-NK-Z000000TM.pat.gz")
 ```
 
+## try to make jovana plot
+
+```{r}
+go_res_compare <- readRDS("../output/go_res_compare.rds")
+```
+```{r}
+dmrcate_array_dmr
+```
+
+```{r}
+go_entrez_filt_simp %>% filter(go %in% filter(go_res_compare, mm_seq == TRUE)$go)
+```
+
