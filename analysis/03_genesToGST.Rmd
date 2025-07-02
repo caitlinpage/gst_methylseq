@@ -48,7 +48,7 @@ go_entrez %>% filter(entrez == 1)
 * and no idea what genome it would follow
 * do a thing for txdb
 * but right now just carry over biomart
-
+https://support.bioconductor.org/p/p133188/
 ```{r}
 biomart_genes <- biomart_genes %>% mutate(coords = paste0(seqnames, ":", start, "-", end))
 ```
