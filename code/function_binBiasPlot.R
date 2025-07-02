@@ -228,7 +228,7 @@ plotBiasGroupedMedian <- function(genes, anno_genes, regression_line=FALSE, log2
 
 
 plotBiasGeneLength <- function(genes, anno, dist_dmr=0, bin_size=100) {
-  genes %>% mutate(num_cg = granges.y.width) %>%
+  genes %>% mutate(width = end - start + 1, num_cg = width) %>%
     mutate(has_dmr = ifelse(ensembl_gene_id %in% filter(anno, abs(min_dist) == dist_dmr)$ensembl_gene_id, TRUE, FALSE), width = end - start + 1) %>%
     .[order(.$width),] %>%
     mutate(bin_group = rep(1:ceiling(nrow(.)/bin_size), each = bin_size)[1:nrow(.)]) %>%
