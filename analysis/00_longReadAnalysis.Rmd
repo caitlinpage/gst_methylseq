@@ -60,10 +60,6 @@ mbr <- ModBamResult(
 plot_gene(mbr, "Peg3")
 ```
 
-```{r}
-#modbam_to_tabix(mbr, "../data/long_read/methy.tsv.bgz")
-```
-
 
 ```{r}
 nmr <- NanoMethResult(
@@ -98,7 +94,7 @@ cgi_anno <- readRDS("../data/long_read/cgi_mm10.rds")
 nrow(cgi_anno)
 head(cgi_anno)
 ```
-* wrong package version so this is being annoying - just download the rds file and read it 
+
 
 ```{r}
 lmr <- bsseq_to_log_methy_ratio(
@@ -164,9 +160,8 @@ long_regions_sig <- dmr_regions %>%
 long_regions_sig %>% as.data.frame() 
 ```
 
-* well damn I've only got 8 genes significant
-* guess I just have to try it
-* hold up that's with TSS overlap
+* only 8 genes significant
+* that's with TSS overlap
 * let's do a full gene overlap
 
 ```{r}
@@ -211,7 +206,6 @@ long_genes_tested
 * I have significant genes without any CG
 * come back to this because something is wrong
 ```{r}
-cgi_anno
 gene_anno %>% filter(chr == "chr7", symbol == "Peg3")
 ```
 
@@ -236,7 +230,7 @@ long_genes_tested
 
 * redoing with top 50 genes
 ```{r}
-dmr_regions
+head(dmr_regions)
 ```
 * should it be all the genes on chr7? 
 * check how the data looks beforehand again
@@ -253,7 +247,7 @@ gene_anno_7$num_cg <- long_cg[match(gene_anno_7$symbol, long_cg$symbol), "num_cg
 gene_anno_7 <- gene_anno_7 %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg), 
                                       qval = dmr_regions[match(.$symbol, dmr_regions$symbol), "qval"],
                                       rank = dmr_regions[match(.$symbol, dmr_regions$symbol), "rank"])
-gene_anno_7
+head(gene_anno_7)
 ```
 
 ## Gene set testing - GOSEQ
@@ -330,7 +324,7 @@ GO.long.50_null <- GO.long.50_null %>% dplyr::mutate(FDR = stats::p.adjust(.data
 head(GO.long.50_null)
 ```
 
-## fisher for lols?
+## fisher
 
 ```{r}
 gene.vector <- long_genes_tested$signif
@@ -365,8 +359,4 @@ ggVennDiagram(list(wall = filter(GO.long, over_represented_pvalue < 0.05)$catego
                    null = filter(GO.long_null, over_represented_pvalue < 0.05)$category))
 ```
 
-```{r}
-GO.long_null
-GO.long
-```
 
