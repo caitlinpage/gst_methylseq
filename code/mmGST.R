@@ -46,6 +46,31 @@
   graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
 }
 
+.getKEGG <- function(){
+  GeneID.PathID <- limma::getGeneKEGGLinks(species.KEGG = "hsa", convert = TRUE)
+  GeneID.PathID$PathwayID <- gsub("path:", "", GeneID.PathID$PathwayID)
+  isna <- rowSums(is.na(GeneID.PathID[, 1:2])) > 0.5
+  GeneID.PathID <- GeneID.PathID[!isna, ]
+  ID.ID <- paste(GeneID.PathID[, 1], GeneID.PathID[, 2], sep = ".")
+  d <- !duplicated(ID.ID)
+  GeneID.PathID <- GeneID.PathID[d, ]
+  PathID.PathName <- limma::getKEGGPathwayNames(species.KEGG = "hsa",
+                                                remove.qualifier = TRUE)
+  #PathID.PathName$PathwayID <- paste0("path:", PathID.PathName$PathwayID)
+  GeneID.PathID <- merge(GeneID.PathID, PathID.PathName, by="PathwayID")
+  kegg <- tapply(GeneID.PathID$GeneID, GeneID.PathID$PathwayID, list)
+
+  list(idList = kegg, idTable = PathID.PathName)
+}
+
+getMsig <- function(species = "hs", version = "7.4", collection, subcollection = NULL) {
+  species <- species
+  msigdb <- msigdb::getMsigdb(org = species, id = 'EZID', version = version)
+  hallmarks <- msigdb::subsetCollection(gsc = msigdb, collection = collection, subcollection = subcollection)
+  msigdb_ids <- GSEABase::geneIds(hallmarks)
+  msigdb_ids
+}
+
 # get the genes and dmrs organised
 run_miss_methyl_a <- function(biomart_genes, test_anno) { # add something about extending the bias to include upstream of gene maybe??
   #get entrez gene ids and gene symbols
@@ -90,7 +115,7 @@ run_miss_methyl_a <- function(biomart_genes, test_anno) { # add something about 
 }
 
 # does all the testing
-run_miss_methyl_b <- function(out, method, plot_bias=FALSE, ...) {
+run_miss_methyl_b <- function(out, collection = c("GO", "KEGG", "MsigDb"), method = c("Wallenius", "Fishers", "None"), species = "hs", version = "7.4", msig_collection = NULL, msig_subcollection = NULL, plot_bias=FALSE, ...) {
   sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
   eg.universe <- out$universe # entrez ids all genes
   freq_genes <- out$freq # num cpgs per gene
@@ -101,8 +126,20 @@ run_miss_methyl_b <- function(out, method, plot_bias=FALSE, ...) {
 
   # various go filters
   # Check collection is a list with character vectors
-  go <- .getGO()
-  collection <- go$idList
+  database <- collection[1]
+  if(database == "GO") {
+    go <- .getGO()
+    collection <- go$idList
+  }
+  else if (database == "KEGG") {
+    kegg <- .getKEGG()
+    collection <- kegg$idList
+  }
+  else if (database == "MsigDb") {
+    collection <- getMsig(species = species, version = version, collection = msig_collection, subcollection = msig_subcollection)
+  } else {
+    collection <- collection
+  }
   #only if it's not a list
   #collection <- list(collection=go$idList)
   collection <- lapply(collection, as.character)
@@ -130,8 +167,10 @@ run_miss_methyl_b <- function(out, method, plot_bias=FALSE, ...) {
   # so don't test, and then add them back at the end
   results <- data.frame(results)
   results_null <- results[results$DE == 0,]
-  results_null$P.DE <- 1
-  results_null$FDR <- 1
+  if(nrow(results_null) != 0) {
+    results_null$P.DE <- 1
+    results_null$FDR <- 1
+  }
 
   results <- results[results$DE != 0,]
   collection <- collection[rownames(results)]
@@ -229,9 +268,13 @@ run_miss_methyl_b <- function(out, method, plot_bias=FALSE, ...) {
   results[,"DE"] <- floor(results[,"DE"])
   results <- rbind(results, results_null)
   results <- data.frame(results, SigGenesInSet)
-
-  results <- merge(go$idTable,results,by.x="GOID",by.y="row.names")
-  rownames(results) <- results$GOID
+  if(database == "GO") {
+    results <- merge(go$idTable,results,by.x="GOID",by.y="row.names")
+    rownames(results) <- results$GOID
+  } else if (database == "KEGG") {
+    results <- merge(kegg$idTable,results,by.x="PathwayID",by.y="row.names")
+    rownames(results) <- results$PathwayID
+  }
   results <- results %>% .[order(.$FDR),]
   list(results, plot)
 
@@ -240,6 +283,7 @@ run_miss_methyl_b <- function(out, method, plot_bias=FALSE, ...) {
 # main wrapper function
 run_gst_seq <- function(dmrs, tested_cpgs,
                         gene_source = c("biomaRt", "ExperimentHub"), gene_feature=c("gene", "promoter"),
+                        collection = c("GO", "MsigDb"), subcollection = NULL,
                         method = c("Wallenius", "Fishers", "None"), plot_bias=TRUE, ...) {
   gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub"))
   gene_feature <- match.arg(tolower(gene_feature), c("gene", "promoter"))
@@ -255,6 +299,7 @@ run_gst_seq <- function(dmrs, tested_cpgs,
     stop("anno failed")
   }
   out <- run_miss_methyl_a(genes, anno)
+  collection <- matrch.arg(tolower(collection), c("go", "msigdb"))
   results <- run_miss_methyl_b(out, correct_bias=correct_bias, plot_bias=plot_bias, ...)
 
   list(res = results, genes = genes, anno = anno, out = out)
