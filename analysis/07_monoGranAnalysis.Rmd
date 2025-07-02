@@ -1,0 +1,416 @@
+---
+title: "07_monoGranAnalysis"
+author: "Caitlin Page"
+date: "2025-05-02"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+## Packages
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(DMRcate)
+library(edgeR)
+library(BiasedUrn)
+library(GO.db)
+library(org.Hs.eg.db)
+library(biomaRt)
+```
+
+## Get counts
+```{r}
+seq_names <- seqnames(BSgenome.Hsapiens.UCSC.hg19)[1:25]
+anno_seq <- lapply(seq_names, function(x) {
+  cbind(data.frame(matchPattern("CG", BSgenome.Hsapiens.UCSC.hg19[[x]])),
+        seqnames = x)}) %>%
+  dplyr::bind_rows()
+anno_seq <- anno_seq %>% mutate(pos = paste0(seqnames, "-", start)) %>%
+  relocate(pos, seqnames)
+```
+
+```{r}
+file_path <- paste0("../data/wgbs_3/", list.files("../data/wgbs_3"))
+file_path
+```
+
+```{r}
+# Mono counts
+fname <- file_path[1]
+N <- file.info(fname)$size
+beta_cd4 <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- file_path[2]
+N <- file.info(fname)$size
+beta_cd4 <- cbind(beta_cd4, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- file_path[3]
+N <- file.info(fname)$size
+beta_cd4 <- cbind(beta_cd4, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_cd4) <- c("M_TP", "C_TP", "M_U3", "C_U3", "M_UH", "C_UH")
+beta_cd4 <- cbind(anno_seq[,1:4], beta_cd4)
+
+# Granulocytes counts
+fname <- file_path[4]
+N <- file.info(fname)$size
+beta_cd8 <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- file_path[5]
+N <- file.info(fname)$size
+beta_cd8 <- cbind(beta_cd8, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- file_path[6]
+N <- file.info(fname)$size
+beta_cd8 <- cbind(beta_cd8, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_cd8) <- c("M_TZ", "C_TZ", "M_UD", "C_UD", "M_UT", "C_UT")
+beta_cd8 <- cbind(anno_seq[,1:4], beta_cd8)
+
+# add unmeth counts
+beta_cd4 <- beta_cd4 %>% mutate(Un_TP = C_TP - M_TP, Un_U3 = C_U3 - M_U3, Un_UH = C_UH - M_UH)
+beta_cd8 <- beta_cd8 %>% mutate(Un_TZ = C_TZ - M_TZ, Un_UD = C_UD - M_UD, Un_UT = C_UT - M_UT)
+
+# combine
+colnames(beta_cd4)[5:13] <- paste0("mono_", colnames(beta_cd4)[5:13])
+colnames(beta_cd8)[5:13] <- paste0("gran_", colnames(beta_cd8)[5:13])
+
+wgbs_counts_mono_gran <- cbind(beta_cd4, beta_cd8[,5:13])
+saveRDS(wgbs_counts_mono_gran, "../output/wgbs_counts_mono_gran.rds")
+```
+
+```{r}
+head(wgbs_counts_t)
+```
+
+## DM analysis
+* Using DMRcate
+* Takes in a BSmooth object
+* This is very computationally intense and was run on HPC
+```{r eval=FALSE}
+wgbs_counts_mono_gran <- wgbs_counts_mono_gran %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
+m_df <- wgbs_counts_mono_gran[,c(5,7,9,14,16,18)]
+colnames(m_df) <- colnames(m_df) %>% gsub("_M", "", .)
+
+coverage_df <- wgbs_counts_mono_gran[,c(6,8,10,15,17,19)]
+colnames(coverage_df) <- colnames(coverage_df) %>% gsub("_C", "", .)
+
+sample_stuff <- cbind(Type = c("mono", "mono", "mono", "gran", "gran", "gran")) %>% data.frame()
+rownames(sample_stuff) <- colnames(m_df)
+
+## make BSseq object
+bseq_cd4_vs_cd8_all <- BSseq(M = as.matrix(m_df),
+                             Cov = as.matrix(coverage_df), pData = sample_stuff,
+                             chr = wgbs_counts_mono_gran$seqnames, pos = as.numeric(wgbs_counts_mono_gran$start),
+                             sampleNames = colnames(m_df))
+
+## BSmooth by sample - so it doesn't crash
+bsmooth1 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,1], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth2 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,2], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth3 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,3], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth4 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,4], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth5 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,5], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth6 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,6], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth_obj <- combine(bsmooth1, bsmooth2, bsmooth3, bsmooth4, bsmooth5, bsmooth6)
+## filter
+bseq.cov <- getCoverage(bsmooth_obj)
+keep <- which(rowSums(bseq.cov[, bsmooth_obj$Type == "mono"] >= 2) >= 2 &
+                rowSums(bseq.cov[, bsmooth_obj$Type == "gran"] >= 2) >= 2)
+
+bsmooth_obj <- bsmooth_obj[keep,]
+saveRDS(bsmooth_obj, "../output/bsmooth_obj_mono_gran.rds")
+```
+
+```{r}
+bsmooth_obj <- readRDS("../output/bsmooth_obj_mono_gran.rds")
+tissue <- factor(c("mono", "mono", "mono", "gran", "gran", "gran"), levels = c("mono", "gran"))
+tissue
+#Regular matrix design
+design <- model.matrix(~tissue)
+design
+
+methdesign <- modelMatrixMeth(design)
+methdesign
+
+seq_annot <- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE, 
+                                 coef = 8, fdr=0.05)
+
+seq_dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
+
+dmrcate_seq_dmr <- extractRanges(seq_dmrcate.res, genome = "hg19")
+dmrcate_seq_dmr <- dmrcate_seq_dmr %>% data.frame()
+dmrcate_seq_anno <- seq_annot@ranges %>% data.frame()
+saveRDS(dmrcate_seq_dmr, "../output/dmrcate_seq_dmr_mono_gran.rds")
+saveRDS(seq_annot, "../output/dmrcate_seq_anno.rds")
+```
+```{r}
+dmrcate_seq_dmr_mg <- readRDS("../output/dmrcate_seq_dmr_mono_gran.rds")
+```
+
+```{r}
+head(dmrcate_seq_anno)
+```
+
+```{r}
+dmrcate_seq_anno %>% group_by(is.sig) %>% summarise(n=n())
+```
+```{r}
+dmrcate_seq_anno %>% filter(seqnames == "chr1") %>% .[1:1000,] %>%
+  ggplot(aes(x = start, y = stat, colour = is.sig)) +
+  geom_point() +
+  geom_line()
+```
+
+```{r}
+nrow(dmrcate_seq_dmr)
+head(dmrcate_seq_dmr)
+```
+```{r}
+
+```
+
+```{r}
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = width)) +
+  geom_density()
+```
+
+```{r}
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+```
+
+## GST
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+anno_dmrcate_mg <- annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes)
+gst_out_mg <- run_miss_methyl_a(biomart_genes, anno_dmrcate_mg)
+gst_res_mg <- run_miss_methyl_b(gst_out_mg, "GO", "Wallenius")[[1]]
+gst_res_mg$rank_fdr <- 1:nrow(gst_res_mg)
+gst_res_mg <- gst_res_mg %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg)
+saveRDS(gst_res_mg, "../output/gst_res_dmrcate_mono_gran.rds")
+```
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_mg_null <- run_miss_methyl_b(gst_out_mg, "GO", "None")[[1]]
+gst_res_mg_null$rank_fdr <- 1:nrow(gst_res_mg_null)
+gst_res_mg_null <- gst_res_mg_null %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg_null)
+saveRDS(gst_res_mg_null, "../output/gst_res_dmrcate_mono_gran_null.rds")
+```
+```{r}
+gst_res_mg
+```
+
+```{r}
+gst_res_mg_null
+```
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+anno_dmrcate_mg_1k <- annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)
+gst_out_mg_1k <- run_miss_methyl_a(biomart_genes, anno_dmrcate_mg_1k)
+gst_res_mg_1k <- run_miss_methyl_b(gst_out_mg_1k, "GO", "Wallenius")[[1]]
+gst_res_mg_1k$rank_fdr <- 1:nrow(gst_res_mg_1k)
+gst_res_mg_1k <- gst_res_mg_1k %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg_1k)
+saveRDS(gst_res_mg_1k, "../output/gst_res_dmrcate_mono_gran_1k.rds")
+
+gst_res_mg_null_1k <- run_miss_methyl_b(gst_out_mg_1k, "GO", "None")[[1]]
+gst_res_mg_null_1k$rank_fdr <- 1:nrow(gst_res_mg_null_1k)
+gst_res_mg_null_1k <- gst_res_mg_null_1k %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg_null_1k)
+saveRDS(gst_res_mg_null_1k, "../output/gst_res_dmrcate_mono_gran_null_1k.rds")
+```
+
+dum de de day the results look bad again
+
+try the plots
+```{r}
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
+immuneGO <- distinct(immuneGO)
+```
+
+
+```{r}
+xx <- as.list(org.Hs.egGO2ALLEGS)
+out <- run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes))
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+go_entrez <- go_entrez[,1:2] %>% data.frame()
+go_entrez <- go_entrez %>%
+  mutate(num_cg = data.frame(out$freq)[match(.$entrez, data.frame(out$freq)$freq_make_table), "Freq"],
+         dmrcate_1k = ifelse(go %in% rownames(filter(gst_res_mg_1k, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_1k_null = ifelse(go %in% rownames(filter(gst_res_mg_null_1k, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_all = ifelse(go %in% rownames(filter(gst_res_mg, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_all_null = ifelse(go %in% rownames(filter(gst_res_mg_null, FDR < 0.05)), TRUE, FALSE))
+go_entrez <- go_entrez %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg))
+go_entrez <- go_entrez %>% group_by(go) %>% mutate(mean_cg = mean(num_cg)) %>% ungroup()
+
+go_entrez <- go_entrez %>%
+  mutate(rank_1k = gst_res_mg_1k[match(.$go, gst_res_mg_1k$GOID), "rank_fdr"],
+         rank_1k_null = gst_res_mg_null_1k[match(.$go, gst_res_mg_null_1k$GOID), "rank_fdr"],,
+         rank_all = gst_res_mg[match(.$go, gst_res_mg$GOID), "rank_fdr"],
+         rank_all_null = gst_res_mg_null[match(.$go, gst_res_mg_null$GOID), "rank_fdr"])
+```
+
+```{r}
+go_entrez %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 1000, rank_1k_null <= 1000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") +
+  scale_x_continuous(limits = c(0, 1500))
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% 
+  filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = case_when(dmrcate_1k == FALSE & dmrcate_1k_null == TRUE ~ "Biased",
+                            dmrcate_1k == TRUE & dmrcate_1k_null == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_cg), y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_res_mg_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_res_mg_null_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_res_mg[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Wall") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_res_mg_null[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Hyper") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+ok so these don't look very good
+in the sense that they look bad
+why?
+
+
+hmmm google says difference is something to do with granules in the cytoplasm
+so maybe this is a bad one?
+maybe it will look better with non go?
+```{r}
+run_miss_methyl_b()
+```
+
+# try msigdb
+
+there's an immune one = c7
+and c8 is cell types!!
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+anno_dmrcate_mg <- annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes)
+gst_out_mg <- run_miss_methyl_a(biomart_genes, anno_dmrcate_mg)
+gst_res_mg_c7 <- run_miss_methyl_b(gst_out_mg, "MsigDb", "Wallenius", msig_collection = "c7")[[1]]
+gst_res_mg_c7$rank_fdr <- 1:nrow(gst_res_mg_c7)
+gst_res_mg_c7 <- gst_res_mg_c7 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg_c7)
+saveRDS(gst_res_mg_c7, "../output/gst_res_dmrcate_mono_gran_c7.rds")
+```
+
+```{r}
+gst_res_mg_c7
+```
+
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_mg_null_c7 <- run_miss_methyl_b(gst_out_mg, "MsigDb", "None", msig_collection = "c7")[[1]]
+gst_res_mg_null_c7$rank_fdr <- 1:nrow(gst_res_mg_null_c7)
+gst_res_mg_null_c7 <- gst_res_mg_null_c7 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg_null_c7)
+saveRDS(gst_res_mg_null_c7, "../output/gst_res_dmrcate_mono_gran_null_c7.rds")
+```
+
+cool cool so I have no idea what these mean
+hopefully cell types will be better
+
+oh dear I think monocytes and granulocytes are related - there are terms that have both in the name
+```{r}
+gst_res_mg_null_c7 %>% filter(is.sig == TRUE)
+```
+
+```{r}
+gst_res_mg_c7[grepl("GRANULOCYTE", rownames(gst_res_mg_c7)),]
+```
+
+- so some of them are significant?
+- but not highly ranked
+
+```{r}
+gst_res_mg_null_c7[grepl("GRANULOCYTE", rownames(gst_res_mg_null_c7)),]
+```
+
+- null has more of them as true
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+anno_dmrcate_mg <- annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr, "biomart", biomart_genes)
+gst_out_mg <- run_miss_methyl_a(biomart_genes, anno_dmrcate_mg)
+gst_res_mg_c8 <- run_miss_methyl_b(gst_out_mg, "MsigDb", "Wallenius", msig_collection = "c8")[[1]]
+gst_res_mg_c8$rank_fdr <- 1:nrow(gst_res_mg_c8)
+gst_res_mg_c8 <- gst_res_mg_c8 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg_c8)
+saveRDS(gst_res_mg_c8, "../output/gst_res_dmrcate_mono_gran_c8.rds")
+
+
+gst_res_mg_null_c8 <- run_miss_methyl_b(gst_out_mg, "MsigDb", "None", msig_collection = "c8")[[1]]
+gst_res_mg_null_c8$rank_fdr <- 1:nrow(gst_res_mg_null_c8)
+gst_res_mg_null_c8 <- gst_res_mg_null_c7 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_mg_null_c8)
+saveRDS(gst_res_mg_null_c8, "../output/gst_res_dmrcate_mono_gran_null_c8.rds")
+```
+
+I'm unconvinced this is showing me good things
+
+```{r}
+gst_res_mg_c8[grepl("GRANULOCYTE", rownames(gst_res_mg_c8)),]
+gst_res_mg_c8[grepl("MONOCYTE", rownames(gst_res_mg_c8)),]
+```
+- actually this one is better - we've got some monocyte stuff in the top
+
+```{r}
+gst_res_mg_null_c8[grepl("GRANULOCYTE", rownames(gst_res_mg_null_c8)),]
+gst_res_mg_null_c8[grepl("MONOCYTE", rownames(gst_res_mg_null_c8)),]
+```
+
+- why does null have so many more??
+- at least ranks are better for mono in wall but still it's weird
+- also on the website there's only 840 c8 gene sets, so how does null results have > 5k???
+```{r}
+gst_res_mg_null_c8[grepl("MONOCYTE", rownames(gst_res_mg_null_c8)),] %>% distinct()
+```
+
