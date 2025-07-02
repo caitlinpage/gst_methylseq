@@ -1,0 +1,260 @@
+---
+title: "04_compareGSTResults"
+author: "Caitlin Page"
+date: "2025-04-30"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Wallenius")[[1]]
+```
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_genes <- annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)
+gst_out_dmr1 <- run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes))
+```
+
+
+```{r}
+gst_res_dmr5 <- readRDS("../output/gst_res_dmrcate_5k.rds")
+gst_res_dmr1 <- readRDS("../output/gst_res_dmrcate_1k.rds")
+```
+
+```{r}
+gst_out_dmr1$freq %>% data.frame()
+```
+
+```{r}
+gst_out_dmr1$universe
+```
+```{r}
+go_entrez
+```
+
+```{r}
+go_entrez_dmrcate_seq <- go_entrez
+```
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% mutate(gene_dm_1k = ifelse(entrez %in% gst_out_dmr1$sig.eg, TRUE, FALSE),
+                                 sig_1k = ifelse(go %in% filter(gst_res_dmr1, is.sig == TRUE)$GOID, TRUE, FALSE),
+                                 rank_1k = gst_res_dmr1[match(.$go, gst_res_dmr1$GOID), "rank_fdr"],
+                                 FDR_1k = gst_res_dmr1[match(.$go, gst_res_dmr1$GOID), "FDR"])
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% group_by(go, term, sig_1k, gene_dm_1k) %>% summarise(n=n()) %>% ungroup() %>% group_by(go) %>% mutate(prop_genes_dm = n/sum(n)) %>% mutate(gene_dm_1k = ifelse(sig_1k == FALSE & prop_genes_dm == 1))
+```
+```{r}
+go_entrez_dmrcate_seq %>% filter(term == "immune system process")
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% group_by(go, term, sig_1k, gene_dm_1k, rank_1k, FDR_1k) %>% distinct(.) %>% summarise(n=n()) %>% ungroup() %>% group_by(go) %>% mutate(total = sum(n), prop_genes_dm = n/sum(n)) %>% filter(gene_dm_1k == TRUE) %>% ungroup() %>% .[order(.$rank_1k),]
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% group_by(go, term, sig_1k, gene_dm_1k, rank_1k, FDR_1k) %>% distinct(.) %>% summarise(n=n()) %>% ungroup() %>% group_by(go) %>% mutate(prop_genes_dm = n/sum(n)) %>% filter(gene_dm_1k == TRUE) %>%
+  ggplot(aes(x = prop_genes_dm, y = rank_1k)) +
+  geom_point(alpha = 0.3)
+```
+- ok jovanas plot is opposite to this
+something is weird
+```{r}
+go_entrez_dmrcate_seq %>% group_by(go, term, sig_1k, gene_dm_1k, rank_1k, FDR_1k) %>% distinct(.) %>% summarise(n=n()) %>% ungroup() %>% group_by(go) %>% mutate(prop_genes_dm = n/sum(n)) %>% filter(gene_dm_1k == TRUE) %>%
+  ggplot(aes(x = prop_genes_dm, y = -log10(FDR_1k))) +
+  geom_point(alpha = 0.3)
+```
+ok it's not the missing p value thing it's something else
+oh hold up is this where doing the bias correction actually stops this???
+
+let's ditch the signif
+i want prop genes dm
+and average number of cpgs
+```{r}
+gst_out_dmr1$freq %>% data.frame()
+```
+```{r}
+go_entrez_dmrcate_seq <- distinct(go_entrez_dmrcate_seq)
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% group_by(go) %>% mutate(n_cg_gene = ifelse(is.na(n_cg_gene), 0, n_cg_gene),
+  mean_cg_go = mean(n_cg_gene)) %>% group_by(go, term, sig_1k, gene_dm_1k, rank_1k, FDR_1k, mean_cg_go) %>% distinct(.) %>% summarise(n=n()) %>% ungroup() %>% group_by(go) %>% mutate(prop_genes_dm = n/sum(n)) %>% filter(gene_dm_1k == TRUE)
+```
+
+- other theory
+- it's because of bias correction
+- so let's try hyper
+```{r}
+gst_res_dmr1_hyper <- readRDS("../output/gst_res_dmr1_hyper.rds")
+```
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% mutate(sig_1k_hyper = ifelse(go %in% filter(gst_res_dmr1_hyper, is.sig == TRUE)$GOID, TRUE, FALSE),
+                                 rank_1k_hyper = gst_res_dmr1_hyper[match(.$go, gst_res_dmr1_hyper$GOID), "rank_fdr"],
+                                 FDR_1k_hyper = gst_res_dmr1_hyper[match(.$go, gst_res_dmr1_hyper$GOID), "FDR"])
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% group_by(go, term, sig_1k_hyper, gene_dm_1k, rank_1k_hyper, FDR_1k_hyper) %>% distinct(.) %>% summarise(n=n()) %>% ungroup() %>% group_by(go) %>% mutate(prop_genes_dm = n/sum(n)) %>% filter(gene_dm_1k == TRUE)
+```
+
+
+```{r}
+go_entrez_dmrcate_seq %>% group_by(go, term, sig_1k_hyper, gene_dm_1k, rank_1k_hyper, FDR_1k_hyper) %>% distinct(.) %>% summarise(n=n()) %>% ungroup() %>% group_by(go) %>% mutate(prop_genes_dm = n/sum(n)) %>% filter(gene_dm_1k == TRUE) %>%
+  ggplot(aes(x = prop_genes_dm, y = -log10(FDR_1k_hyper))) +
+  geom_point(alpha = 0.3)
+```
+- nope that still didn't do it
+
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% group_by(go) %>% mutate(n_genes_go = n()) #i had double ups which got removed with distinct
+
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% ungroup() %>% data.frame()
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% filter(term == "immune system process") %>% group_by(gene_dm_1k) %>% mutate(n=n())
+```
+
+- it would make sense for go terms to be higher ranked if they have more dm genes
+```{r}
+gst_res_dmr1
+gst_res_dmr1 %>%
+  ggplot(aes(x = log2(N))) +
+  geom_density()
+```
+
+```{r}
+gst_res_dmr1 %>% mutate(prop = DE/N) %>%
+  ggplot(aes(x = prop, y = -log10(FDR))) +
+  geom_point()
+
+gst_res_dmr1 %>% mutate(prop = DE/N) %>% filter(FDR < 0.05) %>%
+  ggplot(aes(x = prop, y = -log10(FDR))) +
+  geom_point()
+```
+```{r}
+gst_res_dmr1 %>% mutate(prop = DE/N) %>% filter(prop >= 0.5)
+```
+```{r}
+gst_res_dmr1 %>% mutate(prop = DE/N) %>% mutate(in_immune = ifelse(GOID %in% immuneGO$GOIS, TRUE, FALSE)) %>%
+  filter(N < 1000, N > 10) %>%
+  ggplot(aes(x = prop, y = -log10(FDR), size = N)) +
+  geom_point(alpha = 0.3)
+```
+
+```{r}
+gst_res_dmr1 %>% mutate(prop = DE/N) %>% mutate(in_immune = ifelse(GOID %in% immuneGO$GOIS, TRUE, FALSE)) %>%
+  filter(N < 1000, N > 10) %>%
+  ggplot(aes(x = prop, y = -log10(FDR), colour = in_immune)) +
+  geom_point(alpha = 0.3)
+```
+```{r}
+gst_res_dmr1_hyper %>% mutate(prop = DE/N) %>% mutate(in_immune = ifelse(GOID %in% immuneGO$GOIS, TRUE, FALSE)) %>%
+  filter(N < 1000, N > 10) %>%
+  ggplot(aes(x = prop, y = -log10(FDR), colour = in_immune)) +
+  geom_point(alpha = 0.3)
+```
+
+```{r}
+immuneGO
+```
+
+
+
+# set up go
+```{r}
+xx <- as.list(org.Hs.egGO2ALLEGS)
+if(length(xx) > 0){
+    # Gets the Entrez Gene identifiers for the top 2nd and 3nd GO identifiers
+    goids <- xx[2:3]
+    # Gets all the Entrez Gene identifiers for the first element of goids
+    goids[[1]]
+    # Evidence code for the mappings
+    names(goids[[1]])
+}
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+```
+```{r}
+go_entrez_dmrcate <- go_entrez[,1:2]
+go_entrez_dmrcate <- go_entrez_dmrcate %>% mutate(mm_array_num_cg = data.frame(mm_map_dmrcate_array$freq)[match(.$entrez, data.frame(mm_map_dmrcate_array$freq)$eg.all), "Freq"],
+                             me_array_num_cg = data.frame(me_gst_dmrcate_array_out$freq)[match(.$entrez, data.frame(me_gst_dmrcate_array_out$freq)$freq_make_table), "Freq"])
+go_entrez_dmrcate <- go_entrez_dmrcate %>% mutate(mm_array_num_cg = ifelse(is.na(mm_array_num_cg),0,mm_array_num_cg),
+                                                 me_array_num_cg = ifelse(is.na(me_array_num_cg),0,me_array_num_cg) )
+
+go_entrez_dmrcate <- go_entrez_dmrcate %>% 
+  mutate(mm_array = ifelse(go %in% rownames(filter(mm_dmrcate_array, FDR < 0.05)), TRUE, FALSE),
+         mm_array_null = ifelse(go %in% rownames(filter(mm_dmrcate_array_null, FDR < 0.05)), TRUE, FALSE))
+
+go_entrez_dmrcate <- go_entrez_dmrcate %>% 
+  mutate(mm_array2 = ifelse(go %in% rownames(filter(mm_dmrcate_array2, FDR < 0.05)), TRUE, FALSE),
+         mm_array_null2 = ifelse(go %in% rownames(filter(mm_dmrcate_array2_null, FDR < 0.05)), TRUE, FALSE))
+```
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate[,1:2] %>% data.frame()
+```
+
+```{r}
+mm_cheat_gst_5k
+mm_cheat_gst_5k_null
+mm_cheat_gst_1k
+mm_cheat_gst_1k_null
+```
+
+```{r}
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% data.frame() %>%
+  mutate(num_cg = data.frame(me_gst_dmrcate_seq_out_5k$freq)[match(.$entrez, data.frame(me_gst_dmrcate_seq_out_5k$freq)$freq_make_table), "Freq"],
+         dmrcate_1k = ifelse(go %in% rownames(filter(mm_cheat_gst_1k, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_1k_null = ifelse(go %in% rownames(filter(mm_cheat_gst_1k_null, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_5k = ifelse(go %in% rownames(filter(mm_cheat_gst_5k, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_5k_null = ifelse(go %in% rownames(filter(mm_cheat_gst_5k_null, FDR < 0.05)), TRUE, FALSE))
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg))
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>% group_by(go) %>% mutate(mean_cg = mean(num_cg)) %>% ungroup()
+
+go_entrez_dmrcate_seq <- go_entrez_dmrcate_seq %>%
+  mutate(rank_5k = mm_cheat_gst_5k[match(.$go, mm_cheat_gst_5k$GOID), "rank_fdr"],
+         rank_5k_null = mm_cheat_gst_5k_null[match(.$go, mm_cheat_gst_5k_null$GOID), "rank_fdr"],
+         rank_1k = mm_cheat_gst_1k[match(.$go, mm_cheat_gst_1k$GOID), "rank_fdr"],
+         rank_1k_null = mm_cheat_gst_1k_null[match(.$go, mm_cheat_gst_1k_null$GOID), "rank_fdr"])
+```
+
+```{r}
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+go_entrez_dmrcate_seq %>% distinct(go, mean_cg, dmrcate_5k, dmrcate_5k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+* ah why does it look like this
+* wait could i use like top 100 and fix??
+
+```{r}
+go_entrez_dmrcate_seq %>% filter(rank_1k <= 100 | rank_1k_null <= 100) %>% distinct(go, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+go_entrez_dmrcate_seq %>% filter(rank_5k <= 100 | rank_5k_null <= 100) %>% distinct(go, mean_cg, dmrcate_5k, dmrcate_5k_null) %>% melt(id = c("go", "mean_cg")) %>% filter(value == TRUE) %>%
+  ggplot(aes(x = variable, y = mean_cg, fill = variable)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y = "Average number of CpGs per ontology category")
+```
+
+
+
+
