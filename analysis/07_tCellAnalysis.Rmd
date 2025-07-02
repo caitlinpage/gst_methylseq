@@ -1,0 +1,284 @@
+---
+title: "07_tCellAnalysis"
+author: "Caitlin Page"
+date: "2025-04-29"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+## Packages
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(DMRcate)
+library(BiasedUrn)
+library(GO.db)
+library(biomaRt)
+```
+
+## Get counts
+```{r}
+seq_names <- seqnames(BSgenome.Hsapiens.UCSC.hg19)[1:25]
+anno_seq <- lapply(seq_names, function(x) {
+  cbind(data.frame(matchPattern("CG", BSgenome.Hsapiens.UCSC.hg19[[x]])),
+        seqnames = x)}) %>%
+  dplyr::bind_rows()
+anno_seq <- anno_seq %>% mutate(pos = paste0(seqnames, "-", start)) %>%
+  relocate(pos, seqnames)
+```
+
+```{r}
+file_path <- paste0("../data/wgbs_2/", list.files("../data/wgbs_2"))
+file_path
+```
+
+```{r}
+# CD4 counts
+fname <- file_path[1]
+N <- file.info(fname)$size
+beta_cd4 <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- file_path[2]
+N <- file.info(fname)$size
+beta_cd4 <- cbind(beta_cd4, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- file_path[3]
+N <- file.info(fname)$size
+beta_cd4 <- cbind(beta_cd4, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_cd4) <- c("M_TT", "C_TT", "M_U7", "C_U7", "M_UM", "C_UM")
+beta_cd4 <- cbind(anno_seq[,1:4], beta_cd4)
+
+# CD8 counts
+fname <- file_path[4]
+N <- file.info(fname)$size
+beta_cd8 <- data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE))
+fname <- file_path[5]
+N <- file.info(fname)$size
+beta_cd8 <- cbind(beta_cd8, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+fname <- file_path[6]
+N <- file.info(fname)$size
+beta_cd8 <- cbind(beta_cd8, data.frame(matrix(readBin(fname, "integer", N, size = 1, signed = FALSE), N / 2, 2, byrow=TRUE)))
+colnames(beta_cd8) <- c("M_TR", "C_TR", "M_U5", "C_U5", "M_UK", "C_UK")
+beta_cd8 <- cbind(anno_seq[,1:4], beta_cd8)
+
+# add unmeth counts
+beta_cd4 <- beta_cd4 %>% mutate(Un_TT = C_TT - M_TT, Un_U7 = C_U7 - M_U7, Un_UM = C_UM - M_UM)
+beta_cd8 <- beta_cd8 %>% mutate(Un_TR = C_TR - M_TR, Un_U5 = C_U5 - M_U5, Un_UK = C_UK - M_UK)
+
+# combine
+colnames(beta_cd4)[5:13] <- paste0("cd4_", colnames(beta_cd4)[5:13])
+colnames(beta_cd8)[5:13] <- paste0("cd8_", colnames(beta_cd8)[5:13])
+
+wgbs_counts_t <- cbind(beta_cd4, beta_cd8[,5:13])
+saveRDS(wgbs_counts_t, "../output/wgbs_counts_t.rds")
+```
+
+```{r}
+head(wgbs_counts_t)
+```
+
+## DM analysis
+* Using DMRcate
+* Takes in a BSmooth object
+* This is very computationally intense and was run on HPC
+```{r eval=FALSE}
+wgbs_counts_t <- wgbs_counts_t %>% filter(!seqnames %in% c("chrX", "chrY", "chrM"))
+m_df <- wgbs_counts_t[,c(5,7,9,14,16,18)]
+colnames(m_df) <- colnames(m_df) %>% gsub("_M", "", .)
+
+coverage_df <- wgbs_counts_t[,c(6,8,10,15,17,19)]
+colnames(coverage_df) <- colnames(coverage_df) %>% gsub("_C", "", .)
+
+sample_stuff <- cbind(Type = c("cd4", "cd4", "cd4", "cd8", "cd8", "cd8")) %>% data.frame()
+rownames(sample_stuff) <- colnames(m_df)
+
+## make BSseq object
+bseq_cd4_vs_cd8_all <- BSseq(M = as.matrix(m_df),
+                          Cov = as.matrix(coverage_df), pData = sample_stuff,
+                          chr = wgbs_counts_t$seqnames, pos = as.numeric(wgbs_counts_t$start),
+                          sampleNames = colnames(m_df))
+
+## BSmooth by sample - so it doesn't crash
+bsmooth1 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,1], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth2 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,2], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth3 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,3], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth4 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,4], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth5 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,5], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+bsmooth6 <- BSmooth(BSseq = bseq_cd4_vs_cd8_all[,6], BPPARAM = MulticoreParam(workers = 6), verbose = TRUE)
+
+bsmooth_obj <- combine(bsmooth1, bsmooth2, bsmooth3, bsmooth4, bsmooth5, bsmooth6)
+## filter
+bseq.cov <- getCoverage(bsmooth_obj)
+keep <- which(rowSums(bseq.cov[, bsmooth_obj$Type == "cd4"] >= 2) >= 2 &
+                rowSums(bseq.cov[, bsmooth_obj$Type == "cd8"] >= 2) >= 2)
+length(keep)
+
+bsmooth_obj <- bsmooth_obj[keep,]
+saveRDS(bsmooth_obj, "../output/bsmooth_obj_t.rds")
+```
+
+```{r eval=FALSE}
+tissue <- factor(c("cd4", "cd4", "cd4", "cd8", "cd8", "cd8"), levels = c("cd4", "cd8"))
+tissue
+#Regular matrix design
+design <- model.matrix(~tissue)
+design
+
+methdesign <- modelMatrixMeth(design)
+methdesign
+
+seq_annot <- sequencing.annotate(bsmooth_obj, methdesign, all.cov = TRUE, 
+                                 coef = 8, fdr=0.05)
+#saveRDS(seq_annot, "../output/dmrcate_seq_anno.rds")
+
+seq_dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
+
+dmrcate_seq_dmr <- extractRanges(seq_dmrcate.res, genome = "hg19")
+dmrcate_seq_dmr <- dmrcate_seq_dmr %>% data.frame()
+dmrcate_seq_anno <- seq_annot@ranges %>% data.frame()
+#saveRDS(dmrcate_seq_dmr, "../output/dmrcate_seq_dmr.rds")
+```
+* problem
+* only get 10 dmrs
+* 11 if make min.cpgs = 3
+
+* so let's try bsseq
+* because it was less stringent last time around
+
+```{r}
+bsmooth_obj_t <- readRDS("../output/bsmooth_obj_t.rds")
+```
+```{r}
+library(bsseq)
+```
+```{r}
+bsseq.tstat <- BSmooth.tstat(bsmooth_obj_t, group1 = c("cd4_TT", "cd4_U7", "cd4_UM"),group2 = c("cd8_TR", "cd8_U5", "cd8_UK"),estimate.var = "group2",
+                             local.correct = TRUE,
+                             verbose = TRUE, mc.cores = 4)
+
+bsseq_res_t <- bsseq.tstat@stats %>% data.frame() %>%
+  mutate(seqnames = data.frame(bsseq.tstat@gr)$seqnames,
+         start = data.frame(bsseq.tstat@gr)$start,
+         end = start, position = paste0(seqnames, "-", start)) %>%
+  relocate(position)
+saveRDS(bsseq_res_t, "../output/bsseq_res_t.rds")
+```
+
+```{r}
+bsseq_dmrs_t <- dmrFinder(bsseq.tstat)
+# filter the dmrs
+bsseq_dmrs_t <- subset(bsseq_dmrs_t, n >= 3 & abs(meanDiff) >= 0.1)
+colnames(bsseq_dmrs_t)[1] <- "seqnames"
+bsseq_dmrs_t <- bsseq_dmrs_t %>%
+  mutate(position = paste0(seqnames, "-", start)) %>% relocate(position)
+bsseq_dmrs_t$rank <- 1:nrow(bsseq_dmrs_t)
+saveRDS(bsseq_dmrs_t, "../output/bsseq_dmrs_t.rds")
+```
+
+```{r}
+nrow(bsseq_dmrs_t)
+bsseq_dmrs_t %>% filter(abs(areaStat) > 100) %>% nrow()
+```
+* ok this is more like it
+```{r}
+bsseq_dmrs_t_filt <- bsseq_dmrs_t %>% filter(abs(areaStat) > 100)
+```
+
+
+## Gene annotation
+```{r}
+anno_bsseq_t %>% distinct(ensembl_gene_id)
+```
+```{r}
+bsseq_dmrs_t_filt %>%
+  ggplot(aes(x = width)) +
+  geom_density()
+```
+```{r}
+gst_res_t
+```
+
+## GST
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+anno_bsseq_t <- annoGeneDmr(bsseq_res_t, bsseq_dmrs_t_filt, "biomart", biomart_genes)
+gst_out_t <- run_miss_methyl_a(biomart_genes, anno_bsseq_t)
+gst_res_t <- run_miss_methyl_b(gst_out_t, "Wallenius")[[1]]
+gst_res_t$rank_fdr <- 1:nrow(gst_res_t)
+gst_res_t <- gst_res_t %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_t)
+saveRDS(gst_res_t, "../output/gst_res_bsseq_t.rds")
+```
+```{r}
+gst_res_t_all <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(bsseq_res_t, bsseq_dmrs_t, "biomart", biomart_genes)), "Wallenius")[[1]]
+gst_res_t_all$rank_fdr <- 1:nrow(gst_res_t_all)
+gst_res_t_all <- gst_res_t_all %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_t_all)
+saveRDS(gst_res_t_all, "../output/gst_res_bsseq_t.rds")
+```
+```{r}
+dmrcate_seq_anno_t <- readRDS("../output/dmrcate_seq_anno_t.rds")
+```
+```{r}
+dmrcate_seq_anno_t@ranges %>% data.frame() %>% group_by(is.sig) %>% summarise(n())
+```
+- could try changing fdr=0.1
+
+## Eval
+```{r}
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
+immuneGO <- distinct(immuneGO)
+```
+
+```{r}
+gst_res_t
+gst_res_t_all
+```
+
+```{r}
+venn_list <- list(filt = filter(gst_res_t, FDR < 0.05)$TERM, all = filter(gst_res_t_all, FDR < 0.05)$TERM)
+ggVennDiagram(venn_list)
+```
+
+```{r}
+gst_100 <- rbind(
+  gst_res_t[1:100,] %>% mutate(in_all = cumsum(GOID %in% filter(gst_res_t_all, FDR < 0.05)$GOID), method = "Wall") %>% .[names(.) %in% c("rank_fdr", "in_all", "method")])
+
+gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_all, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in unfiltered sets")
+
+gst_res_t %>% mutate(rank_all = gst_res_t_all[match(.$GOID, gst_res_t_all$GOID), "rank_fdr"]) %>%
+  ggplot(aes(x = rank_fdr, y = rank_all)) +
+  geom_point(alpha = 0.3)
+```
+
+```{r}
+gst_res_t %>% mutate(rank_all = gst_res_t_all[match(.$GOID, gst_res_t_all$GOID), "rank_fdr"]) %>%
+  ggplot(aes(x = rank_fdr, y = rank_all)) +
+  geom_point(alpha = 0.3)
+
+gst_res_t %>% mutate(rank_all = gst_res_t_all[match(.$GOID, gst_res_t_all$GOID), "rank_fdr"]) %>% filter(rank_fdr <= 100) %>%
+  ggplot(aes(x = rank_fdr, y = rank_all)) +
+  geom_point(alpha = 0.3)
+
+gst_res_t %>% mutate(rank_all = gst_res_t_all[match(.$GOID, gst_res_t_all$GOID), "rank_fdr"]) %>% filter(rank_fdr <= 40) %>%
+  ggplot(aes(x = rank_fdr, y = rank_all)) +
+  geom_point(alpha = 0.3)
+```
+
+
+```{r}
+gst_res_t %>% mutate(rank_all = gst_res_t_all[match(.$GOID, gst_res_t_all$GOID), "rank_fdr"])
+```
+
