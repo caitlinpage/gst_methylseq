@@ -7,6 +7,9 @@ editor_options:
   chunk_output_type: console
 ---
 
+## Introduction
+To confirm that my function is robust, running microarray through my testing and sequencing through missMethyl should result in the same results as the standard pipeline of steps.
+
 ## Packages
 
 ```{r}
@@ -20,4 +23,19 @@ library(dplyr)
 library(ggplot2)
 library(ggVennDiagram)
 ```
+
+## Pre-processed files
+```{r}
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
+dmrcate_seq_anno <- data.frame(dmrcate_seq_anno@ranges)
+
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
+immuneGO <- distinct(immuneGO)
+```
+
+
 
