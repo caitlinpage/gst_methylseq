@@ -115,6 +115,9 @@ nrow(wgbs_counts)
 head(wgbs_counts)
 ```
 
+```{r}
+m_df/coverage_df
+```
 
 
 ## Differential Methylation Analysis
