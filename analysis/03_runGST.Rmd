@@ -45,12 +45,13 @@ immuneGO <- distinct(immuneGO)
 ```{r}
 source("../code/mmGST.R")
 source("../code/function_binBiasPlot.R")
-gst_res_dmr1 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Wallenius")[[1]]
+gst_res_dmr1 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "GO", "Wallenius")[[1]]
 gst_res_dmr1$rank_fdr <- 1:nrow(gst_res_dmr1)
 gst_res_dmr1 <- gst_res_dmr1 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 head(gst_res_dmr1)
 #saveRDS(gst_res_dmr1, "../output/gst_res_dmrcate_1k.rds")
 ```
+
 
 ```{r}
 gst_res_dmr1[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE, FALSE)) %>% .[order(.$FDR, decreasing = TRUE),] %>%
@@ -65,11 +66,11 @@ gst_res_dmr1[1:10,] %>% mutate(in_imm = ifelse(GOID %in% immuneGO$GOID, TRUE, FA
 ```{r eval=FALSE}
 source("../code/mmGST.R")
 source("../code/function_binBiasPlot.R")
-gst_res_all <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)), "Wallenius")[[1]]
+gst_res_all <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)), "GO", "Wallenius")[[1]]
 gst_res_all$rank_fdr <- 1:nrow(gst_res_all)
 gst_res_all <- gst_res_all %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 
-gst_res_dmr5 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "Wallenius")[[1]]
+gst_res_dmr5 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:5000,], "biomart", biomart_genes)), "GO", "Wallenius")[[1]]
 gst_res_dmr5$rank_fdr <- 1:nrow(gst_res_dmr5)
 gst_res_dmr5 <- gst_res_dmr5 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 
@@ -101,7 +102,7 @@ ggVennDiagram(venn_list)
 ```{r eval=FALSE}
 source("../code/mmGST.R")
 source("../code/function_binBiasPlot.R")
-gst_res_dmr1_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "Fishers")[[1]]
+gst_res_dmr1_fish <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "GO", "Fishers")[[1]]
 gst_res_dmr1_fish$rank_fdr <- 1:nrow(gst_res_dmr1_fish)
 gst_res_dmr1_fish <- gst_res_dmr1_fish %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 saveRDS(gst_res_dmr1_fish, "../output/gst_res_dmr1_fish.rds")
@@ -117,8 +118,8 @@ head(gst_res_dmr1_fish)
 ```{r}
 source("../code/mmGST.R")
 source("../code/function_binBiasPlot.R")
-system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "Fishers"))
-system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "Wallenius"))
+system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "GO", "Fishers"))
+system.time(run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:100,], "biomart", biomart_genes)), "GO", "Wallenius"))
 ```
 
 ```{r}
@@ -130,7 +131,7 @@ ggVennDiagram(venn_list)
 ```{r eval=FALSE}
 source("../code/mmGST.R")
 source("../code/function_binBiasPlot.R")
-gst_res_dmr1_hyper <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "None")[[1]]
+gst_res_dmr1_hyper <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "GO", "None")[[1]]
 gst_res_dmr1_hyper$rank_fdr <- 1:nrow(gst_res_dmr1_hyper)
 gst_res_dmr1_hyper <- gst_res_dmr1_hyper %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
 
@@ -151,7 +152,8 @@ ggVennDiagram(venn_list)
 
 
 ## Comparisons
-```{r}
+
+```{r eval=FALSE}
 xx <- as.list(org.Hs.egGO2ALLEGS)
 out <- run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes))
 go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
@@ -172,6 +174,9 @@ go_entrez <- go_entrez %>%
          rank_1k_fish = gst_res_dmr1_fish[match(.$go, gst_res_dmr1_fish$GOID), "rank_fdr"],
          rank_5k = gst_res_dmr5[match(.$go, gst_res_dmr5$GOID), "rank_fdr"],
          rank_all = gst_res_all[match(.$go, gst_res_all$GOID), "rank_fdr"])
+```
+```{r}
+saveRDS(go_entrez, "../output/go_entrez.rds")
 ```
 
 ```{r}
@@ -230,5 +235,122 @@ annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes) %>% distinct
 dmrcate_seq_dmr %>%
   ggplot(aes(x = log2(min_smoothed_fdr))) +
   geom_density()
+```
+
+## MsigDb
+c8 - cell types
+```{r eval=FALSE}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1_c8 <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "MsigDb", "Wallenius", msig_collection = "c8")[[1]]
+gst_res_dmr1_c8$rank_fdr <- 1:nrow(gst_res_dmr1_c8)
+gst_res_dmr1_c8 <- gst_res_dmr1_c8 %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_dmr1_c8)
+saveRDS(gst_res_dmr1_c8, "../output/gst_res_dmrcate_1k_c8.rds")
+```
+```{r}
+gst_res_dmr1_c8 <- readRDS("../output/gst_res_dmrcate_1k_c8.rds")
+head(gst_res_dmr1_c8)
+```
+
+```{r eval=FALSE}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1_c8_null <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "MsigDb", "None", msig_collection = "c8")[[1]]
+gst_res_dmr1_c8_null$rank_fdr <- 1:nrow(gst_res_dmr1_c8_null)
+gst_res_dmr1_c8_null <- gst_res_dmr1_c8_null %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_dmr1_c8_null)
+saveRDS(gst_res_dmr1_c8_null, "../output/gst_res_dmrcate_1k_c8_null.rds")
+```
+```{r}
+gst_res_dmr1_c8_null <- readRDS("../output/gst_res_dmrcate_1k_c8_null.rds")
+head(gst_res_dmr1_c8_null)
+```
+
+## KEGG analysis
+
+```{r eval=FALSE}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1_kegg <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "KEGG", "Wallenius")[[1]]
+gst_res_dmr1_kegg$rank_fdr <- 1:nrow(gst_res_dmr1_kegg)
+gst_res_dmr1_kegg <- gst_res_dmr1_kegg %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_dmr1_kegg)
+saveRDS(gst_res_dmr1_kegg, "../output/gst_res_dmrcate_1k_kegg.rds")
+```
+```{r}
+gst_res_dmr1_kegg <- readRDS("../output/gst_res_dmrcate_1k_kegg.rds")
+head(gst_res_dmr1_kegg)
+```
+
+```{r eval=FALSE}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+gst_res_dmr1_kegg_null <- run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(dmrcate_seq_anno, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "KEGG", "None")[[1]]
+gst_res_dmr1_kegg_null$rank_fdr <- 1:nrow(gst_res_dmr1_kegg_null)
+gst_res_dmr1_kegg_null <- gst_res_dmr1_kegg_null %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_dmr1_kegg_null)
+saveRDS(gst_res_dmr1_kegg_null, "../output/gst_res_dmrcate_1k_kegg_null.rds")
+```
+```{r}
+gst_res_dmr1_kegg_null <- readRDS("../output/gst_res_dmrcate_1k_kegg_null.rds")
+head(gst_res_dmr1_kegg_null)
+```
+
+
+```{r}
+gst_res_dmr1_kegg %>% mutate(FDR_null = gst_res_dmr1_kegg_null[match(.$PathwayID, gst_res_dmr1_kegg_null$PathwayID), "FDR"],
+                             rank_fdr_null = gst_res_dmr1_kegg_null[match(.$PathwayID, gst_res_dmr1_kegg_null$PathwayID), "rank_fdr"],
+                             is.sig_null = gst_res_dmr1_kegg_null[match(.$PathwayID, gst_res_dmr1_kegg_null$PathwayID), "is.sig"]) %>%
+  mutate(signif = case_when(is.sig == TRUE & is.sig_null == TRUE ~ "Both",
+                            is.sig == TRUE & is.sig_null == FALSE ~ "Corrected",
+                            is.sig == FALSE & is.sig_null == TRUE ~ "Biased",
+                            TRUE ~ "Neither")) %>%
+  ggplot(aes(x = rank_fdr, y = rank_fdr_null, colour = signif)) +
+  geom_point(alpha = 0.5)
+```
+
+
+
+```{r}
+source("../code/mmGST.R")
+kegg <- .getKEGG()
+names(kegg$idList) <- paste0(names(kegg$idList), ".")
+out <- run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes))
+kegg_entrez <- data.frame(cbind(kegg = gsub("\\..*", "", names(unlist(kegg$idList))), entrez = unlist(kegg$idList)))
+kegg_entrez <- kegg_entrez %>%
+  mutate(num_cg = data.frame(out$freq)[match(.$entrez, data.frame(out$freq)$freq_make_table), "Freq"],
+         dmrcate_1k = ifelse(kegg %in% rownames(filter(gst_res_dmr1_kegg, FDR < 0.05)), TRUE, FALSE),
+         dmrcate_1k_null = ifelse(kegg %in% rownames(filter(gst_res_dmr1_kegg_null, FDR < 0.05)), TRUE, FALSE))
+kegg_entrez <- kegg_entrez %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg))
+kegg_entrez <- kegg_entrez %>% group_by(kegg) %>% mutate(mean_cg = mean(num_cg)) %>% ungroup()
+kegg_entrez <- data.frame(kegg_entrez)
+
+kegg_entrez <- kegg_entrez %>%
+  mutate(rank_1k = gst_res_dmr1_kegg[match(.$kegg, gst_res_dmr1_kegg$PathwayID), "rank_fdr"],
+         rank_1k_null = gst_res_dmr1_kegg_null[match(.$kegg, gst_res_dmr1_kegg_null$PathwayID), "rank_fdr"])
+```
+
+
+```{r}
+kegg_entrez %>% distinct(kegg, mean_cg, dmrcate_1k, dmrcate_1k_null, rank_1k, rank_1k_null) %>%
+  filter(rank_1k <= 1000, rank_1k_null <= 1000) %>%
+  ggplot(aes(x = mean_cg, y = rank_1k_null - rank_1k)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in KEGG category", y = "Increase in rank in Wallenius") +
+  scale_x_continuous(limits = c(0, 1500))
+```
+
+```{r}
+kegg_entrez %>% distinct(kegg, mean_cg, dmrcate_1k, dmrcate_1k_null) %>% 
+  filter(dmrcate_1k_null == TRUE | dmrcate_1k == TRUE) %>% 
+  mutate(Method = case_when(dmrcate_1k == FALSE & dmrcate_1k_null == TRUE ~ "Biased",
+                            dmrcate_1k == TRUE & dmrcate_1k_null == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_cg), y = mean_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
 ```
 
