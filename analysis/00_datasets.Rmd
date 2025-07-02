@@ -256,3 +256,9 @@ Has Methylation, RNA-Seq, and DNA Copy Number Alterations
 * WHY: We wanted a dataset with less methylation differences than cell types, and wanted to look at what DM papers used.
 * USED FOR: Attempted to process data using Galaxy. Bismark to map data, metiliene to identify DM regions.
 Will not be used in final analysis as we would prefer pre-processed data - not fastqs.
+
+# More cell types from 2
+* Instead use cell types that are more similar to each other, CD4 and CD8, to examine appropriate filtering options for when methylation differences are less extreme.
+
+
+
