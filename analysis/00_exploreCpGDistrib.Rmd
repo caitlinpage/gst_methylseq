@@ -19,6 +19,34 @@ library(IlluminaHumanMethylationEPICmanifest)
 library(annotatr)
 ```
 
+```{r}
+biomart_genes %>% distinct(gene_name, num_cg) %>% group_by(num_cg) %>% summarise(frequency = n())
+biomart_genes %>% distinct(gene_name, num_cg) %>% group_by(num_cg) %>% summarise(frequency = n())
+```
+```{r}
+biomart_genes %>% distinct(gene_name, num_cg) %>%
+  ggplot(aes(x = num_cg)) +
+  geom_histogram(bins = 60)
+```
+
+```{r}
+biomart_genes %>% distinct(gene_name, num_cg) %>% group_by(num_cg) %>% summarise(frequency = n()) %>%
+  ggplot(aes(x = num_cg, y = frequency)) +
+  geom_point() +
+  scale_y_continuous(limits = c(0,500))
+```
+
+
+```{r}
+biomart_genes %>% distinct(gene_name, num_cg) %>% group_by(num_cg) %>% summarise(frequency = n()) %>%
+  ggplot(aes(x = num_cg, y = frequency)) +
+  geom_point()
+```
+```{r}
+go_entrez %>% distinct(go, mean_cg) %>%
+  ggplot(aes(x = mean_cg)) +
+  geom_histogram()
+```
 
 
 ```{r}
