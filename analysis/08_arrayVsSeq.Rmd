@@ -1,0 +1,118 @@
+---
+title: "08_arrayVsSeq"
+author: "Caitlin Page"
+date: "2025-05-19"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+anno_array
+```
+
+```{r}
+DMPs <- readRDS("../output/array_dmps.rds")
+```
+
+```{r}
+dmrcate_array <- cbind(array_dmrcate@ranges %>% data.frame(), array_dmrcate@betas)
+```
+
+
+```{r}
+anno_cpg <- build_annotations(genome="hg19", annotations = "hg19_cpgs")
+anno_cpg <- anno_cpg %>% data.frame()
+```
+```{r}
+anno_cpg_island <- anno_cpg %>% filter(type == "hg19_cpg_islands")
+```
+```{r}
+m_df
+coverage_df
+cbind(wgbs_counts[,1:4], m_df/coverage_df)
+```
+
+```{r}
+overlap_pos <- find_overlaps(as_granges(cbind(wgbs_counts[,1:4], m_df/coverage_df)), as_granges(dmrcate_array)) %>% data.frame()
+```
+```{r}
+overlap_pos[is.na(overlap_pos)] <- 0
+overlap_pos 
+```
+```{r}
+overlap_pos[,c(1:12,18:29)] %>% melt(id = c("seqnames", "start", "end", "width", "strand", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot()
+```
+damn this is a proportion
+we do nede the coverage
+
+```{r}
+overlap_pos %>% mutate(av_seq_nk = rowMeans(subset(., select = c(""))))
+```
+```{r}
+rgSet@
+```
+```{r}
+anno_array
+```
+
+
+```{r}
+array_coverage <- getCN(mSetSqFlt) %>% data.frame()
+array_coverage <- array_coverage %>% mutate(seqnames = anno_array[match(rownames(.), anno_array$Name), "seqnames"],
+                                             start = anno_array[match(rownames(.), anno_array$Name), "start"],
+                                             width = 1, width = as.double(width))
+```
+
+
+
+```{r}
+overlap_pos <- find_overlaps(as_granges(cbind(wgbs_counts[,1:4], coverage_df)), as_granges(array_coverage)) %>% data.frame()
+
+overlap_pos[is.na(overlap_pos)] <- 0
+overlap_pos
+```
+```{r}
+overlap_pos %>% melt(id = c("seqnames", "start", "end", "width", "strand", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot()
+```
+
+```{r}
+overlap_pos[,1:12] %>% melt(id = c("seqnames", "start", "end", "width", "strand", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot()
+
+overlap_pos[,1:12] %>% melt(id = c("seqnames", "start", "end", "width", "strand", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot() +
+  scale_y_log10()
+
+
+overlap_pos[,c(1:6,13:24)] %>% melt(id = c("seqnames", "start", "end", "width", "strand", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot()
+```
+```{r}
+overlap_pos <- find_overlaps(as_granges(anno_cpg_island), as_granges(overlap_pos)) %>% data.frame()
+```
+
+```{r}
+overlap_pos[,1:17] %>% melt(id = c("seqnames", "start", "end", "width", "strand", "id", "tx_id", "gene_id", "symbol", "type", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot()
+```
+```{r}
+overlap_pos[,1:17] %>% melt(id = c("seqnames", "start", "end", "width", "strand", "id", "tx_id", "gene_id", "symbol", "type", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot()
+
+overlap_pos[,c(1:11,18:29)] %>% melt(id = c("seqnames", "start", "end", "width", "strand", "id", "tx_id", "gene_id", "symbol", "type", "pos")) %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot()
+```
+
