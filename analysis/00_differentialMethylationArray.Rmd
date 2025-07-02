@@ -258,6 +258,9 @@ densityPlot(mVals, sampGroups=blood_samples$short_group, main="M-values",
 legend("topleft", legend = levels(factor(blood_samples$short_group)),
         text.col=brewer.pal(8,"Dark2"))
 ```
+```{r}
+?minfi::getM
+```
 
 
 ## Differential methylation methods
@@ -356,6 +359,12 @@ dmrcoutput
 ```{r}
 #saveRDS(myannotation, "../output/dmrcate_array_anno.rds")
 #saveRDS(dmrcoutput, "../output/dmrcate_array_out.rds")
+```
+```{r}
+array_dmrcate <- readRDS("../output/dmrcate_array_anno.rds")
+```
+```{r}
+cbind(array_dmrcate@ranges %>% data.frame(), array_dmrcate@betas)
 ```
 
 
