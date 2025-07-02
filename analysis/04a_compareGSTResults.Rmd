@@ -9,13 +9,20 @@ editor_options:
 
 ## Packages
 ```{r}
-
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(ggVennDiagram)
+library(reshape2)
 ```
 
 ## Description
 
 
 ## Files
+```{r}
+go_entrez <- readRDS("../output/go_entrez.rds")
+```
 
 ```{r}
 GO.wall <- readRDS("../output/goseq_res.rds")
