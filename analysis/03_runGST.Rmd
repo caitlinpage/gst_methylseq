@@ -176,7 +176,7 @@ go_entrez <- go_entrez %>%
          rank_all = gst_res_all[match(.$go, gst_res_all$GOID), "rank_fdr"])
 ```
 ```{r}
-saveRDS(go_entrez, "../output/go_entrez.rds")
+go_entrez <- readRDS("../output/go_entrez.rds")
 ```
 
 ```{r}
@@ -212,6 +212,40 @@ truth_gst_100 %>%
   ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
   geom_line(size = 2) +
   labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+```{r}
+sig_terms_array <- readRDS("../output/mm_array_res.rds")
+sig_terms_array_biased <- readRDS("../output/mm_array_null.rds")
+```
+
+```{r}
+sig_terms_array 
+sig_terms_array_biased
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  sig_terms_array[1:100,] %>% mutate(rank_fdr = 1:nrow(.), in_imm = cumsum(rownames(.) %in% immuneGO$GOID), method = "Wall_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  sig_terms_array_biased[1:100,] %>% mutate(rank_fdr = 1:nrow(.), in_imm = cumsum(rownames(.) %in% immuneGO$GOID), method = "Hyper_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets", title = "Array") +
+  theme_bw()
+```
+# Use array results as ground truth
+```{r}
+truth_gst_100 <- rbind(
+  gst_res_dmr1[1:100,] %>% mutate(in_imm = cumsum(GOID %in% rownames(sig_terms_array)), method = "Wall_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_res_dmr1_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% rownames(sig_terms_array)), method = "Hyper_1") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in array sets", title = "Array Wallenius as ground truth") +
   theme_bw()
 ```
 
