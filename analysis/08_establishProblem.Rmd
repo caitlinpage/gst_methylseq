@@ -1,0 +1,807 @@
+---
+title: "08_establishProblem"
+author: "Caitlin Page"
+date: "2025-07-02"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+library(ggVennDiagram)
+library(reshape2)
+```
+
+```{r}
+go_entrez <- readRDS("../output/go_entrez.rds")
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
+dmrcate_seq_anno <- data.frame(dmrcate_seq_anno@ranges)
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+```
+```{r}
+array_dmrcate <- readRDS("../output/dmrcate_array_anno.rds")
+cbind(array_dmrcate@ranges %>% data.frame(), array_dmrcate@betas)
+```
+
+```{r}
+coverage <- wgbs_counts[,c(1,grep("C", colnames(wgbs_counts)))]
+```
+
+```{r}
+dmrcate_seq_anno$position <- paste0(dmrcate_seq_anno$seqnames, "-", dmrcate_seq_anno$start)
+```
+
+```{r}
+wgbs_counts$tested <- ifelse(wgbs_counts$pos %in% dmrcate_seq_anno$position, TRUE, FALSE)
+```
+
+
+## new for paper
+
+```{r}
+biomart_genes
+```
+
+* going to just use the tested cpgs
+* because I have tested positions for array - don't know if I have overall anno for array
+
+* see if genes have diff num of cpgs overlap for anno and array
+```{r}
+biomart_genes %>% nrow()
+biomart_genes %>% distinct(ensembl_gene_id) %>% nrow()
+```
+
+```{r}
+gene_overlap_array_cg <- find_overlaps(as_granges(biomart_genes), array_dmrcate@ranges) %>% data.frame() %>%
+  group_by(ensembl_gene_id) %>%
+  summarise(tested_array_cg = n()) %>%
+  ungroup() %>% data.frame()
+```
+
+
+```{r}
+gene_overlap_seq_cg <- find_overlaps(as_granges(biomart_genes), as_granges(dmrcate_seq_anno)) %>% data.frame() %>%
+  group_by(ensembl_gene_id) %>%
+  summarise(tested_seq_cg = n()) %>%
+  ungroup() %>% data.frame()
+```
+
+```{r}
+biomart_genes[,1:8] %>%
+  mutate(tested_array_cg = gene_overlap_array_cg[match(.$ensembl_gene_id, gene_overlap_array_cg$ensembl_gene_id), "tested_array_cg"],
+         tested_seq_cg = gene_overlap_seq_cg[match(.$ensembl_gene_id, gene_overlap_seq_cg$ensembl_gene_id), "tested_seq_cg"],
+         tested_array_cg = ifelse(is.na(tested_array_cg), 0, tested_array_cg),
+         tested_seq_cg = ifelse(is.na(tested_seq_cg), 0, tested_seq_cg)) %>%
+  ggplot(aes(x = tested_array_cg, y = tested_seq_cg)) +
+  geom_point(alpha = 0.3)
+```
+* can I show this in a better way??
+
+```{r}
+compare_num_anno <- biomart_genes[,1:8] %>%
+  mutate(tested_array_cg = gene_overlap_array_cg[match(.$ensembl_gene_id, gene_overlap_array_cg$ensembl_gene_id), "tested_array_cg"],
+         tested_seq_cg = gene_overlap_seq_cg[match(.$ensembl_gene_id, gene_overlap_seq_cg$ensembl_gene_id), "tested_seq_cg"],
+         tested_array_cg = ifelse(is.na(tested_array_cg), 0, tested_array_cg),
+         tested_seq_cg = ifelse(is.na(tested_seq_cg), 0, tested_seq_cg)) %>% data.frame()
+```
+
+```{r}
+cor.test(compare_num_anno$tested_array_cg, compare_num_anno$tested_seq_cg)
+```
+
+* cpg per gene per gene set
+
+```{r}
+go_entrez_done <- go_entrez
+go_entrez_done
+```
+
+
+
+want focus there to be on exploring, here on the problem of converting ensembl to entrez etc
+```{r}
+x <- org.Hs.egGO
+# Get the entrez gene identifiers that are mapped to a GO ID
+entrez_map <- mappedkeys(x)
+# Convert to a list
+xx <- as.list(x[entrez_map])
+
+xx <- as.list(org.Hs.egGO2ALLEGS)
+
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+
+# map entrez to gene symbol https://web.mit.edu/~r/current/arch/i386_linux26/lib/R/library/org.Hs.eg.db/html/org.Hs.egSYMBOL.html
+x <- org.Hs.egSYMBOL
+# Get the gene symbol that are mapped to an entrez gene identifiers
+mapped_genes <- mappedkeys(x)
+# Convert to a list
+xx <- as.list(x[mapped_genes])
+
+entrez_symbol <- data.frame(cbind(entrez = gsub("\\..*", "", names(unlist(xx))), symbol = unlist(xx)))
+go_entrez <- go_entrez %>% mutate(symbol = entrez_symbol[match(.$entrez, entrez_symbol$entrez), "symbol"])
+go_entrez <- go_entrez %>% mutate(ontology = go_info[match(.$go, go_info$GOID), "ONTOLOGY"],
+                                  term = go_info[match(.$go, go_info$GOID), "TERM"])
+go_entrez %>% filter(entrez == 1)
+```
+```{r}
+go_entrez
+```
+
+```{r}
+compare_num_anno
+```
+
+```{r}
+go_entrez <- go_entrez %>% mutate(
+                                  seqnames = compare_num_anno[match(.$symbol, compare_num_anno$gene_name), "seqnames"],
+                                  start = compare_num_anno[match(.$symbol, compare_num_anno$gene_name), "start"],
+                                  end = compare_num_anno[match(.$symbol, compare_num_anno$gene_name), "end"],
+                                  tested_array_cg = compare_num_anno[match(.$symbol, compare_num_anno$gene_name), "tested_array_cg"],
+                                  tested_seq_cg = compare_num_anno[match(.$symbol, compare_num_anno$gene_name), "tested_seq_cg"]) 
+```
+
+```{r}
+go_entrez_filt <- go_entrez %>% filter(!is.na(start)) %>% group_by(go) %>% mutate(n_genes_go = n(), av_cg_go_array = mean(tested_array_cg), av_cg_go_seq = mean(tested_seq_cg), sum_cg_go_array = sum(tested_array_cg), sum_cg_go_seq = sum(tested_seq_cg), gene_prop_array = sum(tested_array_cg)/n(), gene_prop_seq = sum(tested_seq_cg)/n()) %>% ungroup()
+```
+
+```{r}
+go_entrez_filt %>% distinct(go, av_cg_go_array, av_cg_go_seq) %>%
+  ggplot(aes(x = av_cg_go_array, y = av_cg_go_seq)) +
+  geom_point(alpha = 0.3)
+
+cor.test(distinct(go_entrez_filt, go, av_cg_go_array, av_cg_go_seq)$av_cg_go_array, distinct(go_entrez_filt, go, av_cg_go_array, av_cg_go_seq)$av_cg_go_seq)
+```
+
+```{r}
+go_entrez_filt %>% filter(av_cg_go_array == 0) %>% distinct(go) %>% nrow()
+go_entrez_filt %>% filter(av_cg_go_array == 0) %>% distinct(go, n_genes_go) %>%
+  ggplot(aes(x = n_genes_go)) +
+  geom_density()
+```
+
+```{r}
+go_entrez_filt %>% distinct(go, n_genes_go) %>%
+  group_by(n_genes_go) %>% 
+  summarise(n_categories = n()) %>%
+  ggplot(aes(x = n_genes_go, y = n_categories)) +
+  geom_point()
+```
+
+
+```{r}
+go_entrez_filt %>% distinct(go, n_genes_go, av_cg_go_seq) %>%
+  ggplot(aes(x = n_genes_go, y = av_cg_go_seq)) +
+  geom_point(alpha = 0.3)
+go_entrez_filt %>% distinct(go, n_genes_go, av_cg_go_array) %>%
+  ggplot(aes(x = n_genes_go, y = av_cg_go_array)) +
+  geom_point(alpha = 0.3)
+```
+
+```{r}
+rbind(go_entrez_filt %>% mutate(method = "array", average_cg_per_go = av_cg_go_array) %>% distinct(go, method, average_cg_per_go),
+      go_entrez_filt %>% mutate(method = "seq", average_cg_per_go = av_cg_go_seq) %>% distinct(go, method, average_cg_per_go)) %>%
+  ggplot(aes(x = log2(average_cg_per_go + 0.1), colour = method, fill = method)) +
+  geom_density(alpha = 0.3)
+```
+```{r}
+go_entrez_filt %>% mutate(method = "array", average_cg_per_go = av_cg_go_array) %>% distinct(symbol, method, average_cg_per_go) %>% 
+  summarise(min(average_cg_per_go), max(average_cg_per_go), median(average_cg_per_go), mean(average_cg_per_go))
+go_entrez_filt %>% mutate(method = "array", average_cg_per_go = av_cg_go_seq) %>% distinct(symbol, method, average_cg_per_go) %>% 
+  summarise(min(average_cg_per_go), max(average_cg_per_go), median(average_cg_per_go), mean(average_cg_per_go))
+```
+
+```{r}
+rbind(go_entrez_filt %>% mutate(method = "array", num_cg_per_gene = tested_array_cg) %>% distinct(symbol, method, num_cg_per_gene),
+      go_entrez_filt %>% mutate(method = "seq", num_cg_per_gene = tested_seq_cg) %>% distinct(symbol, method, num_cg_per_gene)) %>%
+  ggplot(aes(x = log2(num_cg_per_gene + 0.1), colour = method, fill = method)) +
+  geom_density(alpha = 0.3)
+```
+```{r}
+go_entrez_filt %>% mutate(method = "array", num_cg_per_gene = tested_array_cg) %>% distinct(symbol, method, num_cg_per_gene) %>% 
+  summarise(min(num_cg_per_gene), max(num_cg_per_gene), median(num_cg_per_gene), mean(num_cg_per_gene))
+go_entrez_filt %>% mutate(method = "seq", num_cg_per_gene = tested_seq_cg) %>% distinct(symbol, method, num_cg_per_gene) %>% 
+  summarise(min(num_cg_per_gene), max(num_cg_per_gene), median(num_cg_per_gene), mean(num_cg_per_gene))
+```
+
+```{r}
+rbind(compare_num_anno %>% mutate(method = "array", num_cg_per_gene = tested_array_cg) %>% distinct(gene_name, method, num_cg_per_gene),
+      compare_num_anno %>% mutate(method = "seq", num_cg_per_gene = tested_seq_cg) %>% distinct(gene_name, method, num_cg_per_gene)) %>%
+  ggplot(aes(x = log2(num_cg_per_gene + 0.1), colour = method, fill = method)) +
+  geom_density(alpha = 0.3)
+
+rbind(compare_num_anno %>% mutate(method = "array", num_cg_per_gene = tested_array_cg) %>% distinct(ensembl_gene_id, method, num_cg_per_gene),
+      compare_num_anno %>% mutate(method = "seq", num_cg_per_gene = tested_seq_cg) %>% distinct(ensembl_gene_id, method, num_cg_per_gene)) %>%
+  ggplot(aes(x = log2(num_cg_per_gene + 0.1), colour = method, fill = method)) +
+  geom_density(alpha = 0.3)
+```
+* ok so with the gene or the go info??
+```{r}
+compare_num_anno %>% distinct(gene_name) %>% nrow()
+go_entrez_filt %>% distinct(symbol) %>% nrow()
+```
+* that's why - a lot less genes involved
+* well we don't care about genes not involved in testing so gene plots should be made with the gene set testing data
+
+* which means redo 1st plot
+
+```{r}
+go_entrez_filt %>% distinct(symbol, tested_array_cg, tested_seq_cg) %>%
+  ggplot(aes(x = tested_array_cg, y = tested_seq_cg)) +
+  geom_point(alpha = 0.3)
+
+cor.test(distinct(go_entrez_filt, symbol, tested_array_cg, tested_seq_cg)$tested_array_cg, 
+         distinct(go_entrez_filt, symbol, tested_array_cg, tested_seq_cg)$tested_seq_cg)
+```
+## continue with new stuff but this is about dm results and pos vs region
+```{r}
+dmrcate_seq_dmr %>%
+  summarise(min(tested_cpgs), max(tested_cpgs), median(tested_cpgs), mean(tested_cpgs), min(width), max(width), median(width), mean(width), min(no.cpgs))
+```
+```{r}
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = width)) +
+  geom_histogram(bins = 50)
+```
+
+```{r}
+find_overlaps(as_granges(mutate(dmrcate_seq_dmr, dmr_id = 1:n())), as_granges(dmrcate_seq_anno)) %>% data.frame() %>%
+  group_by(dmr_id, no.cpgs) %>%
+  summarise(tested_cpgs = n()) %>%
+  ungroup() %>%
+  mutate(check_same = ifelse(no.cpgs == tested_cpgs, TRUE, FALSE)) %>%
+  group_by(check_same) %>% 
+  summarise(n())
+  
+```
+```{r}
+find_overlaps(as_granges(mutate(dmrcate_seq_dmr, dmr_id = 1:n())), as_granges(dmrcate_seq_anno)) %>% data.frame() %>%
+  group_by(dmr_id, no.cpgs) %>%
+  summarise(tested_cpgs = n()) %>%
+  ungroup() %>%
+  mutate(check_same = ifelse(no.cpgs == tested_cpgs, TRUE, FALSE)) %>%
+  filter(check_same == FALSE) %>% .[order(.$tested_cpgs),]
+```
+* why don't they all match up?
+```{r}
+pair_overlaps(as_granges(mutate(dmrcate_seq_dmr, dmr_id = 1:n())), as_granges(dmrcate_seq_anno)) %>% data.frame() %>%
+  filter(dmr_id == 12181)
+```
+
+```{r}
+wgbs_counts %>% filter(seqnames == "chr7", start >= 1867012, start <= 1867203)
+```
+* in this one at least - the number of cpgs comes from the anno - not from the number of TESTED cpgs
+* and we want tested
+
+```{r}
+find_overlaps(as_granges(mutate(dmrcate_seq_dmr, dmr_id = 1:n())), as_granges(dmrcate_seq_anno)) %>% data.frame() %>%
+  group_by(dmr_id) %>%
+  mutate(tested_cpgs = n()) %>%
+  ungroup() %>% 
+  .[,c(1:14,20)] %>%
+  distinct() %>%
+  ggplot(aes(x = as.factor(tested_cpgs))) +
+  geom_bar()
+```
+* ugly - which is why we make a histogram
+
+```{r}
+find_overlaps(as_granges(mutate(dmrcate_seq_dmr, dmr_id = 1:n())), as_granges(dmrcate_seq_anno)) %>% data.frame() %>%
+  group_by(dmr_id) %>%
+  mutate(tested_cpgs = n()) %>%
+  ungroup() %>% 
+  .[,c(1:14,20)] %>%
+  distinct() %>%
+  ggplot(aes(x = tested_cpgs)) +
+  geom_histogram(bins = 50)
+```
+
+```{r}
+overlap_region <- find_overlaps(as_granges(wgbs_counts[,1:4]), as_granges(mutate(dmrcate_seq_dmr, dmr_id = 1:n()))) %>% data.frame()
+dmrcate_seq_anno$pos <- paste0(dmrcate_seq_anno$seqnames, "-", dmrcate_seq_anno$start)
+```
+
+```{r}
+wgbs_counts[,1:4] %>%
+  mutate(pos_in_dmr = ifelse(pos %in% overlap_region$pos, TRUE, FALSE),
+         pos_is_sig = dmrcate_seq_anno[match(.$pos, dmrcate_seq_anno$pos), "is.sig"],
+         pos_is_not_tested = ifelse(is.na(pos_is_sig), TRUE, FALSE),
+         pos_is_sig = ifelse(is.na(pos_is_sig), FALSE, pos_is_sig),
+         pos_dmr_id = overlap_region[match(.$pos, overlap_region$pos), "dmr_id"]) %>%
+  group_by(pos_in_dmr, pos_is_sig, pos_is_not_tested) %>% 
+  summarise(n())
+```
+* still don't like seeing how many dmr positions aren't signif
+```{r}
+wgbs_counts[,1:4] %>%
+  mutate(pos_in_dmr = ifelse(pos %in% overlap_region$pos, TRUE, FALSE),
+         pos_is_sig = dmrcate_seq_anno[match(.$pos, dmrcate_seq_anno$pos), "is.sig"],
+         pos_is_not_tested = ifelse(is.na(pos_is_sig), TRUE, FALSE),
+         pos_is_sig = ifelse(is.na(pos_is_sig), FALSE, pos_is_sig),
+         pos_dmr_id = overlap_region[match(.$pos, overlap_region$pos), "dmr_id"]) %>%
+  group_by(pos_in_dmr, pos_is_sig) %>% 
+  summarise(n=n()) %>%
+  group_by(pos_is_sig) %>%
+  mutate(sum_sig_group = sum(n), prop_sig_in_dm = n/sum(n))
+```
+```{r}
+6917/93250
+```
+
+```{r}
+wgbs_counts[,1:4] %>%
+  mutate(pos_in_dmr = ifelse(pos %in% overlap_region$pos, TRUE, FALSE),
+         pos_is_sig = dmrcate_seq_anno[match(.$pos, dmrcate_seq_anno$pos), "is.sig"],
+         pos_is_not_tested = ifelse(is.na(pos_is_sig), TRUE, FALSE),
+         pos_is_sig = ifelse(is.na(pos_is_sig), FALSE, pos_is_sig),
+         pos_dmr_id = overlap_region[match(.$pos, overlap_region$pos), "dmr_id"]) %>%
+  filter(!is.na(pos_dmr_id)) %>%
+  group_by(pos_dmr_id, pos_is_sig) %>%
+  summarise(n=n()) %>%
+  ungroup() %>%
+  filter(pos_is_sig == TRUE)
+```
+*2,216 of 13k dmrs have significant cpgs in them
+
+```{r}
+dmrcate_seq_dmr
+```
+
+```{r}
+library(annotatr)
+```
+```{r}
+annots <- c('hg19_basicgenes', 'hg19_genes_intergenic')
+
+# Build the annotations (a single GRanges object)
+annotations <- build_annotations(genome = 'hg19', annotations = annots)
+annotations %>% data.frame() %>% group_by(type) %>% summarise(n())
+```
+```{r}
+dmrcate_seq_dmr$dmr_id <- 1:nrow(dmrcate_seq_dmr)
+overlap_tested <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr, dmr_id = 1:n())), as_granges(dmrcate_seq_anno)) %>% data.frame() %>%
+  group_by(dmr_id) %>%
+  mutate(tested_cpgs = n()) %>%
+  ungroup() %>%
+  data.frame()
+dmrcate_seq_dmr$tested_cpgs <- overlap_tested[match(dmrcate_seq_dmr$dmr_id, overlap_tested$dmr_id), "tested_cpgs"]
+```
+
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene"))
+```
+
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, width, tested_cpgs, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(dmr_id, width, tested_cpgs, type_simple) %>%
+  group_by(dmr_id) %>%
+  mutate(how_many_types = n()) %>%
+  filter(how_many_types == 2) %>% distinct(dmr_id, width, tested_cpgs)
+```
+
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, width, tested_cpgs, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(dmr_id, width, tested_cpgs, type_simple) %>%
+  group_by(dmr_id) %>%
+  mutate(how_many_types = n()) %>%
+  ggplot(aes(x = width, y = tested_cpgs, colour = type_simple, size = how_many_types)) +
+  geom_point(alpha = 0.5)
+```
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, width, tested_cpgs, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(dmr_id, width, tested_cpgs, type_simple) %>%
+  group_by(dmr_id) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(dmr_id, type_simple) %>%
+  group_by(type_simple) %>%
+  summarise(n=n()) %>%
+  ungroup() %>%
+  mutate(prop = n/sum(n))
+```
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, width, tested_cpgs, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(dmr_id, width, tested_cpgs, type_simple) %>%
+  group_by(dmr_id) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(dmr_id, type_simple) %>%
+  ggplot(aes(x = type_simple, fill = type_simple)) +
+  geom_bar() +
+  theme(legend.position = "none")
+```
+
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, width, tested_cpgs, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(dmr_id, width, tested_cpgs, type_simple) %>%
+  group_by(dmr_id) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(dmr_id, type_simple) %>% 
+  mutate(dmr_top_1k = ifelse(dmr_id <= 1000, TRUE, FALSE)) %>%
+  group_by(dmr_top_1k, type_simple) %>%
+  summarise(n=n()) %>%
+  ggplot(aes(x = dmr_top_1k, y = n, fill = type_simple)) +
+  geom_bar(position = "fill", stat = "identity") 
+```
+
+
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr), as_granges(wgbs_counts[,1:4])) %>% data.frame() %>% distinct(pos) %>% nrow()
+find_overlaps(as_granges(dmrcate_seq_dmr[1:1000,]), as_granges(wgbs_counts[,1:4])) %>% data.frame() %>% distinct(pos) %>% nrow()
+dmrcate_seq_anno %>% filter(is.sig == TRUE) %>% nrow()
+```
+*and that's why we filter the dmrs
+*bc >300k cpgs is useless
+```{r}
+sig_positions <- wgbs_counts[,1:4] %>%
+  mutate(pos_in_dmr = ifelse(pos %in% overlap_region$pos, TRUE, FALSE),
+         pos_is_sig = dmrcate_seq_anno[match(.$pos, dmrcate_seq_anno$pos), "is.sig"],
+         pos_is_not_tested = ifelse(is.na(pos_is_sig), TRUE, FALSE),
+         pos_is_sig = ifelse(is.na(pos_is_sig), FALSE, pos_is_sig)) %>%
+  filter(pos_is_sig == TRUE)
+```
+
+```{r}
+find_overlaps(as_granges(sig_positions), annotations) %>% data.frame() %>% 
+  distinct(pos, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(pos, type_simple) %>%
+  group_by(pos) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(pos, type_simple) %>%
+  ggplot(aes(x = type_simple, fill = type_simple)) +
+  geom_bar() +
+  theme(legend.position = "none")
+```
+```{r}
+rbind(find_overlaps(as_granges(sig_positions), annotations) %>% data.frame() %>% 
+  distinct(pos, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(pos, type_simple) %>%
+  group_by(pos) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(pos, type_simple) %>%
+  mutate(id = pos, source = "indiv_signif_cpg") %>% .[,2:4],
+  find_overlaps(as_granges(dmrcate_seq_dmr), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, width, tested_cpgs, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(dmr_id, width, tested_cpgs, type_simple) %>%
+  group_by(dmr_id) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(dmr_id, type_simple) %>%
+    mutate(id = dmr_id, source = "dmr") %>% .[,2:4]) %>%
+  group_by(source, type_simple) %>%
+  summarise(n=n()) %>%
+  ggplot(aes(x = source, y = n, fill = type_simple)) +
+  geom_bar(position = "fill", stat = "identity")
+```
+* just using top 1k dmrs: this looks better in showing more with genes 
+
+```{r}
+rbind(find_overlaps(as_granges(dmrcate_seq_anno %>% .[order(.$ind.fdr),] %>% .[1:10000,]), annotations) %>% data.frame() %>% 
+  distinct(pos, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(pos, type_simple) %>%
+  group_by(pos) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(pos, type_simple) %>%
+  mutate(id = pos, source = "indiv_signif_cpg") %>% .[,2:4],
+  find_overlaps(as_granges(dmrcate_seq_dmr[1:1000,]), annotations) %>% data.frame() %>% 
+  distinct(dmr_id, width, tested_cpgs, type) %>%
+  mutate(type_simple = ifelse(type == "hg19_genes_intergenic", "intergenic", "gene")) %>%
+  distinct(dmr_id, width, tested_cpgs, type_simple) %>%
+  group_by(dmr_id) %>%
+  mutate(how_many_types = n(), 
+         type_simple = ifelse(how_many_types == 2, "both", type_simple)) %>%
+  ungroup() %>%
+  distinct(dmr_id, type_simple) %>%
+    mutate(id = dmr_id, source = "dmr") %>% .[,2:4]) %>%
+  group_by(source, type_simple) %>%
+  summarise(n=n()) %>%
+  ggplot(aes(x = source, y = n, fill = type_simple)) +
+  geom_bar(position = "fill", stat = "identity")
+```
+* fair comparison using top 10k sites with the 1k dmrs
+
+```{r}
+dmrcate_seq_anno %>% .[order(.$ind.fdr),]
+```
+
+
+## plots from alicia piece of paper
+
+# proportion of tested cpgs vs total cpgs
+
+```{r}
+wgbs_counts %>%
+  ggplot(aes(x = tested, fill = tested)) +
+  geom_bar()
+
+wgbs_counts %>%
+  ggplot(aes(x = tested, fill = tested)) +
+  geom_bar(position = "stack")
+
+wgbs_counts %>%
+  ggplot(aes(x = "", group = tested, fill = tested)) +
+  geom_bar(position = "fill")
+```
+
+
+wgbs_counts %>%
+  ggplot(aes(x = "", group = tested, fill = tested)) +
+  geom_bar(width = 1) +
+  coord_polar("y", start = 0) +
+  geom_text(aes(y = tested/3 + c(0, cumsum(tested)[-length(tested)]),
+               label = percent(tested/100)), size=5)
+
+
+first plot done then is was dm on y, coverage on x - I think basically want to show more likely dm when coverage goes up??
+
+
+```{r}
+dmrcate_seq_dmr <- dmrcate_seq_dmr %>% mutate(region_id = paste0(seqnames, "-", start)) %>% mutate(dmr_rank = 1:n())
+```
+
+```{r}
+overlap_regions_sites <- pair_overlaps(as_granges(dmrcate_seq_dmr), as_granges(wgbs_counts)) %>% data.frame()
+```
+
+```{r}
+wgbs_counts$site_sig <- dmrcate_seq_anno[match(wgbs_counts$pos, dmrcate_seq_anno$position), "is.sig"]
+wgbs_counts$site_in_dmr <- ifelse(wgbs_counts$pos %in% overlap_regions_sites$pos, TRUE, FALSE)
+wgbs_counts$site_sig <- ifelse(wgbs_counts$tested == FALSE, FALSE, wgbs_counts$site_sig)
+wgbs_counts$av_coverage_nk <- coverage[,2:4] %>% rowMeans(.)
+wgbs_counts$av_coverage_b <- coverage[,5:7] %>% rowMeans(.)
+wgbs_counts$av_coverage <- coverage[,2:7] %>% rowMeans(.)
+
+head(coverage)
+```
+
+```{r}
+wgbs_counts %>% .[order(.$av_coverage),] %>% mutate(cum_site_sig = cumsum(site_sig)) %>%
+  ggplot(aes(x = av_coverage, cum_site_sig)) +
+  geom_point()
+```
+
+```{r}
+wgbs_counts %>% .[order(.$av_coverage),] %>% mutate(cum_site_sig = cumsum(site_sig)) %>%
+  ggplot(aes(x = av_coverage, cum_site_sig)) +
+  geom_line()
+```
+
+```{r}
+wgbs_counts %>% .[order(.$av_coverage),] %>% mutate(cum_site_sig = cumsum(site_sig)) %>%
+  ggplot(aes(x = av_coverage, cum_site_sig)) +
+  geom_line() +
+  scale_x_continuous(limits = c(0, 100))
+```
+
+```{r}
+wgbs_counts %>% .[order(.$av_coverage),] %>% mutate(cum_site_in_dmr = cumsum(site_in_dmr)) %>%
+  ggplot(aes(x = av_coverage, cum_site_in_dmr)) +
+  geom_line()
+```
+
+```{r}
+wgbs_counts %>% .[order(.$av_coverage),] %>% mutate(cum_site_in_dmr = cumsum(site_in_dmr)) %>%
+  ggplot(aes(x = av_coverage, cum_site_in_dmr)) +
+  geom_line() +
+  scale_x_continuous(limits = c(0,100))
+```
+
+so bit less straight line than alicia drew but principal is there
+
+# something venn
+
+next plot instructions are bit confusing she drew a venn diagram and i think it's supposed to be overlapping cpgs and cpgs in regions and also with cpg dm or not
+
+```{r}
+head(wgbs_counts)
+```
+
+```{r}
+ggVennDiagram(list(all = wgbs_counts$pos, tested = filter(wgbs_counts, tested == TRUE)$pos))
+```
+
+```{r}
+ggVennDiagram(list(indiv_sig = filter(wgbs_counts, site_sig == TRUE)$pos, in_dmr = filter(wgbs_counts, site_in_dmr == TRUE)$pos))
+```
+
+```{r}
+ggVennDiagram(list(indiv_sig = filter(wgbs_counts, site_sig == TRUE)$pos, in_dmr = filter(wgbs_counts, site_in_dmr == TRUE, tested == TRUE)$pos))
+```
+
+yowzer I forgot how bad that plot looked are some of the dmrs dodgy??
+
+```{r}
+max(dmrcate_seq_dmr$min_smoothed_fdr)
+max(dmrcate_seq_dmr$Stouffer)
+max(dmrcate_seq_dmr$HMFDR)
+max(dmrcate_seq_dmr$Fisher)
+```
+
+well the min fdrs are all ok but what does stouffer, hmfdr and fisher even mean? b/c maybe i need to trim them - or I did when I do my normal filtering
+
+```{r}
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = min_smoothed_fdr, y = Stouffer)) +
+  geom_point()
+
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = min_smoothed_fdr, y = HMFDR)) +
+  geom_point()
+
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = min_smoothed_fdr, y = Fisher)) +
+  geom_point()
+```
+
+yeah idk how to interpret this
+
+```{r}
+overlap_regions_sites %>% filter(site_sig == TRUE) %>% distinct(region_id, dmr_rank, min_smoothed_fdr, Stouffer, HMFDR, Fisher) %>% .[order(.$dmr_rank),]
+```
+
+-   wait how do the vast majority of dmrs have no sites that were indep found significant?? - I really don't want to figure this out
+
+```{r}
+pair_overlaps(as_granges(dmrcate_seq_dmr), as_granges(dmrcate_seq_anno)) %>% data.frame() %>% filter(is.sig == TRUE) %>% distinct(dmr_rank)
+
+pair_overlaps(as_granges(dmrcate_seq_dmr), as_granges(dmrcate_seq_anno)) %>% data.frame() %>% filter(rawpval < 0.05) %>% distinct(dmr_rank)
+```
+
+-maybe the dmr test uses the raw pvals? - that brings it back up -but the documentation says it uses the signif sites -this is a problem I don't want to solve
+
+```{r}
+head(dmrcate_seq_anno)
+```
+
+```{r}
+ggVennDiagram(list(indiv_sig = filter(wgbs_counts, pos %in% filter(dmrcate_seq_anno, rawpval < 0.05)$position)$pos, in_dmr = filter(wgbs_counts, site_in_dmr == TRUE, tested == TRUE)$pos))
+```
+
+-ok so overlap still terrible it's just flipped around the order - now more in indiv than dmr -it's definitely supposed to not look like this - i should check if bsseq is like this
+
+```{r}
+head(overlap_regions_sites)
+```
+
+```{r}
+distinct(overlap_regions_sites) %>% nrow()
+```
+
+```{r}
+distinct(dmrcate_seq_dmr) %>% nrow()
+```
+
+# something about genes
+
+```{r}
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+biomart_genes <- data.frame(biomart_genes)
+```
+
+```{r}
+#biomart_genes %>% filter(num_cg == max(num_cg))
+```
+
+```{r}
+biomart_genes %>% filter(!is.na(gene_name)) %>%
+  ggplot(aes(x = num_cg)) +
+  geom_histogram(bins = 100) +
+  geom_vline(aes(xintercept = max(num_cg)))
+```
+
+#plot gene sets
+
+```{r}
+summarise_go <- go_entrez %>% group_by(go) %>% summarise(num_genes = n(), sum_cg = sum(num_cg), av_cg = mean(num_cg), max_cg = max(num_cg))
+```
+
+```{r}
+summarise_go %>%
+  ggplot(aes(x = av_cg)) +
+  geom_density() +
+  geom_vline(aes(xintercept = max(av_cg)))
+
+summarise_go %>%
+  ggplot(aes(x = av_cg)) +
+  geom_histogram(bins = 50) +
+  geom_vline(aes(xintercept = max(av_cg)))
+```
+
+## me making plots
+
+# Distribution of CpGs in DMRs
+
+```{r}
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = no.cpgs, colour = method)) +
+  geom_density()
+
+rbind(cbind(no.cpgs = dmrcate_seq_dmr$no.cpgs, method = "dmrcate"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:5000,]$no.cpgs, method = "dmrcate_5k"),
+      cbind(no.cpgs = dmrcate_seq_dmr[1:1000,]$no.cpgs, method = "dmrcate_1k")) %>% data.frame() %>% mutate(no.cpgs = as.double(no.cpgs)) %>%
+  ggplot(aes(x = log2(no.cpgs), colour = method)) +
+  geom_density()
+```
+
+# Distribution of Average number of cpgs in gene sets
+
+```{r}
+summary(go_entrez$num_cg)
+summary(go_entrez %>% group_by(go) %>% summarise(av_cg_per_go = mean(num_cg)) %>% .$av_cg_per_go)
+```
+
+```{r}
+go_entrez %>% 
+  group_by(go) %>% 
+  summarise(av_cg_per_go = mean(num_cg)) %>%
+  ggplot(aes(x = av_cg_per_go)) +
+  geom_density()
+
+go_entrez %>% 
+  group_by(go) %>% 
+  summarise(av_cg_per_go = mean(num_cg)) %>%
+  ggplot(aes(x = log2(av_cg_per_go + 1))) +
+  geom_density() 
+
+go_entrez %>% 
+  group_by(go) %>% 
+  summarise(av_cg_per_go = mean(num_cg)) %>%
+  ggplot(aes(x = av_cg_per_go)) +
+  geom_histogram(bins = 50)
+```
+```{r}
+go_entrez %>% distinct(go)
+```
+
+```{r}
+dmrcate_seq_dmr
+wgbs_counts %>% filter(site_in_dmr == TRUE)
+```
+
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr[1:1000,]), as_granges(dmrcate_seq_anno)) %>% data.frame() %>% distinct(position)
+```
+```{r}
+find_overlaps(as_granges(dmrcate_seq_dmr[1:1000,]), as_granges(biomart_genes)) %>% data.frame() %>% distinct(gene_name)
+```
+
+```{r}
+dmrcate_seq_dmr
+```
+
