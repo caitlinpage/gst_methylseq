@@ -14,6 +14,10 @@ EPICv1 platform, under the hg19 genome annotation. [GSE110554](https://www.ncbi.
 * B cell type: 6 samples
 * NK cell type: 6 samples
 
+
+## Analysis
+Initial minfi analysis followed as described in [link](https://f1000research.com/articles/5-1281/v3)
+
 ## Packages used
 
 ```{r}
@@ -258,9 +262,7 @@ densityPlot(mVals, sampGroups=blood_samples$short_group, main="M-values",
 legend("topleft", legend = levels(factor(blood_samples$short_group)),
         text.col=brewer.pal(8,"Dark2"))
 ```
-```{r}
-?minfi::getM
-```
+
 
 
 ## Differential methylation methods
