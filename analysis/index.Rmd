@@ -36,7 +36,9 @@ Analysis:
   
   b) [Sequencing](00_differentialMethylationSequencing.html)
   
-  [Compare results](04_compareDM.html)
+  [Compare Array and Sequencing results](04_compareDM.html)
+  
+  [Compare distributions of tested array and sequencing sites](02_cpgAvailVsTested.html)
   
   c) Compare CpG level and DMR results
   
@@ -56,7 +58,7 @@ Analysis:
 
   a) [Explore CpG distribution across genome bins](01_exploreBiasByBins.html)
   
-  b) [Explore gene based biases](02_exploreBiasGenes.html) *tba
+  b) [Explore gene based biases](02_exploreBiasGenes.html) 
 
 4. Gene Set Testing
   [Summary page]
@@ -69,14 +71,22 @@ Analysis:
   
 4. [Evaluate gene set testing method for methylation sequencing](03_runGST.html)
 
+[Compare array and sequencing gene set testing results]
+
 6. Applying gene set testing method to different data sets
 
   a) [Long read Analysis](00_longReadAnalysis.html)
   
-
+  b) [Monocyte vs Granulocyte](07_monoGranAnalysis.html)
+  
+  b) [cd4 vs cd8](07_tCellAnalysis.html)
+  
+  b) [Broad Gene Set Database]
+  
+7. [Final Result Plots]
 ```{r}
 	
-#save.image(file='myEnvironment.RData')
+save.image(file='myEnvironment.RData')
 ```
 
 https://www.techcoil.com/blog/how-to-save-and-load-environment-objects-in-r/#google_vignette
