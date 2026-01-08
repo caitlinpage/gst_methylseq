@@ -13,8 +13,8 @@ editor_options:
 
 ```
 
-
 # more detailed gene features
+
 ```{r}
 library(annotatr)
 ```
@@ -36,24 +36,25 @@ annots_gene <- annots_gene %>% data.frame() %>% filter(seqnames %in% unique(bsse
 bseq_dmrs_genes <- annotate_regions(as_granges(bsseq_dmrs), annots_gene) %>% data.frame()
 ```
 
-
 ```{r}
 bseq_dmrs_genes %>% group_by(annot.type) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
 ```
+
 ```{r}
 bseq_dmrs_genes %>% distinct(rank, annot.type) %>% group_by(annot.type) %>% summarise(n_dmr = n(), prop_total_dmr = n()/69858)
 ```
 
-
-
 # cpg annotations - ISLANDS
+
 ```{r}
 annotations %>% head()
 ```
+
 ```{r}
 anno_islands <- annotations %>% data.frame() %>% filter(type == "hg19_cpg_islands") %>% mutate(island_num = 1:n())
 island_cg <- find_overlaps(as_granges(anno_islands), as_granges(wgbs_counts)) %>% data.frame() %>% group_by(island_num) %>% summarise(num_cg = n()) %>% data.frame()
 ```
+
 ```{r}
 head(anno_islands)
 ```
@@ -63,13 +64,13 @@ find_overlaps(as_granges(eh_genes), as_granges(anno_islands)) %>% data.frame() %
   ggplot(aes(x = num_cg.x, y = n_islands)) +
   geom_point(alpha = 0.4)
 ```
+
 ```{r}
 find_overlaps(as_granges(eh_genes), as_granges(anno_islands)) %>% data.frame() %>%
   group_by(width) %>% summarise(n_islands = n()) %>%
   ggplot(aes(x = log2(width), y = n_islands)) +
   geom_point(alpha = 0.4)
 ```
-
 
 ```{r}
 anno_islands <- anno_islands %>% mutate(num_cg = island_cg[match(.$island_num, island_cg$island_num), "num_cg"])
@@ -81,6 +82,7 @@ anno_islands %>% group_by(num_cg) %>% summarise(n= n()) %>%
 ```{r}
 bseq_dmrs_cpg_anno <- annotate_regions(as_granges(bsseq_dmrs), annotations) %>% data.frame()
 ```
+
 ```{r}
 bseq_dmrs_cpg_isl <- filter(bseq_dmrs_cpg_anno, annot.type == "hg19_cpg_islands")
 ```
@@ -101,9 +103,8 @@ anno_islands %>% mutate(has_dmr = ifelse(id %in% bseq_dmrs_cpg_isl$annot.id, TRU
       geom_smooth()
 ```
 
+-   prop of dmrs that have island
 
-- prop of dmrs that have island
 ```{r}
 bsseq_dmrs %>% mutate(has_island = ifelse(rank %in% bseq_dmrs_cpg_isl$rank, TRUE, FALSE)) %>% group_by(has_island) %>% summarise(n=n()) %>% ungroup() %>% mutate(prop = n/sum(n))
 ```
-
