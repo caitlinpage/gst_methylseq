@@ -10,8 +10,8 @@ editor_options:
 ## Introduction
 
 ```{r}
-renv::install("bioc::KEGGREST")
-renv::install("bioc::msigdb")
+#renv::install("bioc::KEGGREST")
+#renv::install("bioc::msigdb")
 ```
 ## MsigDB Analysis
 
