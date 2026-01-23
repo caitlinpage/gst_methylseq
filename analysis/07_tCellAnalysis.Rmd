@@ -181,6 +181,9 @@ bsseq_dmrs_t <- bsseq_dmrs_t %>%
 bsseq_dmrs_t$rank <- 1:nrow(bsseq_dmrs_t)
 saveRDS(bsseq_dmrs_t, "../output/bsseq_dmrs_t.rds")
 ```
+```{r}
+bsseq_dmrs_t <- readRDS("../output/bsseq_dmrs_t.rds")
+```
 
 ```{r}
 nrow(bsseq_dmrs_t)
@@ -194,6 +197,10 @@ bsseq_dmrs_t_filt <- bsseq_dmrs_t %>% filter(abs(areaStat) > 100)
 
 ## Gene annotation
 ```{r}
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+```
+
+```{r}
 anno_bsseq_t %>% distinct(ensembl_gene_id)
 ```
 ```{r}
@@ -204,12 +211,199 @@ bsseq_dmrs_t_filt %>%
 ```{r}
 gst_res_t
 ```
+```{r}
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(org.Hs.eg.db)
+```
+```{r}
+wgbs_counts_t <- readRDS("../output/wgbs_counts_t.rds")
+```
+
+```{r}
+txdb_genes <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene::TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_genes <- find_overlaps(txdb_genes, as_granges(wgbs_counts_t[,1:4])) %>% data.frame() %>% group_by(gene_id, seqnames, start, end, width, strand) %>% summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+```
+
+```{r}
+txdb_genes
+biomart_genes
+```
+
+
+
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(bsseq_dmrs_t_filt, id = 1:nrow(bsseq_dmrs_t_filt))), as_granges(txdb_genes)) %>% data.frame()
+gene_info <- txdb_genes %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+```
+
+```{r}
+.plotBias <- function(D,bias)
+  # Plotting function to show gene level CpG density bias
+  # Belinda Phipson
+  # 5 March 2015
+{
+  o <- order(bias)
+  splitf <- rep(1:100,each=200)[1:length(bias)]
+  avgbias <- tapply(bias[o],factor(splitf),mean)
+  sumDM <- tapply(D[o],factor(splitf),sum)
+  propDM <- sumDM/table(splitf)
+  graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Number of CpGs per gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+}
+```
+
+```{r}
+.plotBias(D = gene_info$is_de, bias = as.vector(gene_info$num_cg))
+```
+```{r}
+sorted.eg.sig <- out$sig.eg #entrez ids for sig cpgs - genes that have sig cpgs
+  eg.universe <- out$universe # entrez ids all genes
+  freq_genes <- out$freq # num cpgs per gene
+  test.de <- out$de #gene de or not
+  #frac <- out$fract.counts
+  equiv <- out$equiv
+```
+
+```{r}
+#test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+```
+```{r}
+gene_info 
+```
+
+```{r}
+run_test_t <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$num_cg,
+  de = gene_info$is_de,
+  equiv = gene_info$num_cg
+)
+#run_miss_methyl_b(run_test_t, method = "Wallenius")
+```
+```{r}
+gst_t <- run_miss_methyl_b(run_test_t, method = "Wallenius")
+gst_t_fisher <- run_miss_methyl_b(run_test_t, method = "Fishers")
+gst_t_hyper <- run_miss_methyl_b(run_test_t, method = "None")
+```
+```{r}
+gst_t[[1]] %>% filter(FDR < 0.05)
+gst_t_fisher[[1]] %>% filter(FDR < 0.05)
+gst_t_hyper[[1]] %>% filter(FDR < 0.05)
+```
+```{r}
+library(UpSetR)
+```
+
+```{r}
+upset_input <- list(GOMethSeq = gst_t[[1]] %>% filter(FDR < 0.05) %>% .$GOID,
+                    Fishers = gst_t_fisher[[1]] %>% filter(FDR < 0.05) %>% .$GOID,
+                    Biased = gst_t_hyper[[1]] %>% filter(FDR < 0.05) %>% .$GOID)
+upset(fromList(upset_input), order.by = "freq", text.scale = 2)
+```
+```{r}
+gst_t <-gst_t[[1]] %>% mutate(rank_fdr = 1:n())
+gst_t_fisher <- gst_t_fisher[[1]] %>% mutate(rank_fdr = 1:n())
+gst_t_hyper <- gst_t_hyper[[1]] %>% mutate(rank_fdr = 1:n())
+```
+
+```{r}
+xx <- as.list(org.Hs.egGO2ALLEGS)
+out <- run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:500,], "biomart", biomart_genes))
+go_entrez <- data.frame(cbind(go = gsub("\\..*", "", names(unlist(xx))), entrez = unlist(xx)))
+go_entrez <- go_entrez[,1:2] %>% data.frame()
+```
+
+```{r}
+go_entrez <- readRDS("../output/go_entrez.rds")
+go_entrez <- go_entrez[,1:2]
+gene_info
+go_entrez <- go_entrez %>%
+  mutate(num_cg = gene_info[match(.$entrez, gene_info$num_cg), "num_cg"],
+         gomethseq = ifelse(go %in% filter(gst_t, FDR < 0.05)$GOID, TRUE, FALSE),
+         fishers = ifelse(go %in% filter(gst_t_fisher, FDR < 0.05)$GOID, TRUE, FALSE),
+         biased = ifelse(go %in% filter(gst_t_hyper, FDR < 0.05)$GOID, TRUE, FALSE),
+         rank_gomethseq = gst_t[match(.$go, gst_t$GOID), "rank_fdr"],
+         rank_fishers = gst_t_fisher[match(.$go, gst_t_fisher$GOID), "rank_fdr"],
+         rank_biased = gst_t_hyper[match(.$go, gst_t_hyper$GOID), "rank_fdr"])
+go_entrez <- go_entrez %>%
+  group_by(go) %>%
+  mutate(mean_num_cg = mean(num_cg, na.rm = TRUE)) %>%
+  ungroup() %>% data.frame()
+         
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_num_cg, rank_gomethseq, rank_biased) %>%
+  #filter(rank_gomethseq <= 1000, rank_biased <= 1000) %>%
+  ggplot(aes(x = mean_num_cg, y = rank_biased - rank_gomethseq)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") 
+ # scale_x_continuous(limits = c(0, 1500))
+```
+
+```{r}
+go_entrez %>% distinct(go, mean_num_cg, gomethseq, biased) %>%
+  filter(gomethseq == TRUE | biased == TRUE) %>% 
+  mutate(Method = case_when(gomethseq == FALSE & biased == TRUE ~ "Biased",
+                            gomethseq == TRUE & biased == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+
+```{r}
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
+immuneGO <- distinct(immuneGO)
+```
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_t[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_t[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+
+
+
+###### OLD
+```{r}
+anno_bsseq_t <- find_overlaps(as_granges(bsseq_dmrs_t_filt), txdb_genes) %>% data.frame()
+```
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+
+gst_out_t <- run_miss_methyl_a(genes(TxDb.Hsapiens.UCSC.hg19.knownGene), anno_bsseq_t)
+gst_res_t <- run_miss_methyl_b(gst_out_t, "Wallenius")[[1]]
+gst_res_t$rank_fdr <- 1:nrow(gst_res_t)
+gst_res_t <- gst_res_t %>% mutate(is.sig = ifelse(FDR < 0.05, TRUE, FALSE))
+head(gst_res_t)
+#saveRDS(gst_res_t, "../output/gst_res_bsseq_t.rds")
+```
 
 ## GST
 ```{r}
 source("../code/mmGST.R")
 source("../code/function_binBiasPlot.R")
-anno_bsseq_t <- annoGeneDmr(bsseq_res_t, bsseq_dmrs_t_filt, "biomart", biomart_genes)
+#anno_bsseq_t <- annoGeneDmr(bsseq_res_t, bsseq_dmrs_t_filt, "biomart", biomart_genes)
+
 gst_out_t <- run_miss_methyl_a(biomart_genes, anno_bsseq_t)
 gst_res_t <- run_miss_methyl_b(gst_out_t, "Wallenius")[[1]]
 gst_res_t$rank_fdr <- 1:nrow(gst_res_t)
