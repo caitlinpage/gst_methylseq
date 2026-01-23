@@ -286,5 +286,23 @@ biomart_genes %>%
 ```
 
 
+##############
 
+```{r}
+source("../code/function_binBiasPlot.R")
+test_anno <- annoGeneDmr(wgbs_counts, bsseq_dmrs, "biomart", biomart_genes)
+test_anno_filt <- annoGeneDmr(wgbs_counts, bsseq_dmrs_filt, "biomart", biomart_genes)
+
+overlap_gene_dmr <- find_overlaps(as_granges(bsseq_dmrs), as_granges(eh_genes)) %>% data.frame()
+```
+
+```{r}
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+```
+
+```{r}
+source("../code/function_binBiasPlot.R")
+plotBiasGeneLength(biomart_genes, test_anno_filt, bin_size = 100)
+plotBiasGeneLength(biomart_genes, test_anno_filt, bin_size = 200)
+```
 
