@@ -137,6 +137,20 @@ go_entrez
 ```{r}
 compare_num_anno
 ```
+```{r}
+#library(GenomicFeatures)
+txdb_genes <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene::TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_genes <- find_overlaps(txdb_genes, as_granges(wgbs_counts[,1:4])) %>% data.frame() %>% group_by(gene_id, seqnames, start, end, width, strand) %>% summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+```
+
+```{r}
+go_entrez_bias <- go_entrez %>% mutate(width = txdb_genes[match(.$entrez, txdb_genes$gene_id), "width"],
+                                       num_cg = txdb_genes[match(.$entrez, txdb_genes$gene_id), "num_cg"])
+go_entrez_bias <- go_entrez_bias %>% filter(!is.na(width), !is.na(num_cg)) %>% group_by(go) %>% mutate(av_width = mean(width), av_num_cg = mean(num_cg)) %>% ungroup()
+go_entrez_bias %>% distinct(go, av_width, av_num_cg) %>% melt(id.vars = "go") %>%
+  ggplot(aes(x = log2(value), fill = variable)) +
+        geom_density(alpha = 0.4)
+```
 
 ```{r}
 go_entrez <- go_entrez %>% mutate(
