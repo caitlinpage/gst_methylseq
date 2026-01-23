@@ -1,0 +1,82 @@
+---
+title: "2026_dataSet"
+author: "Caitlin Page"
+date: "2026-01-21"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+library(BSgenome.Hsapiens.UCSC.hg18)
+library(plyranges)
+library(GenomicFeatures)
+library(reshape2)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+BiocManager::install("TumourMethData")
+```
+```{r}
+library(TumourMethData)
+```
+
+https://www.bioconductor.org/packages/release/data/experiment/vignettes/TumourMethData/inst/doc/getting_tumour_methylation_from_TumourMethData.html
+```{r}
+data("TumourMethDatasets")
+TumourMethDatasets
+```
+
+```{r}
+mcrpc_wgbs_hg38 <- download_meth_dataset(dataset = "mcrpc_wgbs_hg38")
+```
+* this is going to run overnight
+* the raw data is not an option because it's fastqs https://trace.ncbi.nlm.nih.gov/Traces/study/?acc=phs001648&o=acc_s%3Aa
+* and I don't want to
+* it didn't run so hopefully won't need it
+* do still have the version with chr11
+
+```{r}
+mcrpc_wgbs_hg38_chr11 <- download_meth_dataset(dataset = "mcrpc_wgbs_hg38_chr11")
+```
+
+```{r}
+mcrpc_wgbs_hg38_chr11@colData %>% data.frame() %>% group_by(metastatis_site, subtype) %>% summarise(n=n())
+```
+
+
+```{r}
+BiocManager::install("MethylSeqData")
+library(MethylSeqData)
+```
+https://www.bioconductor.org/packages/release/data/experiment/vignettes/MethylSeqData/inst/doc/MethylSeqData.html
+```{r}
+listDatasets()
+```
+
+```{r}
+brain_hickey <- RizzardiHickeyBrain()
+brain_hickey@colData
+```
+* uses hg19
+
+```{r}
+brain_hickey@assays
+```
+
+
+
+```{r}
+1+1
+```
+
+
+
+
+
+
