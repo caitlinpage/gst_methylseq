@@ -24,6 +24,7 @@ wgbs_counts <- readRDS("../output/wgbs_counts.rds")
 bsseq_res <- readRDS("../output/bsseq_res.rds")
 bsseq_dmrs <- readRDS("../output/bsseq_dmrs.rds")
 dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+biomart_genes <- readRDS("../output/genes_biomart.rds")
 ```
 ```{r}
 bsseq_dmrs_filt <- bsseq_dmrs %>% filter(abs(areaStat) > 100) # filter to significant DMRs
@@ -195,9 +196,519 @@ genome_bins %>%
   ggplot(aes(x = num_cg, colour = has_dmr)) +
   geom_density()
 ```
+############
+
+```{r}
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+```
+```{r}
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+biomart_genes <- biomart_genes %>% data.frame()
+```
+
+```{r}
+source("../code/function_binBiasPlot.R")
+test_anno <- annoGeneDmr(wgbs_counts, dmrcate_seq_dmr, "biomart", biomart_genes)
+test_anno_filt <- annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)
+
+overlap_gene_dmr <- find_overlaps(as_granges(dmrcate_seq_dmr), as_granges(eh_genes)) %>% data.frame()
+```
 
 
+```{r}
+source("../code/function_binBiasPlot.R")
+plotBiasGeneLength(biomart_genes, test_anno_filt, bin_size = 100)
+plotBiasGeneLength(biomart_genes, test_anno_filt, bin_size = 200)
+
+plotBiasGeneLength(biomart_genes, test_anno, bin_size = 100)
+plotBiasGeneLength(biomart_genes, test_anno, bin_size = 200)
+```
+
+```{r}
+plotBiasGeneLength(biomart_genes, test_anno_filt, bin_size = 300)
+```
+```{r}
+plotBiasGenomeBins()
+```
+
+```{r}
+source("../code/function_binBiasPlot.R")
+plotBiasGenomeBins(wgbs_counts, dmrcate_seq_dmr, bin_size = 5000, )
+plotBiasGenomeBins(wgbs_counts, dmrcate_seq_dmr[1:1000,], bin_size = 5000)
+```
+```{r}
+plotBiasGenomeBins(wgbs_counts, dmrcate_seq_dmr, bin_size = 500)
+```
+```{r}
+dmrcate_seq_dmr
+```
+
+```{r}
+test_anno
+```
+
+```{r}
+test_anno2 <- annoGeneDmr(wgbs_counts, mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr)), "biomart", biomart_genes)
+```
+
+```{r}
+find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(mutate(biomart_genes, gene_width = end - start + 1))) %>% data.frame() %>%
+  ggplot(aes(x = gene_width, y = no.cpgs)) +
+  geom_point()
+```
+```{r}
+biomart_genes %>% mutate(gene_width = end - start + 1) %>% distinct(gene_name, gene_width, num_cg) %>%
+  ggplot(aes(x = gene_width, y = num_cg)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red")
+```
+```{r}
+find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(mutate(biomart_genes, gene_width = end - start + 1))) %>% data.frame() %>% distinct(gene_name, gene_width, num_cg) %>%
+  ggplot(aes(x = gene_width, y = num_cg)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red")
+
+find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(mutate(biomart_genes, gene_width = end - start + 1))) %>% data.frame() %>% distinct(gene_name, gene_width, num_cg) %>%
+  ggplot(aes(x = log2(gene_width), y = log2(num_cg + 0.1))) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red")
+```
+```{r}
+dmrcate_seq_dmr %>%
+  ggplot(aes(x = width, y = no.cpgs)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, colour = "red")
+```
+```{r}
+cor.test(dmrcate_seq_dmr$width, dmrcate_seq_dmr$no.cpgs)
+```
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(mutate(biomart_genes, gene_width = end - start + 1))) %>% data.frame() %>% distinct(gene_name, gene_width, num_cg)
+cor.test(gene_try$gene_width, gene_try$num_cg)
+```
+* maybe I had only done the math not the visual
+```{r}
+biomart_genes %>% mutate(gene_width = end - start + 1) %>% distinct(gene_name, gene_width, num_cg) %>%
+  ggplot(aes(x = log2(gene_width), y = log2(num_cg))) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red") 
+```
+log2 doesn't make it look better
+
+```{r}
+source("../code/mmGST.R")
+source("../code/function_binBiasPlot.R")
+run_miss_methyl_b(run_miss_methyl_a(biomart_genes, annoGeneDmr(wgbs_counts, dmrcate_seq_dmr[1:1000,], "biomart", biomart_genes)), "GO", "Wallenius")[[1]]
+```
 
 
+########
 
+```{r}
+.estimatePWF <- function(D,bias)
+  # An alternative to goseq function nullp, which is transformation invariant
+  # Belinda Phipson and Gordon Smyth
+  # 6 March 2015
+{
+  prior.prob <- bias
+  o <- order(bias)
+  prior.prob[o] <- limma::tricubeMovingAverage(D[o],span=0.5)
+  prior.prob
+}
+
+.plotBias <- function(D,bias)
+  # Plotting function to show gene level CpG density bias
+  # Belinda Phipson
+  # 5 March 2015
+{
+  o <- order(bias)
+  splitf <- rep(1:100,each=200)[1:length(bias)]
+  avgbias <- tapply(bias[o],factor(splitf),mean)
+  sumDM <- tapply(D[o],factor(splitf),sum)
+  propDM <- sumDM/table(splitf)
+  graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Number of CpGs per gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+}
+```
+```{r}
+freq_genes <- out$freq # num cpgs per gene
+test.de <- out$de #gene de or not
+```
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(mutate(biomart_genes, gene_width = end - start + 1))) %>% data.frame()
+gene_info <- biomart_genes %>% mutate(width = end - start + 1, is_de = ifelse(gene_name %in% gene_try$gene_name, 1, 0)) %>% distinct(gene_name, num_cg, is_de, width)
+```
+
+```{r}
+#test_pwf <- .estimatePWF(D=test.de,bias=as.vector(freq_genes))
+.plotBias(D = gene_info$is_de, bias = as.vector(gene_info$num_cg))
+.plotBias(D = gene_info$is_de, bias = as.vector(gene_info$width)) # width
+```
+```{r}
+#library(GenomicFeatures)
+txdb_genes <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene::TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_genes <- find_overlaps(txdb_genes, as_granges(wgbs_counts[,1:4])) %>% data.frame() %>% group_by(gene_id, seqnames, start, end, width, strand) %>% summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+```
+
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(txdb_genes)) %>% data.frame()
+gene_info <- txdb_genes %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+```
+
+```{r}
+.plotBias(D = gene_info$is_de, bias = as.vector(gene_info$num_cg))
+.plotBias <- function(D,bias)
+  # Plotting function to show gene level CpG density bias
+  # Belinda Phipson
+  # 5 March 2015
+{
+  o <- order(bias)
+  splitf <- rep(1:100,each=200)[1:length(bias)]
+  avgbias <- tapply(bias[o],factor(splitf),mean)
+  sumDM <- tapply(D[o],factor(splitf),sum)
+  propDM <- sumDM/table(splitf)
+  graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Length of gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+}
+.plotBias(D = gene_info$is_de, bias = as.vector(gene_info$width))
+```
+* so so much nicer
+
+```{r}
+txdb_genes %>%
+  ggplot(aes(x = width, y = num_cg)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red")
+
+txdb_genes %>%
+  ggplot(aes(x = width, y = num_cg)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red") +
+  scale_x_continuous(limits = c(0, 2500000)) +
+  scale_y_continuous(limits = c(0,30000))
+
+txdb_genes %>%
+  ggplot(aes(x = width, y = num_cg)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red") +
+  scale_x_continuous(limits = c(0, 1000000)) +
+  scale_y_continuous(limits = c(0,20000))
+```
+```{r}
+# just to limits in the 2 bias plots
+txdb_genes %>%
+  ggplot(aes(x = width, y = num_cg)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(slope = 1, intercept = 0, colour = "red") +
+  scale_x_continuous(limits = c(0, 150000)) +
+ scale_y_continuous(limits = c(0,6000))
+```
+
+```{r}
+txdb_genes[,c(1,5,7)] %>% melt(id.vars = "gene_id") %>%
+  ggplot(aes(x = log2(value), fill = variable)) +
+  geom_density(alpha = 0.4)
+```
+```{r}
+2^8
+```
+```{r}
+txdb_genes %>% filter(width > 32, width < 256)
+```
+
+
+```{r}
+txdb_genes %>%
+  ggplot(aes(x = log2(width))) +
+  geom_density()
+
+txdb_genes %>%
+  ggplot(aes(x = log2(num_cg))) +
+  geom_density()
+```
+
+
+#top 1000
+
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr[1:1000,], id = 1:1000)), as_granges(txdb_genes)) %>% data.frame()
+gene_info <- txdb_genes %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+.plotBias <- function(D,bias)
+  # Plotting function to show gene level CpG density bias
+  # Belinda Phipson
+  # 5 March 2015
+{
+  o <- order(bias)
+  splitf <- rep(1:100,each=200)[1:length(bias)]
+  avgbias <- tapply(bias[o],factor(splitf),mean)
+  sumDM <- tapply(D[o],factor(splitf),sum)
+  propDM <- sumDM/table(splitf)
+  graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Number of CpGs per gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+}
+.plotBias(D = gene_info$is_de, bias = as.vector(gene_info$num_cg))
+.plotBias <- function(D,bias)
+  # Plotting function to show gene level CpG density bias
+  # Belinda Phipson
+  # 5 March 2015
+{
+  o <- order(bias)
+  splitf <- rep(1:100,each=200)[1:length(bias)]
+  avgbias <- tapply(bias[o],factor(splitf),mean)
+  sumDM <- tapply(D[o],factor(splitf),sum)
+  propDM <- sumDM/table(splitf)
+  graphics::par(mar=c(5,5,2,2))
+  graphics::plot(avgbias,as.vector(propDM),
+                 xlab="Length of gene (binned)",
+                 ylab="Proportion Differential Methylation",cex.lab=1.5,
+                 cex.axis=1.2)
+  graphics::lines(stats::lowess(avgbias,propDM),col=4,lwd=2)
+}
+.plotBias(D = gene_info$is_de, bias = as.vector(gene_info$width))
+```
+* better with all
+
+
+```{r}
+#library(GenomicFeatures)
+txdb_genes <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene::TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_genes <- find_overlaps(txdb_genes, as_granges(wgbs_counts[,1:4])) %>% data.frame() %>% group_by(gene_id, seqnames, start, end, width, strand) %>% summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+```
+
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(txdb_genes)) %>% data.frame()
+gene_info <- txdb_genes %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+```
+
+```{r}
+run_test <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$num_cg,
+  de = gene_info$is_de,
+  equiv = gene_info$num_cg
+)
+```
+
+```{r}
+gst <- run_miss_methyl_b(run_test, method = "Wallenius")
+gst_fisher <- run_miss_methyl_b(run_test, method = "Fishers")
+gst_hyper <- run_miss_methyl_b(run_test, method = "None")
+```
+```{r}
+library(UpSetR)
+```
+
+```{r}
+upset_input <- list(GOMethSeq = gst[[1]] %>% filter(FDR < 0.05) %>% .$GOID,
+                    Fishers = gst_fisher[[1]] %>% filter(FDR < 0.05) %>% .$GOID,
+                    Biased = gst_hyper[[1]] %>% filter(FDR < 0.05) %>% .$GOID)
+upset(fromList(upset_input), order.by = "freq", text.scale = 2)
+```
+
+```{r}
+gst <-gst[[1]] %>% mutate(rank_fdr = 1:n())
+gst_fisher <- gst_fisher[[1]] %>% mutate(rank_fdr = 1:n())
+gst_hyper <- gst_hyper[[1]] %>% mutate(rank_fdr = 1:n())
+```
+
+```{r}
+go_entrez <- readRDS("../output/go_entrez.rds")
+go_entrez <- go_entrez[,1:2]
+gene_info
+go_entrez <- go_entrez %>%
+  mutate(num_cg = gene_info[match(.$entrez, gene_info$num_cg), "num_cg"],
+         gomethseq = ifelse(go %in% filter(gst, FDR < 0.05)$GOID, TRUE, FALSE),
+         fishers = ifelse(go %in% filter(gst_fisher, FDR < 0.05)$GOID, TRUE, FALSE),
+         biased = ifelse(go %in% filter(gst_hyper, FDR < 0.05)$GOID, TRUE, FALSE),
+         rank_gomethseq = gst[match(.$go, gst$GOID), "rank_fdr"],
+         rank_fishers = gst_fisher[match(.$go, gst_fisher$GOID), "rank_fdr"],
+         rank_biased = gst_hyper[match(.$go, gst_hyper$GOID), "rank_fdr"])
+go_entrez <- go_entrez %>%
+  group_by(go) %>%
+  mutate(mean_num_cg = mean(num_cg, na.rm = TRUE)) %>%
+  ungroup() %>% data.frame()
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_num_cg, rank_gomethseq, rank_biased) %>%
+  filter(rank_gomethseq <= 1000, rank_biased <= 1000) %>%
+  ggplot(aes(x = mean_num_cg, y = rank_biased - rank_gomethseq)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") 
+ # scale_x_continuous(limits = c(0, 1500))
+```
+
+```{r}
+# find the unique categories
+go_entrez %>% distinct(go, mean_num_cg, gomethseq, biased) %>%
+  filter(gomethseq != biased) %>% 
+  mutate(Method = ifelse(gomethseq == FALSE, "Biased", "GOMethSeq")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+
+# old - all
+go_entrez %>% distinct(go, mean_num_cg, gomethseq, biased) %>%
+  filter(gomethseq == TRUE | biased == TRUE) %>% 
+  mutate(Method = case_when(gomethseq == FALSE & biased == TRUE ~ "Biased",
+                            gomethseq == TRUE & biased == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+```{r}
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
+immuneGO <- distinct(immuneGO)
+```
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+* top 1k
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr[1:1000,], id = 1:1000)), as_granges(txdb_genes)) %>% data.frame()
+gene_info <- txdb_genes %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+```
+
+```{r}
+run_test <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$num_cg,
+  de = gene_info$is_de,
+  equiv = gene_info$num_cg
+)
+```
+
+```{r}
+gst_1k <- run_miss_methyl_b(run_test, method = "Wallenius")
+gst_1k_fisher <- run_miss_methyl_b(run_test, method = "Fishers")
+gst_1k_hyper <- run_miss_methyl_b(run_test, method = "None")
+```
+
+
+```{r}
+upset_input <- list(GOMethSeq = gst_1k[[1]] %>% filter(FDR < 0.05) %>% .$GOID,
+                    Fishers = gst_1k_fisher[[1]] %>% filter(FDR < 0.05) %>% .$GOID,
+                    Biased = gst_1k_hyper[[1]] %>% filter(FDR < 0.05) %>% .$GOID)
+upset(fromList(upset_input), order.by = "freq", text.scale = 2)
+```
+```{r}
+gst_1k <-gst_1k[[1]] %>% mutate(rank_fdr = 1:n())
+gst_1k_fisher <- gst_1k_fisher[[1]] %>% mutate(rank_fdr = 1:n())
+gst_1k_hyper <- gst_1k_hyper[[1]] %>% mutate(rank_fdr = 1:n())
+```
+
+```{r}
+go_entrez <- readRDS("../output/go_entrez.rds")
+go_entrez <- go_entrez[,1:2]
+gene_info
+go_entrez <- go_entrez %>%
+  mutate(num_cg = gene_info[match(.$entrez, gene_info$num_cg), "num_cg"],
+         gomethseq = ifelse(go %in% filter(gst_1k, FDR < 0.05)$GOID, TRUE, FALSE),
+         fishers = ifelse(go %in% filter(gst_1k_fisher, FDR < 0.05)$GOID, TRUE, FALSE),
+         biased = ifelse(go %in% filter(gst_1k_hyper, FDR < 0.05)$GOID, TRUE, FALSE),
+         rank_gomethseq = gst_1k[match(.$go, gst_1k$GOID), "rank_fdr"],
+         rank_fishers = gst_1k_fisher[match(.$go, gst_1k_fisher$GOID), "rank_fdr"],
+         rank_biased = gst_1k_hyper[match(.$go, gst_1k_hyper$GOID), "rank_fdr"])
+go_entrez <- go_entrez %>%
+  group_by(go) %>%
+  mutate(mean_num_cg = mean(num_cg, na.rm = TRUE)) %>%
+  ungroup() %>% data.frame()
+         
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_num_cg, rank_gomethseq, rank_biased) %>%
+  filter(rank_gomethseq <= 1000, rank_biased <= 1000) %>%
+  ggplot(aes(x = mean_num_cg, y = rank_biased - rank_gomethseq)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") 
+ # scale_x_continuous(limits = c(0, 1500))
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_num_cg, gomethseq, biased) %>%
+  filter(gomethseq != biased) %>% 
+  mutate(Method = ifelse(gomethseq == FALSE, "Biased", "GOMethSeq")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+
+go_entrez %>% distinct(go, mean_num_cg, gomethseq, biased) %>%
+  filter(gomethseq == TRUE | biased == TRUE) %>% 
+  mutate(Method = case_when(gomethseq == FALSE & biased == TRUE ~ "Biased",
+                            gomethseq == TRUE & biased == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+```{r}
+txdb_genes %>% summarise(sum(num_cg))
+```
+
+* t cell
+```{r}
+gst_t <- gst_t[[1]]
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_t[1:100,] %>% mutate(rank_fdr = 1:100, in_imm = cumsum(GOID %in% immuneGO$GOID), method = "GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_t_hyper[1:100,] %>% mutate(rank_fdr = 1:100, in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line(size = 2) +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
 
