@@ -1,0 +1,66 @@
+---
+title: "run_cancerChr11"
+author: "Caitlin Page"
+date: "2026-01-22"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+library(BSgenome.Hsapiens.UCSC.hg18)
+library(plyranges)
+library(GenomicFeatures)
+library(reshape2)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+```
+
+```{r}
+library(TumourMethData)
+```
+
+
+```{r}
+data("TumourMethDatasets")
+TumourMethDatasets
+```
+https://www.nature.com/articles/s41588-020-0648-8#Sec10
+```{r}
+mcrpc_wgbs_hg38_chr11 <- download_meth_dataset(dataset = "mcrpc_wgbs_hg38_chr11")
+```
+
+```{r}
+mcrpc_wgbs_hg38_chr11@colData %>% data.frame() %>% group_by(metastatis_site, subtype) %>% summarise(n=n())
+```
+
+```{r}
+mcrpc_wgbs_hg38_chr11@rowRanges
+```
+```{r}
+wgbs_counts %>% filter(seqnames == "chr11") %>% nrow()
+```
+
+
+```{r}
+mcrpc_wgbs_hg38_chr11
+```
+
+```{r}
+library("BSgenome.Hsapiens.UCSC.hg38")
+seq_names <- "chr11"
+  anno_seq <- lapply(seq_names, function(x) {
+    cbind(data.frame(Biostrings::matchPattern("CG", genome[[x]])),
+          seqnames = x
+    )
+  }) %>%
+    dplyr::bind_rows()
+  anno_seq <- anno_seq %>% dplyr::mutate(pos = paste0(seqnames, "-", start)) %>%
+    dplyr::relocate(pos, seqnames)
+  anno_seq
+```
+
