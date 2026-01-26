@@ -1,0 +1,208 @@
+---
+title: "run_hickeyBrainDataset"
+author: "Caitlin Page"
+date: "2026-01-22"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+## Introduction
+
+```{r}
+1+1
+```
+
+```{r}
+library(plyranges)
+library(GenomicFeatures)
+library(reshape2)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(bsseq)
+library(DMRcate)
+```
+
+
+```{r}
+library(MethylSeqData)
+```
+https://www.bioconductor.org/packages/release/data/experiment/vignettes/MethylSeqData/inst/doc/MethylSeqData.html
+```{r}
+listDatasets()
+```
+
+```{r}
+brain_hickey <- RizzardiHickeyBrain()
+```
+* HG19
+
+```{r}
+brain_hickey@colData %>% data.frame() %>% group_by(tissue) %>% summarise(n=n())
+brain_hickey@colData %>% data.frame() %>% group_by(donor) %>% summarise(n=n())
+```
+
+
+DNA methylation was assessed in samples from four tissues: 
+* anterior cingulate cortex (BA24; pink), 
+* prefrontal cortex (BA9; blue), 
+* nucleus accumbens (NAcc; orange), and 
+* hippocampus (HC; gray)
+
+```{r}
+brain_hickey
+```
+
+```{r}
+brain_hickey@rowRanges
+```
+
+```{r}
+brain_hickey@assays@data@listData
+```
+* had wasted time unable to find the positions
+* forgot about rowRanges
+* make all a data frame because that's easier for me
+* or not and just do the bsseq object
+```{r}
+cbind(data.frame(brain_hickey@rowRanges), brain_hickey@assays@data$M, brain_hickey@assays@data$Cov)
+```
+
+* bsseq and then bsmooth
+* then dmrcate
+* bsmooth can be very slow
+* cull the samples
+
+```{r}
+brain_hickey@colData %>% data.frame() %>% filter(neun == "unsorted") %>% group_by(tissue) %>% mutate(tissue_count = n()) %>% group_by(tissue, donor) %>% mutate(tissue_donor_count = n()) %>% group_by(donor) %>% mutate(donor_count = n())
+```
+
+* which tissues to use?
+DNA methylation was assessed in samples from four tissues: 
+* anterior cingulate cortex (BA24; pink), 
+* prefrontal cortex (BA9; blue), 
+* nucleus accumbens (NAcc; orange), and 
+* hippocampus (HC; gray)
+
+* do hippocampus and prefrontal cortex - I've heard of those
+
+```{r}
+samples_selected <- brain_hickey@colData %>% data.frame() %>% filter(neun == "unsorted") %>% filter(tissue %in% c("HC", "BA9")) %>%
+  group_by(donor) %>% mutate(n = n()) %>% filter(n == 2) %>% ungroup() %>%
+  mutate(name = paste0(donor, "_", tissue, "_", neun)) %>% data.frame()
+samples_selected
+```
+* now have 10 samples
+* actually 6 would be enough
+
+```{r}
+samples_selected <- samples_selected[1:6,]
+rownames(samples_selected) <- samples_selected$name
+```
+
+
+```{r}
+brain_m <- brain_hickey@assays@data$M
+brain_m <- brain_m[,samples_selected$name]
+brain_cov <- brain_hickey@assays@data$Cov
+brain_cov <- brain_cov[,samples_selected$name]
+```
+```{r}
+brain_hickey@rowRanges
+```
+
+```{r}
+brain_bseq <- BSseq(M = brain_m, Cov = brain_cov, sampleNames = samples_selected$name, gr = brain_hickey@rowRanges, pData = samples_selected)
+```
+```{r}
+pData(brain_bseq)
+```
+```{r}
+brain_hickey@rowRanges %>% data.frame() %>% distinct(seqnames)
+```
+
+```{r}
+brain_bseq$tissue
+```
+
+```{r}
+saveRDS(brain_bseq, "../output/brain_bseq_obj.rds")
+```
+
+r/4.4.0-gcc-13.2.0
+bseq <- readRDS("/researchers/caitlin.page/phd_gst/brain_bseq_obj.rds")
+
+bseq_nk_vs_b_all <- bseq
+
+bsmooth1 <- BSmooth(BSseq = bseq_nk_vs_b_all[,1], BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
+
+bsmooth2 <- BSmooth(BSseq = bseq_nk_vs_b_all[,2], BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
+bsmooth3 <- BSmooth(BSseq = bseq_nk_vs_b_all[,3], BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
+
+bsmooth4 <- BSmooth(BSseq = bseq_nk_vs_b_all[,4], BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
+bsmooth5 <- BSmooth(BSseq = bseq_nk_vs_b_all[,5], BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
+
+bsmooth6 <- BSmooth(BSseq = bseq_nk_vs_b_all[,6], BPPARAM = MulticoreParam(workers = 12), verbose = TRUE)
+
+dmrcate_smooth <- bsseq::combine(bsmooth1, bsmooth2, bsmooth3, bsmooth4, bsmooth5, bsmooth6)
+
+saveRDS(dmrcate_smooth, "/researchers/caitlin.page/phd_gst/dmrcate_smooth_brain.rds")
+
+#bseq.cov <- getCoverage(dmrcate_smooth)
+#keep <- which(rowSums(bseq.cov[, dmrcate_smooth$tissue == "BA9"] >= 2) >= 2 &
+#                rowSums(bseq.cov[, dmrcate_smooth$tissue == "HC"] >= 2) >= 2)
+
+#dmrcate_smooth <- dmrcate_smooth[keep,]
+
+#tissue <- factor(pData(dmrcate_smooth)$tissue)
+#tissue <- relevel(tissue, "BA9")
+#Regular matrix design
+#design <- model.matrix(~tissue)
+#colnames(design) <- gsub("tissue", "", colnames(design))
+#colnames(design)[1] <- "Intercept"
+#rownames(design) <- colnames(dmrcate_smooth)
+
+#design <- edgeR::modelMatrixMeth(design)
+
+#seq_annot <- sequencing.annotate(dmrcate_smooth, design, all.cov = TRUE,
+ #                                coef = "HC", fdr=0.05)
+
+#dmrcate.res <- dmrcate(seq_annot, C=2, min.cpgs = 5)
+
+#dmrcate_seq_dmr <- extractRanges(seq_dmrcate.res, genome = "hg19")
+#dmrcate_seq_dmr <- data.frame(dmrcate_seq_dmr)
+#dmrcate_seq_anno <- data.frame(seq_annot@ranges)
+#saveRDS(seq_annot, "/researchers/caitlin.page/phd_gst/dmrcate_seq_anno_brain.rds")
+#saveRDS(dmrcate_seq_dmr, "/researchers/caitlin.page/phd_gst/dmrcate_seq_dmr_brain.rds")
+
+################
+
+# couldn't run dm so let's just load in theirs
+https://www.bioconductor.org/packages/release/data/experiment/vignettes/MethylSeqData/inst/doc/MethylSeqData.html
+[paper](https://www.nature.com/articles/s41593-018-0297-8)
+[code repository](https://doi.org/10.5281/zenodo.1469577)
+In the code repository are data objects
+```{r}
+list.files("../../hansenlab-BrainEpigenome/objects")
+```
+
+```{r}
+load("../../hansenlab-BrainEpigenome/objects/All_Annotated_DMRs_GRanges.rda")
+Annotated_NEG_DMRs_gr
+```
+* nice
+```{r}
+list.files("../../hansenlab-BrainEpigenome/datasets_for_comparison/Lister_CG_DMR_lists")
+```
+```{r}
+brain_dmrs_lister <- read.table("../../hansenlab-BrainEpigenome/datasets_for_comparison/Lister_CG_DMR_lists/CGDMRs_hs_NeuN-_hyper_mCG.txt")
+```
+* so this has position but no ranking information
+* which if I pick a small file is maybe ok - just use all of them
+```{r}
+brain_dmrs_ebv <- read.csv("../../hansenlab-BrainEpigenome/datasets_for_comparison/EBV.csv", header = TRUE)
+```
+* this is usable
+* just would need to find in paper what it is
