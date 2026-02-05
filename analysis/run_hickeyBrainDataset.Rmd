@@ -203,6 +203,228 @@ brain_dmrs_lister <- read.table("../../hansenlab-BrainEpigenome/datasets_for_com
 * which if I pick a small file is maybe ok - just use all of them
 ```{r}
 brain_dmrs_ebv <- read.csv("../../hansenlab-BrainEpigenome/datasets_for_comparison/EBV.csv", header = TRUE)
+brain_dmrs_ebv$seqnames <- brain_dmrs_ebv$chr
 ```
 * this is usable
 * just would need to find in paper what it is
+
+
+```{r}
+gene_try <- find_overlaps(as_granges(mutate(brain_dmrs_ebv, id = 1:nrow(brain_dmrs_ebv))), as_granges(txdb_genes)) %>% data.frame()
+gene_info <- txdb_genes %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+```
+
+```{r}
+run_test <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$num_cg,
+  de = gene_info$is_de,
+  equiv = gene_info$num_cg
+)
+```
+
+```{r}
+gst_brain <- run_miss_methyl_b(run_test, method = "Wallenius")
+#gst_2ud_fisher <- run_miss_methyl_b(run_test, method = "Fishers")
+gst_brain_hyper <- run_miss_methyl_b(run_test, method = "None")
+```
+
+```{r}
+gst_brain
+```
+
+
+```{r}
+gst_brain <- gst_brain[[1]]
+gst_brain_hyper <- gst_brain_hyper[[1]]
+gst_brain$rank_fdr <- 1:nrow(gst_brain)
+gst_brain_hyper$rank_fdr <- 1:nrow(gst_brain_hyper)
+```
+
+```{r}
+upset_input <- list(GOMethSeq = gst_1k %>% filter(FDR < 0.05) %>% .$GOID,
+                    Biased = gst_1k_hyper %>% filter(FDR < 0.05) %>% .$GOID)
+upset(fromList(upset_input), order.by = "freq", text.scale = 2)
+```
+
+
+
+```{r}
+go_entrez_brain <- go_entrez[,1:3] %>%
+  mutate(
+         gomethseq = ifelse(go %in% filter(gst_brain, FDR < 0.05)$GOID, TRUE, FALSE),
+         biased = ifelse(go %in% filter(gst_brain_hyper, FDR < 0.05)$GOID, TRUE, FALSE),
+         rank_gomethseq = gst_brain[match(.$go, gst_brain$GOID), "rank_fdr"],
+         rank_biased = gst_brain_hyper[match(.$go, gst_brain_hyper$GOID), "rank_fdr"])
+go_entrez_brain <- go_entrez_brain %>% group_by(go) %>% mutate(num_cg = ifelse(is.na(num_cg), 0, num_cg), mean_num_cg = mean(num_cg)) %>% ungroup()
+```
+
+
+```{r}
+go_entrez_brain %>% distinct(go, mean_num_cg, gomethseq, biased, rank_gomethseq, rank_biased) %>%
+  filter(rank_gomethseq <= 1000, rank_biased <= 1000) %>%
+  ggplot(aes(x = mean_num_cg, y = rank_biased - rank_gomethseq)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") +
+  scale_x_continuous(limits = c(0, 1500))
+```
+
+
+```{r}
+go_entrez_brain %>% distinct(go, mean_num_cg, gomethseq, biased, rank_gomethseq, rank_biased) %>%
+  filter(gomethseq != biased) %>% 
+  mutate(Method = ifelse(gomethseq == FALSE, "Biased", "GOMethSeq")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+
+go_entrez_brain %>% distinct(go, mean_num_cg, gomethseq, biased, rank_gomethseq, rank_biased) %>%
+  filter(gomethseq == TRUE | biased == TRUE) %>% 
+  mutate(Method = case_when(gomethseq == FALSE & biased == TRUE ~ "Biased",
+                            gomethseq == TRUE & biased == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+
+txdb_genes_mod <- find_overlaps(txdb_genes %>%
+  mutate(TSS = ifelse(strand == "+", start, end),
+         start = ifelse(strand == "+", start - 5000, end - 5000),
+         end = ifelse(strand == "+", start + 10000, end + 5000)) %>% .[,c(1:4,6)] %>% as_granges(), 
+  as_granges(wgbs_counts[,1:4])) %>% data.frame() %>%
+  group_by(gene_id, seqnames, start, end, strand, width) %>%
+  summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+
+
+
+
+
+#########################
+
+
+```{r}
+gst_2ud_width <- gst_2ud_width[[1]]
+gst_2ud_width_hyper <- gst_2ud_width_hyper[[1]]
+gst_2ud_width$rank_fdr <- 1:nrow(gst_2ud_width)
+gst_2ud_width_hyper$rank_fdr <- 1:nrow(gst_2ud_width_hyper)
+```
+
+```{r}
+upset_input <- list(GOMethSeq = gst_1k %>% filter(FDR < 0.05) %>% .$GOID,
+                    Biased = gst_1k_hyper %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS2k_GOMethSeq = gst_2ud %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS2k_Biased = gst_2ud_hyper %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS2k_width_GOMethSeq = gst_2ud_width %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS2k_width_Biased = gst_2ud_width_hyper %>% filter(FDR < 0.05) %>% .$GOID)
+upset(fromList(upset_input), order.by = "freq", text.scale = 2)
+```
+
+```{r}
+gst_2ud %>% filter(FDR < 0.05)
+gst_2ud_hyper %>% filter(FDR < 0.05)
+```
+
+```{r}
+go_entrez <- go_entrez %>%
+  mutate(
+         tss2k_width_gomethseq = ifelse(go %in% filter(gst_2ud_width, FDR < 0.05)$GOID, TRUE, FALSE),
+         tss2k_width_biased = ifelse(go %in% filter(gst_2ud_width_hyper, FDR < 0.05)$GOID, TRUE, FALSE),
+         rank_tss2k_width_gomethseq = gst_2ud_width[match(.$go, gst_2ud_width$GOID), "rank_fdr"],
+         rank_tss2k_width_biased = gst_2ud_width_hyper[match(.$go, gst_2ud_width_hyper$GOID), "rank_fdr"])
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_num_cg, rank_tss2k_gomethseq, rank_tss2k_biased) %>%
+  filter(rank_tss2k_gomethseq <= 1000, rank_tss2k_biased <= 1000) %>%
+  ggplot(aes(x = mean_num_cg, y = rank_tss2k_biased - rank_tss2k_gomethseq)) + 
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  labs(x = "Average No. CpGs in GO category", y = "Increase in rank in Wallenius") 
+ # scale_x_continuous(limits = c(0, 1500))
+```
+
+
+```{r}
+go_entrez %>% distinct(go, mean_num_cg, tss2k_gomethseq, tss2k_biased) %>%
+  filter(tss2k_gomethseq != tss2k_biased) %>% 
+  mutate(Method = ifelse(tss2k_gomethseq == FALSE, "Biased", "GOMethSeq")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+
+go_entrez %>% distinct(go, mean_num_cg, tss2k_gomethseq, tss2k_biased) %>%
+  filter(tss2k_gomethseq == TRUE | tss2k_biased == TRUE) %>% 
+  mutate(Method = case_when(tss2k_gomethseq == FALSE & tss2k_biased == TRUE ~ "Biased",
+                            tss2k_gomethseq == TRUE & tss2k_biased == TRUE ~ "Both",
+                            TRUE ~ "Bias Corrected")) %>%
+  ggplot(aes(x = reorder(Method, mean_num_cg), y = mean_num_cg, fill = Method)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Method", y = "Average number of CpGs per ontology category")
+```
+
+```{r}
+gst_1k
+```
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_1k_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS2k_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS2k_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_2ud[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS2k_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS_2kBiased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud_width[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Width_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud_width_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Width_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+```{r}
+truth_gst_100 <- rbind(
+  gst_2ud[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_2ud_width[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Width_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud_width_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Width_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
