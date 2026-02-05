@@ -52,8 +52,8 @@ plotBiasGenomeBins <- function(counts, dmr, plot_style = c("bin", "indiv"), geno
       mutate(num = n()) %>%
       mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
       ggplot(aes(x = num_cg_bin_group, y = prop)) +
-      geom_point(alpha = 0.4) +
-      geom_smooth()
+      geom_point(alpha = 0.4)
+     # geom_smooth()
   } else {
   plot <- genome_bins %>%
     group_by(num_cg) %>%
@@ -67,8 +67,8 @@ plotBiasGenomeBins <- function(counts, dmr, plot_style = c("bin", "indiv"), geno
     mutate(num = n()) %>%
     mutate(has_dmr = ifelse(num == 1, TRUE, has_dmr)) %>% filter(has_dmr == TRUE) %>%
     ggplot(aes(x = num_cg, y = prop)) +
-      geom_point(alpha = 0.4) +
-      geom_smooth()
+      geom_point(alpha = 0.4)
+    #  geom_smooth()
   }
   list(genome_bins, plot)
 }
@@ -120,11 +120,11 @@ sourceGenes <- function(counts, gene_source = c("biomaRt", "ExperimentHub"), gen
   genes
 }
 
-annoGeneDmr <- function(counts, dmrs, gene_source = c("biomart", "experimenthub", "self"), genes) { #why do I have the gene source here?? why???
-  gene_source <- match.arg(tolower(gene_source), c("biomart", "experimenthub", "self"))
+annoGeneDmr <- function(counts, dmrs, gene_source = c("txdb", "biomart", "experimenthub", "self"), genes) { #why do I have the gene source here?? why???
+  gene_source <- match.arg(tolower(gene_source), c("txdb", "biomart", "experimenthub", "self"))
   genes <- data.frame(genes)
   # ensure ensembl_id name consistency
-  colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
+  #colnames(genes)[grepl("ENSG", genes[1,])] <- "ensembl_gene_id"
   # double check only 1 ensembl id per gene entry
   genes$width <- genes$end - genes$start + 1
   genes <- genes %>% group_by(ensembl_gene_id) %>% filter(width == max(width)) %>% ungroup()
