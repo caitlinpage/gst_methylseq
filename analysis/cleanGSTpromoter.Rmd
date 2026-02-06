@@ -1,0 +1,363 @@
+---
+title: "cleanGSTpromoter"
+author: "Caitlin Page"
+date: "2026-02-05"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r}
+library(plyranges)
+library(dplyr)
+library(ggplot2)
+
+library(BiasedUrn)
+library(ggVennDiagram)
+library(org.Hs.eg.db)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(biomaRt)
+```
+
+
+
+```{r}
+wgbs_counts <- readRDS("../output/wgbs_counts.rds")
+biomart_genes <- readRDS("../output/genes_biomart.rds")
+txdb_genes <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
+dmrcate_seq_dmr <- readRDS("../output/dmrcate_seq_dmr.rds") %>% data.frame()
+dmrcate_seq_anno <- readRDS("../output/dmrcate_seq_anno.rds")
+dmrcate_seq_anno <- data.frame(dmrcate_seq_anno@ranges)
+
+immuneGO <- read.table("../data/gene_sets/GO-immune-system-process.txt", header = FALSE)
+names(immuneGO) <- "GOID"
+immuneGO <- distinct(immuneGO)
+```
+
+
+```{r}
+genes_with_pos3 <- pair_overlaps(txdb_genes %>%
+  mutate(TSS = ifelse(strand == "+", start, end),
+         actual_start = start,
+         actual_end = end,
+         start = ifelse(strand == "+", start - 10000, start),
+         end = ifelse(strand == "+", end, end + 10000),
+         actual_width = width) %>% .[,c(1:4,6:11)] %>% as_granges(), as_granges(wgbs_counts[,1:4])) %>% data.frame()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 50000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 20000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 10000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 2000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+```
+
+* oops I had been doing this plot wrongn - calculating surrounds of tss wrong
+* also overcomplicated the new start/end
+* just get tss based on strand (start or end)
+* and then +/- x amount from tss
+* actually this one was more keeping full gene length and adding space in front of tss
+* but weird then that downstream numbers lower than if cutting the gene length more - don't get that
+
+```{r}
+genes_with_pos3 <- pair_overlaps(txdb_genes %>%
+  mutate(TSS = ifelse(strand == "+", start, end),
+         actual_start = start,
+         actual_end = end,
+         start = TSS - 10000,
+         end = TSS + 10000,
+         actual_width = width) %>% .[,c(1:4,6:11)] %>% as_granges(), as_granges(wgbs_counts[,1:4])) %>% data.frame()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 50000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 20000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 10000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 2000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+```
+* it is weird though that it's like this
+* because it made sense that they would be more dense around tss
+* maybe it should be an average?
+* or more like a density of it?
+density = num_cg on read/length * 100
+length is now all the same
+so just number of cpgs on read
+* wait density upstream vs downstream??
+```{r}
+pair_overlaps(txdb_genes %>%
+  mutate(TSS = ifelse(strand == "+", start, end),
+         actual_start = start,
+         actual_end = end,
+         start = TSS - 10000,
+         end = TSS + 10000,
+         actual_width = width) %>% .[,c(1:4,6:11)] %>% as_granges(), as_granges(wgbs_counts[,1:4])) %>% data.frame() %>% 
+  mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>%
+  group_by(gene_id) %>%
+  summarise(n_cg = n(), density = n()/20001 * 100) %>%
+  ggplot(aes(x = n_cg)) +
+  geom_density()
+
+pair_overlaps(txdb_genes %>%
+  mutate(TSS = ifelse(strand == "+", start, end),
+         actual_start = start,
+         actual_end = end,
+         start = TSS - 10000,
+         end = TSS + 10000,
+         actual_width = width) %>% .[,c(1:4,6:11)] %>% as_granges(), as_granges(wgbs_counts[,1:4])) %>% data.frame() %>% 
+  mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos),
+         up_down = ifelse(dist_from_tss >= 0, "downstream", "upstream")) %>%
+  group_by(gene_id, up_down) %>%
+  summarise(n_cg = n(), density = n()/10000 * 100) %>%
+  ggplot(aes(x = n_cg, colour = up_down)) +
+  geom_density()
+```
+* yeah I think this plot tells me it
+```{r}
+genes_with_pos3 <- pair_overlaps(biomart_genes %>%
+  mutate(start = TSS - 10000,
+         end = TSS + 10000) %>% .[,c(1:8)] %>% as_granges(), as_granges(wgbs_counts[,1:4])) %>% data.frame()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 20000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 10000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+
+genes_with_pos3 %>% mutate(cpg_pos = granges.y.start, 
+                          dist_from_tss = ifelse(granges.x.strand == "+", cpg_pos - TSS, TSS - cpg_pos)) %>% 
+  filter(abs(dist_from_tss) <= 2000) %>%
+  ggplot(aes(x = dist_from_tss)) +
+  geom_bar()
+```
+
+
+
+#####
+
+# testing
+
+```{r}
+txdb_genes_mod <- find_overlaps(txdb_genes %>%
+  mutate(TSS = ifelse(strand == "+", start, end),
+         start = TSS - 2000,
+         end = TSS + 2000) %>% .[,c(1:4,6)] %>% as_granges(), 
+  as_granges(wgbs_counts[,1:4])) %>% data.frame() %>%
+  group_by(gene_id, seqnames, start, end, strand, width) %>%
+  summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(txdb_genes_mod)) %>% data.frame()
+gene_info <- txdb_genes_mod %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+```
+
+```{r}
+run_test <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$num_cg,
+  de = gene_info$is_de,
+  equiv = gene_info$num_cg
+)
+```
+
+```{r}
+gst_2ud <- run_miss_methyl_b(run_test, method = "Wallenius")
+#gst_2ud_fisher <- run_miss_methyl_b(run_test, method = "Fishers")
+gst_2ud_hyper <- run_miss_methyl_b(run_test, method = "None")
+```
+
+```{r}
+run_test <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$width,
+  de = gene_info$is_de,
+  equiv = gene_info$width
+)
+```
+
+```{r}
+gst_2ud_width <- run_miss_methyl_b(run_test, method = "Wallenius")
+#gst_2ud_width_fisher <- run_miss_methyl_b(run_test, method = "Fishers")
+gst_2ud_width_hyper <- run_miss_methyl_b(run_test, method = "None")
+```
+
+```{r}
+gst_2ud <- gst_2ud[[1]]
+gst_2ud_hyper <- gst_2ud_hyper[[1]]
+gst_2ud$rank_fdr <- 1:nrow(gst_2ud)
+gst_2ud_hyper$rank_fdr <- 1:nrow(gst_2ud_hyper)
+
+gst_2ud_width <- gst_2ud_width[[1]]
+gst_2ud_width_hyper <- gst_2ud_width_hyper[[1]]
+gst_2ud_width$rank_fdr <- 1:nrow(gst_2ud_width)
+gst_2ud_width_hyper$rank_fdr <- 1:nrow(gst_2ud_width_hyper)
+```
+
+
+
+# 1500 up, 500 down
+
+
+```{r}
+txdb_genes_mod <- find_overlaps(txdb_genes %>%
+  mutate(TSS = ifelse(strand == "+", start, end),
+         start = ifelse(strand == "+", TSS - 1500, TSS - 500),
+         end = ifelse(strand == "+", TSS + 500, TSS + 1500)) %>% .[,c(1:4,6)] %>% as_granges(), 
+  as_granges(wgbs_counts[,1:4])) %>% data.frame() %>%
+  group_by(gene_id, seqnames, start, end, strand, width) %>%
+  summarise(num_cg = n()) %>% ungroup() %>% data.frame()
+gene_try <- find_overlaps(as_granges(mutate(dmrcate_seq_dmr, id = 1:nrow(dmrcate_seq_dmr))), as_granges(txdb_genes_mod)) %>% data.frame()
+gene_info <- txdb_genes_mod %>% mutate(is_de = ifelse(gene_id %in% gene_try$gene_id, 1, 0)) %>% distinct(gene_id, num_cg, is_de, width)
+
+run_test <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$num_cg,
+  de = gene_info$is_de,
+  equiv = gene_info$num_cg
+)
+
+gst_15u5d <- run_miss_methyl_b(run_test, method = "Wallenius")
+#gst_2ud_fisher <- run_miss_methyl_b(run_test, method = "Fishers")
+gst_15u5d_hyper <- run_miss_methyl_b(run_test, method = "None")
+
+# width as bias
+run_test <- list(
+  sig.eg = gene_info %>% filter(is_de == 1) %>% .$gene_id,
+  universe = gene_info$gene_id,
+  freq = gene_info$width,
+  de = gene_info$is_de,
+  equiv = gene_info$width
+)
+
+gst_15u5d_width <- run_miss_methyl_b(run_test, method = "Wallenius")
+#gst_2ud_width_fisher <- run_miss_methyl_b(run_test, method = "Fishers")
+gst_15u5d_width_hyper <- run_miss_methyl_b(run_test, method = "None")
+
+# formatting
+gst_15u5d <- gst_15u5d[[1]]
+gst_15u5d_hyper <- gst_15u5d_hyper[[1]]
+gst_15u5d$rank_fdr <- 1:nrow(gst_15u5d)
+gst_15u5d_hyper$rank_fdr <- 1:nrow(gst_15u5d_hyper)
+
+gst_15u5d_width <- gst_15u5d_width[[1]]
+gst_15u5d_width_hyper <- gst_15u5d_width_hyper[[1]]
+gst_15u5d_width$rank_fdr <- 1:nrow(gst_15u5d_width)
+gst_15u5d_width_hyper$rank_fdr <- 1:nrow(gst_15u5d_width_hyper)
+```
+```{r}
+upset_input <- list(TSS2k_GOMethSeq = gst_2ud %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS2k_Biased = gst_2ud_hyper %>% filter(FDR < 0.05) %>% .$GOID,)
+upset(fromList(upset_input), order.by = "freq", text.scale = 2)
+```
+
+
+
+
+```{r}
+upset_input <- list(GOMethSeq = gst_1k %>% filter(FDR < 0.05) %>% .$GOID,
+                    Biased = gst_1k_hyper %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS5k_GOMethSeq = gst_5ud %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS5k_Biased = gst_5ud_hyper %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS5k_width_GOMethSeq = gst_5ud_width %>% filter(FDR < 0.05) %>% .$GOID,
+                    TSS5k_width_Biased = gst_5ud_width_hyper %>% filter(FDR < 0.05) %>% .$GOID)
+upset(fromList(upset_input), order.by = "freq", text.scale = 2)
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_1k[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_1k_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS2k_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_2ud_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS2k_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_5ud[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_5ud_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_5ud_width[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_width_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_5ud_width_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_with_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+```{r}
+truth_gst_100 <- rbind(
+  gst_5ud[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_5ud_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_5ud_width[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_width_GOMethSeq") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")],
+  gst_5ud_width_hyper[1:100,] %>% mutate(in_imm = cumsum(GOID %in% immuneGO$GOID), method = "TSS5k_width_Biased") %>% .[names(.) %in% c("rank_fdr", "in_imm", "method")])
+
+truth_gst_100 %>%
+  ggplot(aes(x = rank_fdr, y = in_imm, colour = method)) +
+  geom_line() +
+  labs(x = "Rank", y = "Cumulative no. in immune sets") +
+  theme_bw()
+```
+
+
+
+
